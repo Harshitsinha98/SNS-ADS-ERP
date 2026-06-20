@@ -7,27 +7,24 @@ import { CheckCircle, Phone, PhoneOff, MessageCircle } from "lucide-react";
 import { fmtDuration, toWaNumber } from "../../utils/helpers";
 import Timeline from "../../components/Timeline";
 
-const PRIORITIES = ["Low", "Medium", "High", "Urgent"];
+const PRIORITIES = ["Hot", "Warm", "Cold"];
 
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth(); // role: 'admin' | 'employee'
-  
-  // DataContext se saare necessary functions le lo
-  const { 
-    leads, users, settings, 
-    updateLeadStatus, addWorknote, updateFollowUpDate, 
+
+  const {
+    leads, users, settings,
+    updateLeadStatus, addWorknote, updateFollowUpDate,
     reassignLead, updateLeadRevenue, updatePriority, addNote
   } = useData();
-  
+
   const lead = leads.find((l) => l.id === id);
   const [noteText, setNoteText] = useState("");
-  // By default, admin notes are private. Employees don't see this toggle.
-  const [isPrivate, setIsPrivate] = useState(user?.role === 'admin'); 
+  const [isPrivate, setIsPrivate] = useState(user?.role === 'admin');
   const [revenueInput, setRevenueInput] = useState("");
-  
-  // Call Tracking States
+
   const [callActive, setCallActive] = useState(false);
   const [callStart, setCallStart] = useState(null);
   const [elapsed, setElapsed] = useState(0);
@@ -45,8 +42,6 @@ export default function LeadDetail() {
   const employees = users.filter((u) => u.role === "employee");
   const isOverdue = lead.followUp && new Date(lead.followUp) < new Date() && !["Closed-Won", "Lost"].includes(lead.status);
 
-  // --- Actions ---
-
   const handleAddWorknote = () => {
     if (!noteText.trim()) return;
     const visibility = (user.role === 'admin' && isPrivate) ? 'admin_only' : 'team';
@@ -55,11 +50,11 @@ export default function LeadDetail() {
   };
 
   const handleRevenueSave = () => {
-      if(revenueInput && !isNaN(revenueInput)){
-          updateLeadRevenue(lead.id, revenueInput, user);
-          alert("Revenue saved securely.");
-          setRevenueInput("");
-      }
+    if (revenueInput && !isNaN(revenueInput)) {
+      updateLeadRevenue(lead.id, revenueInput, user);
+      alert("Revenue saved securely.");
+      setRevenueInput("");
+    }
   };
 
   const startCall = () => {
@@ -77,10 +72,10 @@ export default function LeadDetail() {
 
   const saveCallLog = () => {
     const visibility = (user.role === 'admin' && isPrivate) ? 'admin_only' : 'team';
-    addNote(lead.id, noteText || "Call completed — no notes added.", "call", { 
-        duration: pendingDuration, 
-        by: user.name, 
-        visibility 
+    addNote(lead.id, noteText || "Call completed — no notes added.", "call", {
+      duration: pendingDuration,
+      by: user.name,
+      visibility
     });
     setShowWorknoteModal(false);
     setNoteText("");
@@ -92,25 +87,23 @@ export default function LeadDetail() {
     window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
   };
 
-  // 🛡️ Security Check: Filter timeline based on role
   const visibleTimeline = (lead.notes || []).filter(note => {
-      if (user.role === 'admin') return true; 
-      const vis = note.visibility || note.metadata?.visibility;
-      return vis !== 'admin_only'; 
+    if (user.role === 'admin') return true;
+    const vis = note.visibility || note.metadata?.visibility;
+    return vis !== 'admin_only';
   });
 
   return (
     <Layout title={`Lead Record: ${lead.name}`}>
       <button onClick={() => navigate(-1)} className="text-sm text-gray-500 mb-4 hover:underline">← Back</button>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* LEFT COLUMN: Controls & Details */}
+
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white rounded-xl shadow border p-5">
             <h2 className="text-lg font-bold">{lead.name}</h2>
             <p className="text-sm text-gray-500 font-mono mt-1">{lead.phone} • {lead.source}</p>
-            
+
             <div className="mt-4 space-y-4">
               <div>
                 <label className="text-xs font-semibold text-gray-500">Current Status</label>
@@ -119,10 +112,9 @@ export default function LeadDetail() {
                 </select>
               </div>
 
-              {/* 🔥 PRIORITY ADDED HERE */}
               <div>
                 <label className="text-xs font-semibold text-gray-500">Priority</label>
-                <select value={lead.priority || "Medium"} onChange={(e) => updatePriority(lead.id, e.target.value)} className="w-full border rounded p-2 mt-1 bg-gray-50">
+                <select value={lead.priority || "Warm"} onChange={(e) => updatePriority(lead.id, e.target.value, user)} className="w-full border rounded p-2 mt-1 bg-gray-50">
                   {PRIORITIES.map(p => <option key={p}>{p}</option>)}
                 </select>
               </div>
@@ -146,7 +138,6 @@ export default function LeadDetail() {
               )}
             </div>
 
-            {/* CALL ACTION BUTTONS */}
             <div className="mt-6 space-y-2">
               {!callActive ? (
                 <button onClick={startCall} className="w-full flex items-center justify-center gap-2 bg-green-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-green-700 transition">
@@ -161,37 +152,35 @@ export default function LeadDetail() {
                 <MessageCircle size={15} /> WhatsApp
               </button>
             </div>
-            
-            {/* 💰 Revenue Entry (Admin Only) */}
-             {user.role === 'admin' && lead.status === "Closed-Won" && (
-                <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <label className="text-xs font-semibold text-green-700 flex items-center gap-1"><CheckCircle size={14}/> Deal Revenue (₹)</label>
-                    <div className="flex gap-2 mt-2">
-                    <input type="number" value={revenueInput} onChange={(e) => setRevenueInput(e.target.value)} className="w-full border border-green-300 rounded p-2" placeholder="e.g. 50000" />
-                    <button onClick={handleRevenueSave} className="bg-green-600 text-white px-4 rounded hover:bg-green-700 font-medium">Save</button>
-                    </div>
-                    <p className="text-[10px] text-green-600 mt-1">Stored securely. Employees cannot see this.</p>
+
+            {/* 💰 Revenue Entry — Admin only, abhi kabhi bhi add/update kar sakta hai, status pe gated nahi hai */}
+            {user.role === 'admin' && (
+              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <label className="text-xs font-semibold text-green-700 flex items-center gap-1"><CheckCircle size={14} /> Deal Revenue (₹)</label>
+                <div className="flex gap-2 mt-2">
+                  <input type="number" value={revenueInput} onChange={(e) => setRevenueInput(e.target.value)} className="w-full border border-green-300 rounded p-2" placeholder={lead.value ? `Current: ₹${lead.value}` : "e.g. 50000"} />
+                  <button onClick={handleRevenueSave} className="bg-green-600 text-white px-4 rounded hover:bg-green-700 font-medium">Save</button>
                 </div>
+                <p className="text-[10px] text-green-600 mt-1">Stored securely. Employees cannot see this.</p>
+              </div>
             )}
           </div>
 
           <div className="bg-white rounded-xl shadow border p-5">
-             <h3 className="font-semibold mb-3">Add Worknote</h3>
-             <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows="3" className="w-full border rounded p-3 text-sm" placeholder="Client ne kya kaha? Next steps?"></textarea>
-             
-             {/* 👁️ Visibility Toggle for Admin */}
-             {user.role === 'admin' && (
-                <div className="flex items-center gap-2 mt-3 mb-1">
-                    <input type="checkbox" id="privateNote" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="cursor-pointer" />
-                    <label htmlFor="privateNote" className="text-xs font-medium text-gray-600 cursor-pointer">Keep this note private (Admin Only)</label>
-                </div>
-             )}
+            <h3 className="font-semibold mb-3">Add Worknote</h3>
+            <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows="3" className="w-full border rounded p-3 text-sm" placeholder="Client ne kya kaha? Next steps?"></textarea>
 
-             <button onClick={handleAddWorknote} className="w-full bg-blue-600 text-white rounded p-2 mt-3 hover:bg-blue-700 font-medium transition-colors">Save Worknote</button>
+            {user.role === 'admin' && (
+              <div className="flex items-center gap-2 mt-3 mb-1">
+                <input type="checkbox" id="privateNote" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="cursor-pointer" />
+                <label htmlFor="privateNote" className="text-xs font-medium text-gray-600 cursor-pointer">Keep this note private (Admin Only)</label>
+              </div>
+            )}
+
+            <button onClick={handleAddWorknote} className="w-full bg-blue-600 text-white rounded p-2 mt-3 hover:bg-blue-700 font-medium transition-colors">Save Worknote</button>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: ServiceNow Activity Timeline */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl shadow border p-6 h-[80vh] flex flex-col">
             <h3 className="font-semibold text-lg mb-6 border-b pb-2">Activity Stream</h3>
@@ -200,30 +189,29 @@ export default function LeadDetail() {
             </div>
           </div>
         </div>
-        
+
       </div>
 
-      {/* CALL LOG MODAL */}
       {showWorknoteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-sm">
             <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Call ended</p>
             <p className="text-sm text-gray-600 mb-4">Duration: <span className="font-mono font-semibold text-green-600">{fmtDuration(pendingDuration)}</span></p>
-            
+
             <textarea className="w-full border rounded-md p-2 text-sm mb-3" rows="4"
               placeholder="What happened on this call?" value={noteText} onChange={(e) => setNoteText(e.target.value)} autoFocus />
-            
+
             {user.role === 'admin' && (
-                <div className="flex items-center gap-2 mb-3">
-                    <input type="checkbox" id="privateCallNote" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
-                    <label htmlFor="privateCallNote" className="text-xs font-medium text-gray-600">Keep this note private</label>
-                </div>
-             )}
+              <div className="flex items-center gap-2 mb-3">
+                <input type="checkbox" id="privateCallNote" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+                <label htmlFor="privateCallNote" className="text-xs font-medium text-gray-600">Keep this note private</label>
+              </div>
+            )}
 
             <button onClick={saveCallLog} className="w-full bg-blue-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-blue-700">Save call log</button>
           </div>
         </div>
       )}
-    </Layout>  
+    </Layout>
   );
 }
