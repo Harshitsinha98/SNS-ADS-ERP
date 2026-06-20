@@ -43,9 +43,19 @@ export default function LeadHub() {
   // handleSync function replace karo:
 const handleSync = async () => {
   setSyncing(true);
-  const result = await triggerWhatsAppSync();
-  setSyncing(false);
-  alert(result.imported > 0 ? `${result.imported} new WhatsApp lead(s) imported.` : "No new WhatsApp leads right now.");
+  try {
+    const result = await triggerWhatsAppSync();
+    alert(
+      result.imported > 0
+        ? `${result.imported} new WhatsApp lead(s) imported.`
+        : "Koi naya pending lead nahi mila. Naye leads webhook se real-time aate hain — ye button sirf pehle se atki hui leads ko retry karta hai."
+    );
+  } catch (e) {
+    console.error("Sync error:", e);
+    alert("Sync failed — backend se connect nahi ho paaya. Render logs check karo, service down ho sakti hai.");
+  } finally {
+    setSyncing(false);
+  }
 };
 
   return (
