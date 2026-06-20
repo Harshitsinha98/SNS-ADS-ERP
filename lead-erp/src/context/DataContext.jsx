@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import {
-  collection, doc, onSnapshot, addDoc, updateDoc, setDoc,
-  query, orderBy, limit, arrayUnion, writeBatch // NAYA: writeBatch import kiya
+  collection, collectionGroup, doc, onSnapshot, addDoc, updateDoc, setDoc,
+  query, orderBy, limit, writeBatch
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
@@ -16,50 +16,65 @@ const DEFAULT_SETTINGS = {
 
 export function DataProvider({ children }) {
   const { user } = useAuth();
-  
-  // States
+
   const [leads, setLeads] = useState([]);
   const [users, setUsers] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [notifications, setNotifications] = useState([]);
   const [activity, setActivity] = useState([]);
   const [goals, setGoals] = useState({});
+  const [financials, setFinancials] = useState({}); // { [leadId]: { revenue, ... } } — sirf admin ke liye
 
   // ==========================================
   // 1. FIREBASE REALTIME LISTENERS
   // ==========================================
   useEffect(() => {
-    // Login hone se pehle listener mat lagao — warna permission-denied aayega
     if (!user) {
-      setLeads([]); setUsers([]); setNotifications([]); setActivity([]); setGoals({});
+      setLeads([]); setUsers([]); setNotifications([]); setActivity([]); setGoals({}); setFinancials({});
       return;
     }
 
     const unsubLeads = onSnapshot(collection(db, "leads"), (snap) =>
       setLeads(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
-    
+
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) =>
       setUsers(snap.docs.map((d) => ({ id: d.id, phone: d.id.replace("+91", ""), ...d.data() })))
     );
-    
+
     const unsubSettings = onSnapshot(doc(db, "settings", "config"), (d) => {
       if (d.exists()) setSettings(d.data());
     });
-    
+
     const unsubNotifs = onSnapshot(collection(db, "notifications"), (snap) =>
       setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
-    
+
     const unsubActivity = onSnapshot(query(collection(db, "activity"), orderBy("at", "desc"), limit(100)), (snap) =>
       setActivity(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
-    
+
     const unsubGoals = onSnapshot(doc(db, "goals", "config"), (d) => {
       if (d.exists()) setGoals(d.data());
     });
 
-    return () => { unsubLeads(); unsubUsers(); unsubSettings(); unsubNotifs(); unsubActivity(); unsubGoals(); };
+    // Revenue aggregate — sirf admin role ke liye collectionGroup query lagti hai.
+    // Employee ke liye listener register hi nahi hota (rules bhi block karengi agar koi force kare).
+    let unsubFinancials = () => {};
+    if (user.role === "admin") {
+      unsubFinancials = onSnapshot(collectionGroup(db, "private"), (snap) => {
+        const map = {};
+        snap.docs.forEach((d) => {
+          const leadId = d.ref.parent.parent.id; // leads/{leadId}/private/data → leadId nikalna
+          map[leadId] = d.data();
+        });
+        setFinancials(map);
+      }, (err) => console.error("Financials listener error:", err));
+    } else {
+      setFinancials({});
+    }
+
+    return () => { unsubLeads(); unsubUsers(); unsubSettings(); unsubNotifs(); unsubActivity(); unsubGoals(); unsubFinancials(); };
   }, [user]);
 
 
@@ -76,40 +91,109 @@ export function DataProvider({ children }) {
   // ==========================================
   // 3. LEAD OPERATIONS
   // ==========================================
-  const addNote = async (id, text, type = "note", extra = {}) => {
+  const writeNote = async (leadId, noteData) => {
     try {
-      await updateDoc(doc(db, "leads", id), {
-        notes: arrayUnion({ type, text, at: new Date().toISOString(), ...extra }),
-        lastUpdated: new Date().toISOString(),
+      await addDoc(collection(db, "leads", leadId, "notes"), {
+        ...noteData,
+        at: new Date().toISOString(),
       });
-    } catch (e) { console.error("Error adding note:", e); }
+    } catch (e) { console.error("Error writing note:", e); }
   };
 
-  const updateLead = async (id, patch) => {
+  const addNote = async (id, text, type = "note", extra = {}) => {
+    await writeNote(id, {
+      type, text,
+      visibility: extra.visibility || "team",
+      authorId: extra.authorId || null,
+      authorName: extra.authorName || extra.by || "System",
+      authorRole: extra.authorRole || null,
+      ...extra,
+    });
+    const patch = { lastUpdated: new Date().toISOString() };
+    if (type === "call" || type === "worknote") {
+      patch.lastContactedAt = new Date().toISOString();
+    }
+    try { await updateDoc(doc(db, "leads", id), patch); } catch (e) { console.error(e); }
+  };
+
+  const addWorknote = (id, text, user, extra = {}) => {
+    const visibility = user?.role === "admin" ? (extra.visibility || "admin_only") : "team";
+    addNote(id, text, "worknote", {
+      authorId: user?.id || user?.uid || null,
+      authorName: user?.name || "Unknown",
+      authorRole: user?.role || "employee",
+      visibility,
+    });
+    logActivity(`Worknote added on lead ${id} by ${user?.name || "Unknown"}`);
+  };
+
+  const updateLead = async (id, patch, user) => {
     try {
-      const payload = { ...patch, lastUpdated: new Date().toISOString() };
-      
+      await updateDoc(doc(db, "leads", id), { ...patch, lastUpdated: new Date().toISOString() });
       if (patch.status) {
-        payload.notes = arrayUnion({ 
-          type: "status", 
-          text: `Status changed to "${patch.status}"`, 
-          at: new Date().toISOString() 
+        await writeNote(id, {
+          type: "status",
+          text: `Status changed to "${patch.status}"${user?.name ? ` by ${user.name}` : ""}`,
+          visibility: "team",
+          authorName: user?.name || "System",
         });
         logActivity(`Lead ${id} status changed to "${patch.status}"`);
       }
-      await updateDoc(doc(db, "leads", id), payload);
     } catch (e) { console.error("Error updating lead:", e); }
   };
 
-  const reassignLead = (id, employeeId) => {
-    updateLead(id, { assignedTo: employeeId });
-    pushNotif(employeeId, `New lead assigned to you (${id})`);
-    logActivity(`Lead ${id} reassigned to ${employeeId}`);
+  const updateLeadStatus = (id, status, user) => updateLead(id, { status }, user);
+
+  const updatePriority = async (id, priority, user) => {
+    try {
+      await updateDoc(doc(db, "leads", id), { priority, lastUpdated: new Date().toISOString() });
+      await writeNote(id, {
+        type: "system",
+        text: `Priority changed to "${priority}"${user?.name ? ` by ${user.name}` : ""}`,
+        visibility: "team",
+        authorName: user?.name || "System",
+      });
+    } catch (e) { console.error("Error updating priority:", e); }
   };
 
-  const blacklistLead = (id) => { 
-    updateLead(id, { blacklisted: true, status: "Lost" }); 
-    logActivity(`Lead ${id} blacklisted`); 
+  const updateFollowUpDate = async (id, date, user) => {
+    try {
+      await updateDoc(doc(db, "leads", id), { followUp: date, lastUpdated: new Date().toISOString() });
+      await writeNote(id, {
+        type: "system",
+        text: `Follow-up date updated${user?.name ? ` by ${user.name}` : ""}`,
+        visibility: "team",
+        authorName: user?.name || "System",
+      });
+    } catch (e) { console.error("Error updating follow-up date:", e); }
+  };
+
+  const updateLeadRevenue = async (id, revenue, user) => {
+    try {
+      await setDoc(doc(db, "leads", id, "private", "data"), {
+        revenue: Number(revenue) || 0,
+        revenueUpdatedBy: user?.name || "Unknown",
+        revenueUpdatedAt: new Date().toISOString(),
+      }, { merge: true });
+      logActivity(`Revenue updated on lead ${id} → ₹${revenue} by ${user?.name || "Unknown"}`);
+    } catch (e) { console.error("Error updating revenue:", e); }
+  };
+
+  const reassignLead = async (id, employeeId, employeeName, user) => {
+    await updateLead(id, { assignedTo: employeeId, assignedToName: employeeName || null });
+    await writeNote(id, {
+      type: "assignment",
+      text: `Reassigned to ${employeeName || employeeId}${user?.name ? ` by ${user.name}` : ""}`,
+      visibility: "team",
+      authorName: user?.name || "System",
+    });
+    pushNotif(employeeId, `New lead assigned to you (${id})`);
+    logActivity(`Lead ${id} reassigned to ${employeeName || employeeId}`);
+  };
+
+  const blacklistLead = (id) => {
+    updateLead(id, { blacklisted: true, status: "Lost" });
+    logActivity(`Lead ${id} blacklisted`);
   };
 
 
@@ -124,11 +208,10 @@ export function DataProvider({ children }) {
         return 0;
       }
 
-      const batch = writeBatch(db); // 🔥 BATCH WRITER: Super fast upload
+      const batch = writeBatch(db);
       let rr = 0;
       let count = 0;
-      
-      // Workload optimization (Loop ke bahar ek baar calculate karo)
+
       const currentWorkloads = {};
       if (assigner === "workload") {
         emps.forEach(e => {
@@ -138,41 +221,35 @@ export function DataProvider({ children }) {
 
       for (const r of rows) {
         let assignedTo;
-        
         if (assigner === "workload") {
-          // Find employee with minimum leads locally
           assignedTo = Object.keys(currentWorkloads).reduce((a, b) => currentWorkloads[a] < currentWorkloads[b] ? a : b);
-          currentWorkloads[assignedTo]++; // Naya lead milne par count badha do
+          currentWorkloads[assignedTo]++;
         } else {
           assignedTo = emps[(rr++) % emps.length]?.id;
         }
 
-        const newLeadRef = doc(collection(db, "leads")); // Naya document reference
+        const newLeadRef = doc(collection(db, "leads"));
         batch.set(newLeadRef, {
           name: r.name || r.Name || "Unknown",
           phone: r.phone || r.Phone || "",
           email: r.email || r.Email || "",
           source: r.source || r.Source || "Import",
           requirement: r.requirement || r.Requirement || "",
-          status: "New", 
-          assignedTo, 
-          blacklisted: false, 
-          value: 0, 
+          status: "New",
+          assignedTo,
+          blacklisted: false,
           priority: "Warm",
-          createdAt: new Date().toISOString(), 
+          createdAt: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
-          followUp: null, 
-          notes: [],
+          followUp: null,
+          lastContactedAt: null,
         });
         count++;
 
-        // Firebase 1 batch mein max 500 allow karta hai. 
-        if (count % 450 === 0) {
-          await batch.commit(); // Pehle 450 upload karo
-        }
+        if (count % 450 === 0) await batch.commit();
       }
-      
-      await batch.commit(); // Baaki bache hue upload karo
+
+      await batch.commit();
       return count;
     } catch (e) {
       console.error("Bulk Import Error:", e);
@@ -189,12 +266,12 @@ export function DataProvider({ children }) {
       await setDoc(doc(db, "users", "+91" + u.phone), { name: u.name, role: u.role, active: true });
     } catch (e) { console.error("Add user error:", e); }
   };
-  
+
   const updateUser = async (id, patch) => {
-    try { await updateDoc(doc(db, "users", id), patch); } 
+    try { await updateDoc(doc(db, "users", id), patch); }
     catch (e) { console.error("Update user error:", e); }
   };
-  
+
   const deactivateUser = (id) => updateUser(id, { active: false });
 
 
@@ -211,11 +288,8 @@ export function DataProvider({ children }) {
     try {
       const mine = notifications.filter((n) => n.userId === userId && !n.read);
       if (mine.length === 0) return;
-
-      const batch = writeBatch(db); // 🔥 BATCH WRITER: Ek sath sab mark read honge
-      mine.forEach((n) => {
-        batch.update(doc(db, "notifications", n.id), { read: true });
-      });
+      const batch = writeBatch(db);
+      mine.forEach((n) => batch.update(doc(db, "notifications", n.id), { read: true }));
       await batch.commit();
     } catch (e) { console.error("Mark read error:", e); }
   };
@@ -246,8 +320,10 @@ export function DataProvider({ children }) {
 
   return (
     <DataContext.Provider value={{
-      leads, users, settings, notifications, activity, goals,
-      setSettings: setSettingsValue, updateLead, addNote, reassignLead, blacklistLead,
+      leads, users, settings, notifications, activity, goals, financials,
+      setSettings: setSettingsValue, updateLead, addNote, addWorknote,
+      updateLeadStatus, updatePriority, updateFollowUpDate, updateLeadRevenue,
+      reassignLead, blacklistLead,
       addBulkLeads, addUser, updateUser, deactivateUser, pushNotif, markRead, logActivity, setMyGoal,
       triggerWhatsAppSync,
     }}>

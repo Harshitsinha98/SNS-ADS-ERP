@@ -1,5 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { collection, doc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db } from "../../firebase";
 import Layout from "../../components/Layout";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
@@ -12,7 +14,7 @@ const PRIORITIES = ["Hot", "Warm", "Cold"];
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth(); // role: 'admin' | 'employee'
+  const { user } = useAuth();
 
   const {
     leads, users, settings,
@@ -21,6 +23,8 @@ export default function LeadDetail() {
   } = useData();
 
   const lead = leads.find((l) => l.id === id);
+  const [notes, setNotes] = useState([]);
+  const [financial, setFinancial] = useState(null);
   const [noteText, setNoteText] = useState("");
   const [isPrivate, setIsPrivate] = useState(user?.role === 'admin');
   const [revenueInput, setRevenueInput] = useState("");
@@ -30,6 +34,26 @@ export default function LeadDetail() {
   const [elapsed, setElapsed] = useState(0);
   const [showWorknoteModal, setShowWorknoteModal] = useState(false);
   const [pendingDuration, setPendingDuration] = useState(0);
+
+  // Notes ab subcollection se live aate hain. Employee ke liye Firestore Rules
+  // khud admin_only documents ko snapshot se hata degi — client filter ki zaroorat nahi.
+  useEffect(() => {
+    if (!id) return;
+    const q = query(collection(db, "leads", id, "notes"), orderBy("at", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, (err) => console.error("Notes listener error:", err));
+    return unsub;
+  }, [id]);
+
+  // Financial sirf admin ke liye subscribe hota hai — employee ke liye request hi nahi jaati
+  useEffect(() => {
+    if (!id || user?.role !== 'admin') { setFinancial(null); return; }
+    const unsub = onSnapshot(doc(db, "leads", id, "private", "data"), (snap) => {
+      setFinancial(snap.exists() ? snap.data() : null);
+    }, (err) => console.error("Financial listener error:", err));
+    return unsub;
+  }, [id, user?.role]);
 
   useEffect(() => {
     if (!callActive) return;
@@ -74,7 +98,9 @@ export default function LeadDetail() {
     const visibility = (user.role === 'admin' && isPrivate) ? 'admin_only' : 'team';
     addNote(lead.id, noteText || "Call completed — no notes added.", "call", {
       duration: pendingDuration,
-      by: user.name,
+      authorName: user.name,
+      authorId: user.id || user.uid,
+      authorRole: user.role,
       visibility
     });
     setShowWorknoteModal(false);
@@ -83,15 +109,9 @@ export default function LeadDetail() {
   };
 
   const quickWhatsApp = () => {
-    addNote(lead.id, "Opened WhatsApp chat from lead page", "whatsapp");
+    addNote(lead.id, "Opened WhatsApp chat from lead page", "whatsapp", { authorName: user.name, visibility: "team" });
     window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
   };
-
-  const visibleTimeline = (lead.notes || []).filter(note => {
-    if (user.role === 'admin') return true;
-    const vis = note.visibility || note.metadata?.visibility;
-    return vis !== 'admin_only';
-  });
 
   return (
     <Layout title={`Lead Record: ${lead.name}`}>
@@ -153,15 +173,14 @@ export default function LeadDetail() {
               </button>
             </div>
 
-            {/* 💰 Revenue Entry — Admin only, abhi kabhi bhi add/update kar sakta hai, status pe gated nahi hai */}
             {user.role === 'admin' && (
               <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                 <label className="text-xs font-semibold text-green-700 flex items-center gap-1"><CheckCircle size={14} /> Deal Revenue (₹)</label>
                 <div className="flex gap-2 mt-2">
-                  <input type="number" value={revenueInput} onChange={(e) => setRevenueInput(e.target.value)} className="w-full border border-green-300 rounded p-2" placeholder={lead.value ? `Current: ₹${lead.value}` : "e.g. 50000"} />
+                  <input type="number" value={revenueInput} onChange={(e) => setRevenueInput(e.target.value)} className="w-full border border-green-300 rounded p-2" placeholder={financial?.revenue ? `Current: ₹${financial.revenue}` : "e.g. 50000"} />
                   <button onClick={handleRevenueSave} className="bg-green-600 text-white px-4 rounded hover:bg-green-700 font-medium">Save</button>
                 </div>
-                <p className="text-[10px] text-green-600 mt-1">Stored securely. Employees cannot see this.</p>
+                <p className="text-[10px] text-green-600 mt-1">Separate admin-only record. Employees have zero DB-level access.</p>
               </div>
             )}
           </div>
@@ -185,7 +204,7 @@ export default function LeadDetail() {
           <div className="bg-white rounded-xl shadow border p-6 h-[80vh] flex flex-col">
             <h3 className="font-semibold text-lg mb-6 border-b pb-2">Activity Stream</h3>
             <div className="flex-1 overflow-y-auto">
-              <Timeline entries={visibleTimeline} />
+              <Timeline entries={notes} />
             </div>
           </div>
         </div>

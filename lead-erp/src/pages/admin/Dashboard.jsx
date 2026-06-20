@@ -3,11 +3,11 @@ import StatCard from "../../components/StatCard";
 import StatusPie from "../../components/charts/PieChart";
 import ConvBar from "../../components/charts/BarChart";
 import { useData } from "../../context/DataContext";
-import { daysSince, fmtMoney, pipelineValue, sourceStats, fmtDate } from "../../utils/helpers";
+import { daysSince, fmtMoney, fmtDate } from "../../utils/helpers";
 import { IndianRupee, Layers, TrendingUp, Flame, AlertTriangle } from "lucide-react";
 
 export default function Dashboard() {
-  const { leads, users, activity } = useData();
+  const { leads, users, activity, financials } = useData();
   const active = leads.filter((l) => !l.blacklisted);
 
   const total = active.length;
@@ -16,7 +16,17 @@ export default function Dashboard() {
   const activeLeads = total - converted - lost;
   const convRate = total ? ((converted / total) * 100).toFixed(1) : 0;
 
-  const { wonValue, openValue } = pipelineValue(leads);
+  // Revenue ab leads/{id}/private/data se aata hai — lead.value field se nahi
+  const revenueOf = (lead) => financials[lead.id]?.revenue || 0;
+
+  const wonValue = active
+    .filter((l) => l.status === "Closed-Won")
+    .reduce((sum, l) => sum + revenueOf(l), 0);
+
+  const openValue = active
+    .filter((l) => !["Closed-Won", "Lost"].includes(l.status))
+    .reduce((sum, l) => sum + revenueOf(l), 0);
+
   const slaBreaches = active.filter(
     (l) => !["Closed-Won", "Lost"].includes(l.status) && daysSince(l.lastUpdated) >= 3
   );
@@ -28,7 +38,21 @@ export default function Dashboard() {
   const leaderboard = users.filter((u) => u.role === "employee").map((u) => ({
     name: u.name, value: active.filter((l) => l.assignedTo === u.id && l.status === "Closed-Won").length,
   }));
-  const sources = sourceStats(leads);
+
+  const sourceMap = {};
+  active.forEach((l) => {
+    const src = l.source || "Unknown";
+    if (!sourceMap[src]) sourceMap[src] = { source: src, total: 0, won: 0, revenue: 0 };
+    sourceMap[src].total++;
+    if (l.status === "Closed-Won") {
+      sourceMap[src].won++;
+      sourceMap[src].revenue += revenueOf(l);
+    }
+  });
+  const sources = Object.values(sourceMap).map((s) => ({
+    ...s,
+    rate: s.total ? ((s.won / s.total) * 100).toFixed(1) : 0,
+  }));
 
   return (
     <Layout title="Business Command Center">

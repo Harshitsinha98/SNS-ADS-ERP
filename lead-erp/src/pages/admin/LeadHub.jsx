@@ -2,12 +2,25 @@ import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Layout from "../../components/Layout";
 import { useData } from "../../context/DataContext";
+import { useAuth } from "../../context/AuthContext";
 import { parseCSV, toCSV, fmtDate } from "../../utils/helpers";
-import { StatusLamp, PriorityBadge } from "../../components/StatusLamp";
+import { StatusLamp } from "../../components/StatusLamp";
 import { Upload, Download, RefreshCw } from "lucide-react";
 
+const PRIORITIES = ["Hot", "Warm", "Cold"];
+
+const priorityClass = (p) => {
+  switch (p) {
+    case "Hot": return "bg-red-50 text-red-700 border-red-200";
+    case "Warm": return "bg-amber-50 text-amber-700 border-amber-200";
+    case "Cold": return "bg-blue-50 text-blue-700 border-blue-200";
+    default: return "border-paper-line";
+  }
+};
+
 export default function LeadHub() {
-  const { leads, users, settings, reassignLead, blacklistLead, addBulkLeads, triggerWhatsAppSync } = useData();
+  const { user } = useAuth();
+  const { leads, users, settings, reassignLead, blacklistLead, addBulkLeads, triggerWhatsAppSync, updatePriority } = useData();
   const [sortBy, setSortBy] = useState("createdAt");
   const [filterStatus, setFilterStatus] = useState("All");
   const [syncing, setSyncing] = useState(false);
@@ -40,23 +53,22 @@ export default function LeadHub() {
     URL.revokeObjectURL(url);
   };
 
-  // handleSync function replace karo:
-const handleSync = async () => {
-  setSyncing(true);
-  try {
-    const result = await triggerWhatsAppSync();
-    alert(
-      result.imported > 0
-        ? `${result.imported} new WhatsApp lead(s) imported.`
-        : "Koi naya pending lead nahi mila. Naye leads webhook se real-time aate hain — ye button sirf pehle se atki hui leads ko retry karta hai."
-    );
-  } catch (e) {
-    console.error("Sync error:", e);
-    alert("Sync failed — backend se connect nahi ho paaya. Render logs check karo, service down ho sakti hai.");
-  } finally {
-    setSyncing(false);
-  }
-};
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const result = await triggerWhatsAppSync();
+      alert(
+        result.imported > 0
+          ? `${result.imported} new WhatsApp lead(s) imported.`
+          : "Koi naya pending lead nahi mila. Naye leads webhook se real-time aate hain — ye button sirf pehle se atki hui leads ko retry karta hai."
+      );
+    } catch (e) {
+      console.error("Sync error:", e);
+      alert("Sync failed — backend se connect nahi ho paaya. Render logs check karo, service down ho sakti hai.");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <Layout title="Centralized Lead Hub">
@@ -97,7 +109,15 @@ const handleSync = async () => {
                 <td className="p-3 num text-ink/50">{l.id}</td>
                 <td><Link to={`/admin/leads/${l.id}`} className="font-medium hover:underline">{l.name}</Link></td>
                 <td>{l.source}</td>
-                <td><PriorityBadge p={l.priority} /></td>
+                <td>
+                  <select
+                    value={l.priority || "Warm"}
+                    onChange={(e) => updatePriority(l.id, e.target.value, user)}
+                    className={`border rounded p-1 text-xs font-medium ${priorityClass(l.priority)}`}
+                  >
+                    {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+                  </select>
+                </td>
                 <td><StatusLamp status={l.status} /></td>
                 <td>
                   <select value={l.assignedTo || ""} onChange={(e) => reassignLead(l.id, e.target.value)}
