@@ -1,31 +1,54 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Layout from "../../components/Layout";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
-import { CheckCircle } from "lucide-react";
-import Timeline from "../../components/Timeline"; // Naya Timeline component import kiya
+import { CheckCircle, Phone, PhoneOff, MessageCircle } from "lucide-react";
+import { fmtDuration, toWaNumber } from "../../utils/helpers";
+import Timeline from "../../components/Timeline";
+
+const PRIORITIES = ["Low", "Medium", "High", "Urgent"];
 
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth(); // role: 'admin' | 'employee'
-  const { leads, users, settings, updateLeadStatus, addWorknote, updateFollowUpDate, reassignLead, updateLeadRevenue } = useData();
+  
+  // DataContext se saare necessary functions le lo
+  const { 
+    leads, users, settings, 
+    updateLeadStatus, addWorknote, updateFollowUpDate, 
+    reassignLead, updateLeadRevenue, updatePriority, addNote
+  } = useData();
   
   const lead = leads.find((l) => l.id === id);
   const [noteText, setNoteText] = useState("");
-  // By default, admin notes are private. Employees don't see this toggle and their notes are 'team' visibility.
+  // By default, admin notes are private. Employees don't see this toggle.
   const [isPrivate, setIsPrivate] = useState(user?.role === 'admin'); 
   const [revenueInput, setRevenueInput] = useState("");
+  
+  // Call Tracking States
+  const [callActive, setCallActive] = useState(false);
+  const [callStart, setCallStart] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [showWorknoteModal, setShowWorknoteModal] = useState(false);
+  const [pendingDuration, setPendingDuration] = useState(0);
+
+  useEffect(() => {
+    if (!callActive) return;
+    const t = setInterval(() => setElapsed(Math.floor((Date.now() - callStart) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [callActive, callStart]);
 
   if (!lead) return <Layout title="Lead"><p className="text-red-500">Lead not found.</p></Layout>;
 
   const employees = users.filter((u) => u.role === "employee");
-  const isOverdue = lead.followUp && new Date(lead.followUp) < new Date() && lead.status !== "Closed-Won";
+  const isOverdue = lead.followUp && new Date(lead.followUp) < new Date() && !["Closed-Won", "Lost"].includes(lead.status);
+
+  // --- Actions ---
 
   const handleAddWorknote = () => {
     if (!noteText.trim()) return;
-    
     const visibility = (user.role === 'admin' && isPrivate) ? 'admin_only' : 'team';
     addWorknote(lead.id, noteText, user, { visibility });
     setNoteText("");
@@ -37,15 +60,43 @@ export default function LeadDetail() {
           alert("Revenue saved securely.");
           setRevenueInput("");
       }
-  }
+  };
+
+  const startCall = () => {
+    setCallStart(Date.now());
+    setElapsed(0);
+    setCallActive(true);
+    window.location.href = `tel:${lead.phone}`;
+  };
+
+  const endCall = () => {
+    setPendingDuration(elapsed);
+    setCallActive(false);
+    setShowWorknoteModal(true);
+  };
+
+  const saveCallLog = () => {
+    const visibility = (user.role === 'admin' && isPrivate) ? 'admin_only' : 'team';
+    addNote(lead.id, noteText || "Call completed — no notes added.", "call", { 
+        duration: pendingDuration, 
+        by: user.name, 
+        visibility 
+    });
+    setShowWorknoteModal(false);
+    setNoteText("");
+    setPendingDuration(0);
+  };
+
+  const quickWhatsApp = () => {
+    addNote(lead.id, "Opened WhatsApp chat from lead page", "whatsapp");
+    window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
+  };
 
   // 🛡️ Security Check: Filter timeline based on role
   const visibleTimeline = (lead.notes || []).filter(note => {
-      if (user.role === 'admin') return true; // Admin sees everything
-      
-      // Support dono formats (backend wala raw aur frontend wala metadata object)
+      if (user.role === 'admin') return true; 
       const vis = note.visibility || note.metadata?.visibility;
-      return vis !== 'admin_only'; // Employees cannot see admin_only notes
+      return vis !== 'admin_only'; 
   });
 
   return (
@@ -68,6 +119,14 @@ export default function LeadDetail() {
                 </select>
               </div>
 
+              {/* 🔥 PRIORITY ADDED HERE */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Priority</label>
+                <select value={lead.priority || "Medium"} onChange={(e) => updatePriority(lead.id, e.target.value)} className="w-full border rounded p-2 mt-1 bg-gray-50">
+                  {PRIORITIES.map(p => <option key={p}>{p}</option>)}
+                </select>
+              </div>
+
               <div>
                 <label className="text-xs font-semibold text-gray-500">Follow-up Date {isOverdue && <span className="text-red-500">(Overdue)</span>}</label>
                 <input type="datetime-local" value={lead.followUp || ""} onChange={(e) => updateFollowUpDate(lead.id, e.target.value, user)} className="w-full border rounded p-2 mt-1" />
@@ -86,8 +145,24 @@ export default function LeadDetail() {
                 </div>
               )}
             </div>
+
+            {/* CALL ACTION BUTTONS */}
+            <div className="mt-6 space-y-2">
+              {!callActive ? (
+                <button onClick={startCall} className="w-full flex items-center justify-center gap-2 bg-green-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-green-700 transition">
+                  <Phone size={15} /> Start call
+                </button>
+              ) : (
+                <button onClick={endCall} className="w-full flex items-center justify-center gap-2 bg-red-600 text-white rounded-md p-2.5 text-sm font-medium animate-pulse">
+                  <PhoneOff size={15} /> End call · {fmtDuration(elapsed)}
+                </button>
+              )}
+              <button onClick={quickWhatsApp} className="w-full flex items-center justify-center gap-2 bg-teal-50 text-teal-700 border border-teal-200 rounded-md p-2.5 text-sm font-medium hover:bg-teal-100 transition">
+                <MessageCircle size={15} /> WhatsApp
+              </button>
+            </div>
             
-            {/* 💰 Revenue Entry (Admin Only) - Appears if status is Won */}
+            {/* 💰 Revenue Entry (Admin Only) */}
              {user.role === 'admin' && lead.status === "Closed-Won" && (
                 <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                     <label className="text-xs font-semibold text-green-700 flex items-center gap-1"><CheckCircle size={14}/> Deal Revenue (₹)</label>
@@ -120,15 +195,35 @@ export default function LeadDetail() {
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl shadow border p-6 h-[80vh] flex flex-col">
             <h3 className="font-semibold text-lg mb-6 border-b pb-2">Activity Stream</h3>
-            
             <div className="flex-1 overflow-y-auto">
-              {/* Sirf component pass kar diya! */}
               <Timeline entries={visibleTimeline} />
             </div>
           </div>
         </div>
         
       </div>
+
+      {/* CALL LOG MODAL */}
+      {showWorknoteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1">Call ended</p>
+            <p className="text-sm text-gray-600 mb-4">Duration: <span className="font-mono font-semibold text-green-600">{fmtDuration(pendingDuration)}</span></p>
+            
+            <textarea className="w-full border rounded-md p-2 text-sm mb-3" rows="4"
+              placeholder="What happened on this call?" value={noteText} onChange={(e) => setNoteText(e.target.value)} autoFocus />
+            
+            {user.role === 'admin' && (
+                <div className="flex items-center gap-2 mb-3">
+                    <input type="checkbox" id="privateCallNote" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} />
+                    <label htmlFor="privateCallNote" className="text-xs font-medium text-gray-600">Keep this note private</label>
+                </div>
+             )}
+
+            <button onClick={saveCallLog} className="w-full bg-blue-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-blue-700">Save call log</button>
+          </div>
+        </div>
+      )}
     </Layout>  
   );
 }
