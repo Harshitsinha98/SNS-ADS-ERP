@@ -115,3 +115,16 @@ export const fmtDuration = (sec) => {
   const m = Math.floor(sec / 60), s = sec % 60;
   return `${m}:${s.toString().padStart(2, "0")}`;
 };
+// ServiceNow style timeline entry formatter
+export const createActivityEntry = (type, text, user, metadata = {}) => {
+  return {
+    id: "ACT" + Date.now() + Math.floor(Math.random() * 1000),
+    type, // 'worknote', 'status_change', 'call', 'assignment', 'system'
+    text,
+    authorId: user.id,
+    authorName: user.name,
+    authorRole: user.role,
+    createdAt: new Date().toISOString(),
+    metadata
+  };
+};

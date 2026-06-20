@@ -1,61 +1,114 @@
 import { useParams, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import Layout from "../../components/Layout";
-import Timeline from "../../components/Timeline";
 import { useData } from "../../context/DataContext";
-import { fmtDate, fmtMoney, daysSince } from "../../utils/helpers";
-import { PriorityBadge } from "../../components/StatusLamp";
+import { useAuth } from "../../context/AuthContext";
+import { Clock, MessageSquare, RefreshCw, UserCheck } from "lucide-react";
 
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { leads, users, reassignLead, blacklistLead } = useData();
+  const { user } = useAuth(); // Current logged in user (Admin/Emp)
+  const { leads, users, settings, updateLeadStatus, addWorknote, updateFollowUpDate, reassignLead } = useData();
+  
   const lead = leads.find((l) => l.id === id);
-
-  if (!lead) return <Layout title="Lead"><p className="text-danger">Lead not found.</p></Layout>;
+  const [noteText, setNoteText] = useState("");
+  
+  if (!lead) return <Layout title="Lead"><p className="text-red-500">Lead not found.</p></Layout>;
 
   const employees = users.filter((u) => u.role === "employee");
-  const calls = lead.notes.filter((n) => n.type === "call");
-  const totalCallSeconds = calls.reduce((s, c) => s + (c.duration || 0), 0);
+  const isOverdue = lead.followUp && new Date(lead.followUp) < new Date() && lead.status !== "Closed-Won";
+
+  const handleAddWorknote = () => {
+    if (!noteText.trim()) return;
+    addWorknote(lead.id, noteText, user);
+    setNoteText("");
+  };
+
+  // Activity Icon Picker
+  const getIcon = (type) => {
+    if (type === 'worknote') return <MessageSquare size={16} className="text-blue-500" />;
+    if (type === 'status_change') return <RefreshCw size={16} className="text-orange-500" />;
+    if (type === 'assignment') return <UserCheck size={16} className="text-green-500" />;
+    return <Clock size={16} className="text-gray-500" />;
+  };
 
   return (
-    <Layout title={`Lead — ${lead.name}`}>
-      <button onClick={() => navigate(-1)} className="text-sm text-ink/40 mb-4 hover:text-ink">← Back</button>
+    <Layout title={`Lead Record: ${lead.name}`}>
+      <button onClick={() => navigate(-1)} className="text-sm text-gray-500 mb-4 hover:underline">← Back</button>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* LEFT COLUMN: Controls & Details */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="bg-white rounded-xl shadow border p-5">
+            <h2 className="text-lg font-bold">{lead.name}</h2>
+            <p className="text-sm text-gray-500 font-mono mt-1">{lead.phone} • {lead.source}</p>
+            
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Current Status</label>
+                <select value={lead.status} onChange={(e) => updateLeadStatus(lead.id, e.target.value, user)} className="w-full border rounded p-2 mt-1 bg-gray-50">
+                  {settings.statuses.map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
 
-      <div className="grid grid-cols-3 gap-6">
-        <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
-          <p className="eyebrow mb-3">Lead profile</p>
-          <p className="text-sm mb-1"><span className="text-ink/40">Name</span> · {lead.name}</p>
-          <p className="text-sm mb-1 num"><span className="text-ink/40">Phone</span> · {lead.phone}</p>
-          <p className="text-sm mb-1"><span className="text-ink/40">Source</span> · {lead.source}</p>
-          <p className="text-sm mb-1"><span className="text-ink/40">Requirement</span> · {lead.requirement}</p>
-          <p className="text-sm mb-1"><span className="text-ink/40">Value</span> · <span className="num">{fmtMoney(lead.value)}</span></p>
-          <p className="text-sm mb-3"><span className="text-ink/40">Priority</span> · <PriorityBadge p={lead.priority} /></p>
+              <div>
+                <label className="text-xs font-semibold text-gray-500">Follow-up Date {isOverdue && <span className="text-red-500">(Overdue)</span>}</label>
+                <input type="datetime-local" value={lead.followUp || ""} onChange={(e) => updateFollowUpDate(lead.id, e.target.value, user)} className="w-full border rounded p-2 mt-1" />
+              </div>
 
-          <p className="eyebrow mb-1.5">Assigned to</p>
-          <select value={lead.assignedTo || ""} onChange={(e) => reassignLead(lead.id, e.target.value)}
-            className="w-full border border-paper-line rounded-md p-2 text-sm mb-3">
-            {employees.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
+              {user.role === "admin" && (
+                <div>
+                  <label className="text-xs font-semibold text-gray-500">Assigned To</label>
+                  <select value={lead.assignedTo || ""} onChange={(e) => {
+                    const emp = employees.find(x => x.id === e.target.value);
+                    if (emp) reassignLead(lead.id, emp.id, emp.name, user);
+                  }} className="w-full border rounded p-2 mt-1">
+                    <option value="">Unassigned</option>
+                    {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
 
-          {!lead.blacklisted && (
-            <button onClick={() => blacklistLead(lead.id)} className="text-xs text-danger hover:underline">Blacklist this lead</button>
-          )}
+          <div className="bg-white rounded-xl shadow border p-5">
+             <h3 className="font-semibold mb-3">Add Worknote</h3>
+             <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows="3" className="w-full border rounded p-3 text-sm" placeholder="Client ne kya kaha? Next steps?"></textarea>
+             <button onClick={handleAddWorknote} className="w-full bg-blue-600 text-white rounded p-2 mt-2 hover:bg-blue-700">Save Worknote</button>
+          </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
-          <p className="eyebrow mb-3">Status & engagement</p>
-          <p className="text-sm mb-1">Current status · <b>{lead.status}</b></p>
-          <p className="text-sm mb-1 num">Idle for · {daysSince(lead.lastUpdated)} days</p>
-          <p className="text-sm mb-1">Total calls logged · <b>{calls.length}</b></p>
-          <p className="text-sm mb-1 num">Total talk-time · <b>{Math.floor(totalCallSeconds / 60)} min</b></p>
-          {lead.followUp && <p className="text-sm num">Next follow-up · {fmtDate(lead.followUp)}</p>}
+        {/* RIGHT COLUMN: ServiceNow Activity Timeline */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-xl shadow border p-6 h-[80vh] flex flex-col">
+            <h3 className="font-semibold text-lg mb-6 border-b pb-2">Activity Stream</h3>
+            
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+              {(lead.notes || []).map((act, index) => (
+                <div key={index} className="flex gap-4">
+                  <div className="mt-1 bg-gray-100 p-2 rounded-full h-8 w-8 flex items-center justify-center">
+                    {getIcon(act.type)}
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3 flex-1 border">
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="text-sm font-semibold text-gray-800">{act.authorName} <span className="text-xs text-gray-400 font-normal">({act.authorRole})</span></span>
+                      <span className="text-xs text-gray-400">{new Date(act.createdAt).toLocaleString()}</span>
+                    </div>
+                    <p className="text-sm text-gray-700 mt-1">{act.text}</p>
+                  </div>
+                </div>
+              ))}
+              
+              {(!lead.notes || lead.notes.length === 0) && (
+                <p className="text-gray-400 text-sm text-center mt-10">No activity logged yet. Start by adding a worknote.</p>
+              )}
+            </div>
+          </div>
         </div>
-
-        <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
-          <p className="eyebrow mb-3">Follow-up history</p>
-          <Timeline entries={lead.notes} />
-        </div>
+        
       </div>
-    </Layout>
+    </Layout>  
   );
 }
