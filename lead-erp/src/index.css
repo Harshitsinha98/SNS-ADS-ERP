@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-paper text-ink font-body antialiased;
+}
+
+.eyebrow {
+  @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-ink/50;
+}
+
+.num {
+  @apply font-mono;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

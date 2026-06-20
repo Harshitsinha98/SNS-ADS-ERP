@@ -1,0 +1,93 @@
+[
+  {
+    "id": "WA1781931841055",
+    "name": "Curl Test Lead",
+    "phone": "919999988878",
+    "email": "",
+    "source": "WhatsApp",
+    "requirement": "Hi, mujhe 2BHK chahiye",
+    "status": "New",
+    "assignedTo": null,
+    "blacklisted": false,
+    "createdAt": "2024-06-20T07:53:20.000Z",
+    "lastUpdated": "2026-06-20T05:04:01.055Z",
+    "followUp": null,
+    "notes": [
+      {
+        "text": "First WhatsApp msg: \"Hi, mujhe 2BHK chahiye\"",
+        "at": "2026-06-20T05:04:01.055Z"
+      }
+    ],
+    "waMessageId": "wamid.TEST1"
+  },
+  {
+    "id": "WA1781931302054",
+    "name": "Curl Test Lead",
+    "phone": "919999988888",
+    "email": "",
+    "source": "WhatsApp",
+    "requirement": "Hi, mujhe 2BHK chahiye",
+    "status": "New",
+    "assignedTo": null,
+    "blacklisted": false,
+    "createdAt": "2024-06-20T07:53:20.000Z",
+    "lastUpdated": "2026-06-20T05:11:15.307Z",
+    "followUp": null,
+    "notes": [
+      {
+        "text": "First WhatsApp msg: \"Hi, mujhe 2BHK chahiye\"",
+        "at": "2026-06-20T04:55:02.054Z"
+      },
+      {
+        "text": "New WhatsApp msg: \"Hi, mujhe 2BHK chahiye\"",
+        "at": "2026-06-20T05:06:21.335Z"
+      },
+      {
+        "text": "New WhatsApp msg: \"Hi, mujhe 2BHK chahiye\"",
+        "at": "2026-06-20T05:06:38.137Z"
+      },
+      {
+        "text": "New WhatsApp msg: \"Hi, mujhe 2BHK chahiye\"",
+        "at": "2026-06-20T05:08:19.295Z"
+      },
+      {
+        "text": "New WhatsApp msg: \"Hi, mujhe 2BHK chahiye\"",
+        "at": "2026-06-20T05:09:08.290Z"
+      },
+      {
+        "text": "New WhatsApp msg: \"Hi, mujhe 2BHK chahiye\"",
+        "at": "2026-06-20T05:09:40.818Z"
+      },
+      {
+        "text": "New WhatsApp msg: \"Hi, mujhe 2BHK chahiye\"",
+        "at": "2026-06-20T05:11:15.307Z"
+      }
+    ],
+    "waMessageId": "wamid.TEST1"
+  },
+  {
+    "id": "WA1781851287072",
+    "name": "test user name",
+    "phone": "16315551181",
+    "email": "",
+    "source": "WhatsApp",
+    "requirement": "this is a text message",
+    "status": "New",
+    "assignedTo": null,
+    "blacklisted": false,
+    "createdAt": "2017-09-08T20:36:28.000Z",
+    "lastUpdated": "2026-06-19T06:47:54.545Z",
+    "followUp": null,
+    "notes": [
+      {
+        "text": "First WhatsApp msg: \"this is a text message\"",
+        "at": "2026-06-19T06:41:27.073Z"
+      },
+      {
+        "text": "New WhatsApp msg: \"this is a text message\"",
+        "at": "2026-06-19T06:47:54.545Z"
+      }
+    ],
+    "waMessageId": "ABGGFlA5Fpa"
+  }
+]
