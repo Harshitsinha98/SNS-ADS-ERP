@@ -4,6 +4,7 @@ import {
   query, orderBy, limit, arrayUnion,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { useAuth } from "./AuthContext";
 
 const DataContext = createContext();
 export const useData = () => useContext(DataContext);
@@ -14,6 +15,7 @@ const DEFAULT_SETTINGS = {
 };
 
 export function DataProvider({ children }) {
+  const { user } = useAuth();
   const [leads, setLeads] = useState([]);
   const [users, setUsers] = useState([]);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -22,6 +24,12 @@ export function DataProvider({ children }) {
   const [goals, setGoals] = useState({});
 
   useEffect(() => {
+    // Login hone se pehle koi Firestore listener mat lagao — warna permission-denied aayega
+    if (!user) {
+      setLeads([]); setUsers([]); setNotifications([]); setActivity([]); setGoals({});
+      return;
+    }
+
     const unsubLeads = onSnapshot(collection(db, "leads"), (snap) =>
       setLeads(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
@@ -40,8 +48,9 @@ export function DataProvider({ children }) {
     const unsubGoals = onSnapshot(doc(db, "goals", "config"), (d) => {
       if (d.exists()) setGoals(d.data());
     });
+
     return () => { unsubLeads(); unsubUsers(); unsubSettings(); unsubNotifs(); unsubActivity(); unsubGoals(); };
-  }, []);
+  }, [user]);
 
   const logActivity = (text) => addDoc(collection(db, "activity"), { text, at: new Date().toISOString() });
 
@@ -107,7 +116,6 @@ export function DataProvider({ children }) {
   const setMyGoal = (empId, target) => setDoc(doc(db, "goals", "config"), { ...goals, [empId]: Number(target) || 0 }, { merge: true });
   const setSettingsValue = (s) => setDoc(doc(db, "settings", "config"), s, { merge: true });
 
-  // Manual "Sync now" button — backend ko trigger karta hai, Firestore listener khud refresh ho jayega
   const triggerWhatsAppSync = async () => {
     const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/whatsapp/sync-now`, { method: "POST" });
     return res.json();
