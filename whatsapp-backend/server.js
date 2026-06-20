@@ -43,9 +43,12 @@ async function importWhatsAppLead({ phone, name, requirement }) {
   const emps = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
   if (!emps.length) {
+  const existingPending = await db.collection("pending_whatsapp").where("phone", "==", phone).limit(1).get();
+  if (existingPending.empty) {
     await db.collection("pending_whatsapp").add({ phone, name, requirement, queuedAt: new Date().toISOString() });
-    return { status: "queued", reason: "no_active_employees" };
   }
+  return { status: "queued", reason: "no_active_employees" };
+}
 
   let assignedTo;
   if (settings.autoAssign === "workload") {
