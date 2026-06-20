@@ -3,17 +3,21 @@ import { useState } from "react";
 import Layout from "../../components/Layout";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
-import { Clock, MessageSquare, RefreshCw, UserCheck } from "lucide-react";
+import { CheckCircle } from "lucide-react";
+import Timeline from "../../components/Timeline"; // Naya Timeline component import kiya
 
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth(); // Current logged in user (Admin/Emp)
-  const { leads, users, settings, updateLeadStatus, addWorknote, updateFollowUpDate, reassignLead } = useData();
+  const { user } = useAuth(); // role: 'admin' | 'employee'
+  const { leads, users, settings, updateLeadStatus, addWorknote, updateFollowUpDate, reassignLead, updateLeadRevenue } = useData();
   
   const lead = leads.find((l) => l.id === id);
   const [noteText, setNoteText] = useState("");
-  
+  // By default, admin notes are private. Employees don't see this toggle and their notes are 'team' visibility.
+  const [isPrivate, setIsPrivate] = useState(user?.role === 'admin'); 
+  const [revenueInput, setRevenueInput] = useState("");
+
   if (!lead) return <Layout title="Lead"><p className="text-red-500">Lead not found.</p></Layout>;
 
   const employees = users.filter((u) => u.role === "employee");
@@ -21,17 +25,28 @@ export default function LeadDetail() {
 
   const handleAddWorknote = () => {
     if (!noteText.trim()) return;
-    addWorknote(lead.id, noteText, user);
+    
+    const visibility = (user.role === 'admin' && isPrivate) ? 'admin_only' : 'team';
+    addWorknote(lead.id, noteText, user, { visibility });
     setNoteText("");
   };
 
-  // Activity Icon Picker
-  const getIcon = (type) => {
-    if (type === 'worknote') return <MessageSquare size={16} className="text-blue-500" />;
-    if (type === 'status_change') return <RefreshCw size={16} className="text-orange-500" />;
-    if (type === 'assignment') return <UserCheck size={16} className="text-green-500" />;
-    return <Clock size={16} className="text-gray-500" />;
-  };
+  const handleRevenueSave = () => {
+      if(revenueInput && !isNaN(revenueInput)){
+          updateLeadRevenue(lead.id, revenueInput, user);
+          alert("Revenue saved securely.");
+          setRevenueInput("");
+      }
+  }
+
+  // 🛡️ Security Check: Filter timeline based on role
+  const visibleTimeline = (lead.notes || []).filter(note => {
+      if (user.role === 'admin') return true; // Admin sees everything
+      
+      // Support dono formats (backend wala raw aur frontend wala metadata object)
+      const vis = note.visibility || note.metadata?.visibility;
+      return vis !== 'admin_only'; // Employees cannot see admin_only notes
+  });
 
   return (
     <Layout title={`Lead Record: ${lead.name}`}>
@@ -71,12 +86,33 @@ export default function LeadDetail() {
                 </div>
               )}
             </div>
+            
+            {/* 💰 Revenue Entry (Admin Only) - Appears if status is Won */}
+             {user.role === 'admin' && lead.status === "Closed-Won" && (
+                <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <label className="text-xs font-semibold text-green-700 flex items-center gap-1"><CheckCircle size={14}/> Deal Revenue (₹)</label>
+                    <div className="flex gap-2 mt-2">
+                    <input type="number" value={revenueInput} onChange={(e) => setRevenueInput(e.target.value)} className="w-full border border-green-300 rounded p-2" placeholder="e.g. 50000" />
+                    <button onClick={handleRevenueSave} className="bg-green-600 text-white px-4 rounded hover:bg-green-700 font-medium">Save</button>
+                    </div>
+                    <p className="text-[10px] text-green-600 mt-1">Stored securely. Employees cannot see this.</p>
+                </div>
+            )}
           </div>
 
           <div className="bg-white rounded-xl shadow border p-5">
              <h3 className="font-semibold mb-3">Add Worknote</h3>
              <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows="3" className="w-full border rounded p-3 text-sm" placeholder="Client ne kya kaha? Next steps?"></textarea>
-             <button onClick={handleAddWorknote} className="w-full bg-blue-600 text-white rounded p-2 mt-2 hover:bg-blue-700">Save Worknote</button>
+             
+             {/* 👁️ Visibility Toggle for Admin */}
+             {user.role === 'admin' && (
+                <div className="flex items-center gap-2 mt-3 mb-1">
+                    <input type="checkbox" id="privateNote" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="cursor-pointer" />
+                    <label htmlFor="privateNote" className="text-xs font-medium text-gray-600 cursor-pointer">Keep this note private (Admin Only)</label>
+                </div>
+             )}
+
+             <button onClick={handleAddWorknote} className="w-full bg-blue-600 text-white rounded p-2 mt-3 hover:bg-blue-700 font-medium transition-colors">Save Worknote</button>
           </div>
         </div>
 
@@ -85,25 +121,9 @@ export default function LeadDetail() {
           <div className="bg-white rounded-xl shadow border p-6 h-[80vh] flex flex-col">
             <h3 className="font-semibold text-lg mb-6 border-b pb-2">Activity Stream</h3>
             
-            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-              {(lead.notes || []).map((act, index) => (
-                <div key={index} className="flex gap-4">
-                  <div className="mt-1 bg-gray-100 p-2 rounded-full h-8 w-8 flex items-center justify-center">
-                    {getIcon(act.type)}
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3 flex-1 border">
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="text-sm font-semibold text-gray-800">{act.authorName} <span className="text-xs text-gray-400 font-normal">({act.authorRole})</span></span>
-                      <span className="text-xs text-gray-400">{new Date(act.createdAt).toLocaleString()}</span>
-                    </div>
-                    <p className="text-sm text-gray-700 mt-1">{act.text}</p>
-                  </div>
-                </div>
-              ))}
-              
-              {(!lead.notes || lead.notes.length === 0) && (
-                <p className="text-gray-400 text-sm text-center mt-10">No activity logged yet. Start by adding a worknote.</p>
-              )}
+            <div className="flex-1 overflow-y-auto">
+              {/* Sirf component pass kar diya! */}
+              <Timeline entries={visibleTimeline} />
             </div>
           </div>
         </div>

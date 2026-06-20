@@ -23,12 +23,14 @@ async function importWhatsAppLead({ phone, name, requirement }) {
   try {
     // 1. Duplicate Check: Agar number already hai, toh sirf note add karo
     const existing = await db.collection("leads").where("phone", "==", phone).limit(1).get();
+    // Duplicate Check ke andar:
     if (!existing.empty) {
       await existing.docs[0].ref.update({
         notes: FieldValue.arrayUnion({
           type: "whatsapp",
           text: `New WhatsApp message: ${requirement}`,
           at: new Date().toISOString(),
+          visibility: "admin_only" // <--- YE LINE NAYI HAI
         }),
         lastUpdated: new Date().toISOString(),
       });
