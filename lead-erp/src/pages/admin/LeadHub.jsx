@@ -7,7 +7,7 @@ import { StatusLamp, PriorityBadge } from "../../components/StatusLamp";
 import { Upload, Download, RefreshCw } from "lucide-react";
 
 export default function LeadHub() {
-  const { leads, users, settings, reassignLead, blacklistLead, addBulkLeads, mergeWhatsAppLeads } = useData();
+  const { leads, users, settings, reassignLead, blacklistLead, addBulkLeads, triggerWhatsAppSync } = useData();
   const [sortBy, setSortBy] = useState("createdAt");
   const [filterStatus, setFilterStatus] = useState("All");
   const [syncing, setSyncing] = useState(false);
@@ -40,12 +40,13 @@ export default function LeadHub() {
     URL.revokeObjectURL(url);
   };
 
-  const handleSync = async () => {
-    setSyncing(true);
-    const count = await mergeWhatsAppLeads();
-    setSyncing(false);
-    alert(count > 0 ? `${count} new WhatsApp lead(s) imported.` : "No new WhatsApp leads right now.");
-  };
+  // handleSync function replace karo:
+const handleSync = async () => {
+  setSyncing(true);
+  const result = await triggerWhatsAppSync();
+  setSyncing(false);
+  alert(result.imported > 0 ? `${result.imported} new WhatsApp lead(s) imported.` : "No new WhatsApp leads right now.");
+};
 
   return (
     <Layout title="Centralized Lead Hub">

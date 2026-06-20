@@ -1,67 +1,63 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { seedLeads, seedUsers, seedSettings } from "../data/seed";
-import { fetchWhatsAppLeads } from "../utils/whatsapp";
+import {
+  collection, doc, onSnapshot, addDoc, updateDoc, setDoc,
+  query, orderBy, limit, arrayUnion,
+} from "firebase/firestore";
+import { db } from "../firebase";
 
 const DataContext = createContext();
 export const useData = () => useContext(DataContext);
 
-const load = (key, fallback) => {
-  const s = localStorage.getItem(key);
-  return s ? JSON.parse(s) : fallback;
-};
-
-const loadUsers = (seedUsers) => {
-  const s = localStorage.getItem("erp_users");
-  if (!s) return seedUsers;
-  try {
-    const parsed = JSON.parse(s);
-    const isValid = Array.isArray(parsed) && parsed.length > 0 && parsed.every((u) => u.phone);
-    return isValid ? parsed : seedUsers;
-  } catch {
-    return seedUsers;
-  }
+const DEFAULT_SETTINGS = {
+  statuses: ["New", "Ringing", "Meeting Fixed", "Negotiation", "Follow-up", "Closed-Won", "Lost"],
+  autoAssign: "round-robin",
 };
 
 export function DataProvider({ children }) {
-  const [leads, setLeads] = useState(() => load("erp_leads", seedLeads));
-  const [users, setUsers] = useState(() => loadUsers(seedUsers));
-  const [settings, setSettings] = useState(() => load("erp_settings", seedSettings));
-  const [notifications, setNotifications] = useState(() => load("erp_notifs", []));
-  const [activity, setActivity] = useState(() => load("erp_activity", []));
-  const [goals, setGoals] = useState(() => load("erp_goals", {}));
+  const [leads, setLeads] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [notifications, setNotifications] = useState([]);
+  const [activity, setActivity] = useState([]);
+  const [goals, setGoals] = useState({});
 
-  useEffect(() => localStorage.setItem("erp_leads", JSON.stringify(leads)), [leads]);
-  useEffect(() => localStorage.setItem("erp_users", JSON.stringify(users)), [users]);
-  useEffect(() => localStorage.setItem("erp_settings", JSON.stringify(settings)), [settings]);
-  useEffect(() => localStorage.setItem("erp_notifs", JSON.stringify(notifications)), [notifications]);
-  useEffect(() => localStorage.setItem("erp_activity", JSON.stringify(activity)), [activity]);
-  useEffect(() => localStorage.setItem("erp_goals", JSON.stringify(goals)), [goals]);
+  useEffect(() => {
+    const unsubLeads = onSnapshot(collection(db, "leads"), (snap) =>
+      setLeads(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+    const unsubUsers = onSnapshot(collection(db, "users"), (snap) =>
+      setUsers(snap.docs.map((d) => ({ id: d.id, phone: d.id.replace("+91", ""), ...d.data() })))
+    );
+    const unsubSettings = onSnapshot(doc(db, "settings", "config"), (d) => {
+      if (d.exists()) setSettings(d.data());
+    });
+    const unsubNotifs = onSnapshot(collection(db, "notifications"), (snap) =>
+      setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+    const unsubActivity = onSnapshot(query(collection(db, "activity"), orderBy("at", "desc"), limit(100)), (snap) =>
+      setActivity(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+    const unsubGoals = onSnapshot(doc(db, "goals", "config"), (d) => {
+      if (d.exists()) setGoals(d.data());
+    });
+    return () => { unsubLeads(); unsubUsers(); unsubSettings(); unsubNotifs(); unsubActivity(); unsubGoals(); };
+  }, []);
 
-  const logActivity = (text) =>
-    setActivity((prev) => [{ id: Date.now(), text, at: new Date().toISOString() }, ...prev].slice(0, 100));
+  const logActivity = (text) => addDoc(collection(db, "activity"), { text, at: new Date().toISOString() });
 
-  // type: "note" | "call" | "whatsapp" | "status"   extra: { duration, by }
   const addNote = (id, text, type = "note", extra = {}) =>
-    setLeads((prev) =>
-      prev.map((l) =>
-        l.id === id
-          ? { ...l, notes: [...l.notes, { type, text, at: new Date().toISOString(), ...extra }], lastUpdated: new Date().toISOString() }
-          : l
-      )
-    );
+    updateDoc(doc(db, "leads", id), {
+      notes: arrayUnion({ type, text, at: new Date().toISOString(), ...extra }),
+      lastUpdated: new Date().toISOString(),
+    });
 
-  const updateLead = (id, patch) => {
-    setLeads((prev) =>
-      prev.map((l) => {
-        if (l.id !== id) return l;
-        const updated = { ...l, ...patch, lastUpdated: new Date().toISOString() };
-        if (patch.status && patch.status !== l.status) {
-          updated.notes = [...l.notes, { type: "status", text: `Status changed to "${patch.status}"`, at: new Date().toISOString() }];
-        }
-        return updated;
-      })
-    );
-    if (patch.status) logActivity(`Lead ${id} status changed to "${patch.status}"`);
+  const updateLead = async (id, patch) => {
+    const payload = { ...patch, lastUpdated: new Date().toISOString() };
+    if (patch.status) {
+      payload.notes = arrayUnion({ type: "status", text: `Status changed to "${patch.status}"`, at: new Date().toISOString() });
+      logActivity(`Lead ${id} status changed to "${patch.status}"`);
+    }
+    await updateDoc(doc(db, "leads", id), payload);
   };
 
   const reassignLead = (id, employeeId) => {
@@ -70,18 +66,20 @@ export function DataProvider({ children }) {
     logActivity(`Lead ${id} reassigned to ${employeeId}`);
   };
 
-  const blacklistLead = (id) => {
-    updateLead(id, { blacklisted: true, status: "Lost" });
-    logActivity(`Lead ${id} blacklisted`);
+  const blacklistLead = (id) => { updateLead(id, { blacklisted: true, status: "Lost" }); logActivity(`Lead ${id} blacklisted`); };
+
+  const leastLoaded = (emps) => {
+    const counts = {};
+    emps.forEach((e) => (counts[e.id] = leads.filter((l) => l.assignedTo === e.id).length));
+    return emps.sort((a, b) => counts[a.id] - counts[b.id])[0]?.id;
   };
 
-  const addBulkLeads = (rows, assigner) => {
+  const addBulkLeads = async (rows, assigner) => {
     const emps = users.filter((u) => u.role === "employee");
-    let rr = 0;
-    const mapped = rows.map((r) => {
+    let rr = 0, count = 0;
+    for (const r of rows) {
       const assignedTo = assigner === "workload" ? leastLoaded(emps) : emps[(rr++) % emps.length]?.id;
-      return {
-        id: "L" + Math.floor(10000 + Math.random() * 89999),
+      await addDoc(collection(db, "leads"), {
         name: r.name || r.Name || "Unknown",
         phone: r.phone || r.Phone || "",
         email: r.email || r.Email || "",
@@ -90,87 +88,38 @@ export function DataProvider({ children }) {
         status: "New", assignedTo, blacklisted: false, value: 0, priority: "Warm",
         createdAt: new Date().toISOString(), lastUpdated: new Date().toISOString(),
         followUp: null, notes: [],
-      };
-    });
-    setLeads((prev) => [...mapped, ...prev]);
-    return mapped.length;
+      });
+      count++;
+    }
+    return count;
   };
 
-  const leastLoaded = (emps) => {
-    const counts = {};
-    emps.forEach((e) => (counts[e.id] = leads.filter((l) => l.assignedTo === e.id).length));
-    return emps.sort((a, b) => counts[a.id] - counts[b.id])[0]?.id;
-  };
-
-  const addUser = (u) => setUsers((prev) => [...prev, { ...u, id: "emp" + (prev.length + 1) }]);
-  const updateUser = (id, patch) => setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)));
+  const addUser = (u) => setDoc(doc(db, "users", "+91" + u.phone), { name: u.name, role: u.role, active: true });
+  const updateUser = (id, patch) => updateDoc(doc(db, "users", id), patch);
   const deactivateUser = (id) => updateUser(id, { active: false });
 
-  const pushNotif = (userId, text) =>
-    setNotifications((prev) => [{ id: Date.now(), userId, text, read: false, at: new Date().toISOString() }, ...prev]);
-  const markRead = (userId) =>
-    setNotifications((prev) => prev.map((n) => (n.userId === userId ? { ...n, read: true } : n)));
-
-  const mergeWhatsAppLeads = async () => {
-    const waLeads = await fetchWhatsAppLeads();
-    if (!waLeads.length) return 0;
-
-    const emps = users.filter((u) => u.role === "employee" && u.active !== false);
-    if (!emps.length) return 0;
-
-    let rr = 0;
-    let added = 0;
-    const newlyAdded = [];
-
-    setLeads((prev) => {
-      const existingPhones = new Set(prev.map((l) => l.phone));
-      const counts = {};
-      emps.forEach((e) => (counts[e.id] = prev.filter((l) => l.assignedTo === e.id).length));
-
-      const fresh = waLeads
-        .filter((w) => !existingPhones.has(w.phone))
-        .map((w) => {
-          let assignedTo;
-          if (settings.autoAssign === "workload") {
-            assignedTo = emps.sort((a, b) => counts[a.id] - counts[b.id])[0]?.id;
-            counts[assignedTo] = (counts[assignedTo] || 0) + 1;
-          } else {
-            assignedTo = emps[rr % emps.length]?.id;
-            rr++;
-          }
-          added++;
-          const lead = { ...w, assignedTo, priority: w.priority || "Warm", value: w.value || 0, notes: w.notes || [] };
-          newlyAdded.push(lead);
-          return lead;
-        });
-
-      return [...fresh, ...prev];
-    });
-
-    newlyAdded.forEach((lead) => {
-      pushNotif(lead.assignedTo, `New WhatsApp lead: ${lead.name} (${lead.id})`);
-      logActivity(`📲 WhatsApp lead auto-imported: ${lead.name} → ${lead.assignedTo}`);
-    });
-
-    return added;
+  const pushNotif = (userId, text) => addDoc(collection(db, "notifications"), { userId, text, read: false, at: new Date().toISOString() });
+  const markRead = async (userId) => {
+    const mine = notifications.filter((n) => n.userId === userId && !n.read);
+    await Promise.all(mine.map((n) => updateDoc(doc(db, "notifications", n.id), { read: true })));
   };
 
-  useEffect(() => {
-    const interval = setInterval(() => { mergeWhatsAppLeads(); }, 20000);
-    return () => clearInterval(interval);
-  }, [users, settings]);
+  const setMyGoal = (empId, target) => setDoc(doc(db, "goals", "config"), { ...goals, [empId]: Number(target) || 0 }, { merge: true });
+  const setSettingsValue = (s) => setDoc(doc(db, "settings", "config"), s, { merge: true });
 
-  const setMyGoal = (empId, target) => setGoals((prev) => ({ ...prev, [empId]: Number(target) || 0 }));
+  // Manual "Sync now" button — backend ko trigger karta hai, Firestore listener khud refresh ho jayega
+  const triggerWhatsAppSync = async () => {
+    const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/whatsapp/sync-now`, { method: "POST" });
+    return res.json();
+  };
 
   return (
-    <DataContext.Provider
-      value={{
-        leads, users, settings, notifications, activity, goals,
-        setSettings, updateLead, addNote, reassignLead, blacklistLead,
-        addBulkLeads, addUser, updateUser, deactivateUser, pushNotif, markRead,
-        mergeWhatsAppLeads, logActivity, setMyGoal,
-      }}
-    >
+    <DataContext.Provider value={{
+      leads, users, settings, notifications, activity, goals,
+      setSettings: setSettingsValue, updateLead, addNote, reassignLead, blacklistLead,
+      addBulkLeads, addUser, updateUser, deactivateUser, pushNotif, markRead, logActivity, setMyGoal,
+      triggerWhatsAppSync,
+    }}>
       {children}
     </DataContext.Provider>
   );

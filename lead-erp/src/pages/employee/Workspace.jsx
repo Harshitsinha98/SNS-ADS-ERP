@@ -40,13 +40,13 @@ export default function Workspace() {
   const saveGoal = () => { setMyGoal(user.id, goalInput); setEditingGoal(false); setGoalInput(""); };
 
   const quickCall = (lead) => {
-    addNote(lead.id, `📱 Quick-call initiated from dashboard at ${fmtDate(new Date().toISOString())}`);
-    window.location.href = `tel:${lead.phone}`;
-  };
-  const quickWhatsApp = (lead) => {
-    addNote(lead.id, `💬 WhatsApp opened from dashboard at ${fmtDate(new Date().toISOString())}`);
-    window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
-  };
+  addNote(lead.id, "Quick-call initiated from dashboard", "call");
+  window.location.href = `tel:${lead.phone}`;
+};
+const quickWhatsApp = (lead) => {
+  addNote(lead.id, "WhatsApp opened from dashboard", "whatsapp");
+  window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
+};
 
   return (
     <Layout title={`Welcome, ${user.name}`}>

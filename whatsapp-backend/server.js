@@ -1,160 +1,175 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
+import cron from "node-cron";
 import fs from "fs";
+import { initializeApp, cert } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 
-dotenv.config();
+const serviceAccount = JSON.parse(fs.readFileSync("./serviceAccountKey.json", "utf-8"));
+
+initializeApp({ credential: cert(serviceAccount) });
+const db = getFirestore();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 3001;
-const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
-const LEADS_FILE = "./leads.json";
-
-// ---- Simple file-based lead store (baad mein real DB se replace karo) ----
-const readLeads = () => {
-  try {
-    return JSON.parse(fs.readFileSync(LEADS_FILE, "utf-8"));
-  } catch {
-    return [];
+// ============================================================
+// CORE: WhatsApp lead ko Firestore mein import karna (dedup + auto-assign)
+// ============================================================
+async function importWhatsAppLead({ phone, name, requirement }) {
+  const existing = await db.collection("leads").where("phone", "==", phone).limit(1).get();
+  if (!existing.empty) {
+    await existing.docs[0].ref.update({
+      notes: FieldValue.arrayUnion({
+        type: "whatsapp",
+        text: `New WhatsApp message: ${requirement}`,
+        at: new Date().toISOString(),
+      }),
+      lastUpdated: new Date().toISOString(),
+    });
+    return { status: "duplicate", leadId: existing.docs[0].id };
   }
-};
-const writeLeads = (leads) => fs.writeFileSync(LEADS_FILE, JSON.stringify(leads, null, 2));
 
-// =====================================================================
-// 1. WEBHOOK VERIFICATION (Meta is GET request se webhook verify karta hai)
-// =====================================================================
+  const settingsDoc = await db.collection("settings").doc("config").get();
+  const settings = settingsDoc.exists ? settingsDoc.data() : { autoAssign: "round-robin" };
+
+  const usersSnap = await db
+    .collection("users")
+    .where("role", "==", "employee")
+    .where("active", "==", true)
+    .get();
+  const emps = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  if (!emps.length) {
+    await db.collection("pending_whatsapp").add({ phone, name, requirement, queuedAt: new Date().toISOString() });
+    return { status: "queued", reason: "no_active_employees" };
+  }
+
+  let assignedTo;
+  if (settings.autoAssign === "workload") {
+    const counts = {};
+    for (const e of emps) {
+      const c = await db.collection("leads").where("assignedTo", "==", e.id).get();
+      counts[e.id] = c.size;
+    }
+    assignedTo = emps.sort((a, b) => counts[a.id] - counts[b.id])[0].id;
+  } else {
+    const counterRef = db.collection("settings").doc("waCounter");
+    const counterDoc = await counterRef.get();
+    const idx = (counterDoc.exists ? counterDoc.data().idx : 0) % emps.length;
+    assignedTo = emps[idx].id;
+    await counterRef.set({ idx: idx + 1 });
+  }
+
+  const leadData = {
+    name: name || "WhatsApp Lead",
+    phone,
+    email: "",
+    source: "WhatsApp",
+    requirement: requirement || "",
+    status: "New",
+    assignedTo,
+    blacklisted: false,
+    value: 0,
+    priority: "Warm",
+    createdAt: new Date().toISOString(),
+    lastUpdated: new Date().toISOString(),
+    followUp: null,
+    notes: [],
+  };
+
+  const ref = await db.collection("leads").add(leadData);
+
+  await db.collection("notifications").add({
+    userId: assignedTo,
+    text: `New WhatsApp lead: ${leadData.name} (${ref.id})`,
+    read: false,
+    at: new Date().toISOString(),
+  });
+  await db.collection("activity").add({
+    text: `📲 WhatsApp lead auto-imported: ${leadData.name} → ${assignedTo}`,
+    at: new Date().toISOString(),
+  });
+
+  return { status: "created", leadId: ref.id };
+}
+
+async function processPendingQueue() {
+  const snap = await db.collection("pending_whatsapp").get();
+  let processed = 0;
+  for (const docSnap of snap.docs) {
+    const data = docSnap.data();
+    const result = await importWhatsAppLead({ phone: data.phone, name: data.name, requirement: data.requirement });
+    if (result.status !== "queued") {
+      await docSnap.ref.delete();
+      processed++;
+    }
+  }
+  return processed;
+}
+
+// ============================================================
+// WhatsApp Webhook (Meta) — real-time
+// ============================================================
 app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("✅ Webhook verified by Meta");
-    return res.status(200).send(challenge); // Meta ko challenge wapas bhejo
+  if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+    return res.status(200).send(challenge);
   }
-  return res.sendStatus(403);
+  res.sendStatus(403);
 });
 
-// =====================================================================
-// 2. INCOMING MESSAGES (Meta POST request se naye message bhejta hai)
-// =====================================================================
-app.post("/webhook", (req, res) => {
-  const body = req.body;
-  
-  // NAYI LINE: Ye jo bhi request aayegi, sab print kar dega!
-  console.log("📥 META NE KUCH BHEJA:", JSON.stringify(body, null, 2));
+app.post("/webhook", async (req, res) => {
+  try {
+    const change = req.body?.entry?.[0]?.changes?.[0]?.value;
+    const message = change?.messages?.[0];
+    const contact = change?.contacts?.[0];
 
-  if (body.object === "whatsapp_business_account") {
-// ... baaki ka purana code ...
-    body.entry?.forEach((entry) => {
-      entry.changes?.forEach((change) => {
-        const value = change.value;
-        const message = value?.messages?.[0];
-        const contact = value?.contacts?.[0];
-
-        // Sirf incoming user messages process karo (status updates ignore)
-        if (message && contact) {
-          const newLead = {
-            id: "WA" + Date.now(),
-            name: contact.profile?.name || "WhatsApp User",
-            phone: message.from, // wa_id (country code ke saath)
-            email: "",
-            source: "WhatsApp",
-            requirement:
-              message.type === "text"
-                ? message.text.body
-                : `[${message.type} message received]`,
-            status: "New",
-            assignedTo: null, // ERP auto-assign isko pick karega
-            blacklisted: false,
-            createdAt: new Date(Number(message.timestamp) * 1000).toISOString(),
-            lastUpdated: new Date().toISOString(),
-            followUp: null,
-            notes: [{ text: `First WhatsApp msg: "${message.text?.body || message.type}"`, at: new Date().toISOString() }],
-            waMessageId: message.id,
-          };
-
-          const leads = readLeads();
-          // Duplicate phone check — same number dobara aaye to note add karo, naya lead nahi
-          const existing = leads.find((l) => l.phone === newLead.phone);
-          if (existing) {
-            existing.notes.push({ text: `New WhatsApp msg: "${message.text?.body || message.type}"`, at: new Date().toISOString() });
-            existing.lastUpdated = new Date().toISOString();
-          } else {
-            leads.unshift(newLead);
-            console.log("🆕 New WhatsApp lead:", newLead.name, newLead.phone);
-          }
-          writeLeads(leads);
-        }
-      });
-    });
+    if (message) {
+      const phone = message.from;
+      const name = contact?.profile?.name || "WhatsApp Lead";
+      const requirement = message.text?.body || "[Non-text message]";
+      const result = await importWhatsAppLead({ phone, name, requirement });
+      console.log("Webhook processed:", result);
+    }
+    res.sendStatus(200);
+  } catch (e) {
+    console.error("Webhook error:", e);
+    res.sendStatus(200);
   }
-  // Meta ko hamesha 200 turant do, warna woh retry karta rahega
-  res.sendStatus(200);
 });
 
-// =====================================================================
-// 3. ERP ke liye API — React frontend yahan se WhatsApp leads fetch karega
-// =====================================================================
-app.get("/api/whatsapp-leads", (req, res) => {
-  res.json(readLeads());
+// ============================================================
+// Manual "Sync WhatsApp now" button
+// ============================================================
+app.post("/api/whatsapp/sync-now", async (req, res) => {
+  try {
+    const imported = await processPendingQueue();
+    res.json({ success: true, imported });
+  } catch (e) {
+    console.error("Manual sync error:", e);
+    res.status(500).json({ success: false, error: "Sync failed" });
+  }
 });
 
-// =====================================================================
-// OTP-BASED LOGIN SYSTEM (Admin + Employee)
-// =====================================================================
-const otpStore = {}; // { "9876543210": { otp: "123456", expiresAt: 1234567890 } }
-
-function generateOtp() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-}
-
-// Step 1: OTP generate + send
-app.post("/api/auth/send-otp", async (req, res) => {
-  const { phone } = req.body;
-  if (!phone || phone.length !== 10) {
-    return res.status(400).json({ success: false, error: "Valid 10-digit phone number bhejo" });
+// ============================================================
+// 5-minute safety-net cron
+// ============================================================
+cron.schedule("*/5 * * * *", async () => {
+  try {
+    const imported = await processPendingQueue();
+    if (imported > 0) console.log(`⏱ 5-min sync: ${imported} pending lead(s) processed`);
+  } catch (e) {
+    console.error("5-min cron error:", e);
   }
-
-  const otp = generateOtp();
-  otpStore[phone] = { otp, expiresAt: Date.now() + 5 * 60 * 1000 }; // 5 min valid
-
-  console.log(`📲 OTP for ${phone}: ${otp}`); // terminal mein dikhega — dev/testing ke liye
-
-  // -----------------------------------------------------------------
-  // PRODUCTION: yahan apna real SMS provider plug karo, jaise:
-  //
-  // await fetch("https://your-sms-provider.com/send", {
-  //   method: "POST",
-  //   headers: { Authorization: `Bearer ${process.env.SMS_API_KEY}` },
-  //   body: JSON.stringify({ to: phone, message: `Your ERP login OTP is ${otp}` }),
-  // });
-  // -----------------------------------------------------------------
-
-  const isDev = process.env.NODE_ENV !== "production";
-  res.json({ success: true, message: "OTP sent", ...(isDev && { devOtp: otp }) });
 });
 
-// Step 2: OTP verify
-app.post("/api/auth/verify-otp", (req, res) => {
-  const { phone, otp } = req.body;
-  const record = otpStore[phone];
+// ============================================================
+app.get("/", (req, res) => res.send("SNS ADS ERP backend is running ✅"));
 
-  if (!record) return res.status(400).json({ success: false, error: "Pehle OTP request karo" });
-  if (Date.now() > record.expiresAt) {
-    delete otpStore[phone];
-    return res.status(400).json({ success: false, error: "OTP expire ho gaya, dobara try karo" });
-  }
-  if (record.otp !== otp) {
-    return res.status(400).json({ success: false, error: "Galat OTP" });
-  }
-
-  delete otpStore[phone]; // one-time use
-  res.json({ success: true });
-});
-
-
-app.listen(PORT, () => console.log(`🚀 WhatsApp backend running on port ${PORT}`));
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`🚀 Backend running on port ${PORT}`));
