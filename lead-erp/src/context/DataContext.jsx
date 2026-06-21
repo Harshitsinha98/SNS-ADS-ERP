@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import {
   collection, collectionGroup, doc, onSnapshot, addDoc, updateDoc, setDoc,
-  query, orderBy, limit, writeBatch
+  query, where, orderBy, limit, writeBatch
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
@@ -34,8 +34,20 @@ export function DataProvider({ children }) {
       return;
     }
 
-    const unsubLeads = onSnapshot(collection(db, "leads"), (snap) =>
-      setLeads(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    // FIX: Admin ke liye poori collection, employee ke liye explicit where() filter.
+    // Firestore list-queries ko security rules ke against pre-validate karta hai —
+    // agar rule resource.data (per-doc) condition pe depend karta hai (jaise
+    // assignedTo == myPhone()), to query mein bhi exactly wahi where() clause
+    // hona zaroori hai, warna poori query hi permission-denied ho jaati hai
+    // (kuch matching docs nahi milte — sab kuch reject ho jaata hai).
+    const leadsQuery = user.role === "admin"
+      ? collection(db, "leads")
+      : query(collection(db, "leads"), where("assignedTo", "==", user.id));
+
+    const unsubLeads = onSnapshot(
+      leadsQuery,
+      (snap) => setLeads(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (err) => console.error("Leads listener error:", err)
     );
 
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) =>
