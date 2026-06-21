@@ -23,7 +23,7 @@ export function DataProvider({ children }) {
   const [notifications, setNotifications] = useState([]);
   const [activity, setActivity] = useState([]);
   const [goals, setGoals] = useState({});
-  const [financials, setFinancials] = useState({}); // { [leadId]: { revenue, ... } } — sirf admin ke liye
+  const [financials, setFinancials] = useState({});
 
   // ==========================================
   // 1. FIREBASE REALTIME LISTENERS
@@ -34,12 +34,6 @@ export function DataProvider({ children }) {
       return;
     }
 
-    // FIX: Admin ke liye poori collection, employee ke liye explicit where() filter.
-    // Firestore list-queries ko security rules ke against pre-validate karta hai —
-    // agar rule resource.data (per-doc) condition pe depend karta hai (jaise
-    // assignedTo == myPhone()), to query mein bhi exactly wahi where() clause
-    // hona zaroori hai, warna poori query hi permission-denied ho jaati hai
-    // (kuch matching docs nahi milte — sab kuch reject ho jaata hai).
     const leadsQuery = user.role === "admin"
       ? collection(db, "leads")
       : query(collection(db, "leads"), where("assignedTo", "==", user.id));
@@ -50,34 +44,60 @@ export function DataProvider({ children }) {
       (err) => console.error("Leads listener error:", err)
     );
 
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) =>
-      setUsers(snap.docs.map((d) => ({ id: d.id, phone: d.id.replace("+91", ""), ...d.data() })))
+    const unsubUsers = onSnapshot(
+      collection(db, "users"),
+      (snap) => setUsers(snap.docs.map((d) => ({ id: d.id, phone: d.id.replace("+91", ""), ...d.data() }))),
+      (err) => console.error("Users listener error:", err)
     );
 
     const unsubSettings = onSnapshot(doc(db, "settings", "config"), (d) => {
       if (d.exists()) setSettings(d.data());
-    });
+    }, (err) => console.error("Settings listener error:", err));
 
-    const unsubNotifs = onSnapshot(collection(db, "notifications"), (snap) =>
-      setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    // FIX: where("userId","==",user.id) add kiya. Rule mein isAdmin() ka koi
+    // bypass nahi hai (resource.data.userId == myPhone() hi ek condition hai),
+    // to bina filter ke ye list query admin-employee dono ke liye permission-denied
+    // thi — notification bell isi liye kabhi populate nahi ho raha tha.
+    const unsubNotifs = onSnapshot(
+      query(collection(db, "notifications"), where("userId", "==", user.id)),
+      (snap) => setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (err) => console.error("Notifications listener error:", err)
     );
 
-    const unsubActivity = onSnapshot(query(collection(db, "activity"), orderBy("at", "desc"), limit(100)), (snap) =>
-      setActivity(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-    );
+    // FIX: Rule "activity" ko sirf isAdmin() ke liye allow karta hai. Employee ke
+    // liye listener pehle bhi unconditionally subscribe ho raha tha → uncaught
+    // permission-denied har baar console mein. State pehle se bhi khaali rehti thi
+    // (failed listener update hi nahi karta), to behavior same — ab sirf clean hai.
+    let unsubActivity = () => {};
+    if (user.role === "admin") {
+      unsubActivity = onSnapshot(
+        query(collection(db, "activity"), orderBy("at", "desc"), limit(100)),
+        (snap) => setActivity(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        (err) => console.error("Activity listener error:", err)
+      );
+    } else {
+      setActivity([]);
+    }
 
-    const unsubGoals = onSnapshot(doc(db, "goals", "config"), (d) => {
-      if (d.exists()) setGoals(d.data());
-    });
+    // FIX: Rule "goals" ko bhi sirf isAdmin() ke liye allow karta hai — same gating
+    // financials wale pattern jaisa. Agar kisi employee-facing screen ko apna
+    // personal target dikhana ho, to data-model alag se design karna padega
+    // (e.g. goals/{empId} subcollection), batana.
+    let unsubGoals = () => {};
+    if (user.role === "admin") {
+      unsubGoals = onSnapshot(doc(db, "goals", "config"), (d) => {
+        if (d.exists()) setGoals(d.data());
+      }, (err) => console.error("Goals listener error:", err));
+    } else {
+      setGoals({});
+    }
 
-    // Revenue aggregate — sirf admin role ke liye collectionGroup query lagti hai.
-    // Employee ke liye listener register hi nahi hota (rules bhi block karengi agar koi force kare).
     let unsubFinancials = () => {};
     if (user.role === "admin") {
       unsubFinancials = onSnapshot(collectionGroup(db, "private"), (snap) => {
         const map = {};
         snap.docs.forEach((d) => {
-          const leadId = d.ref.parent.parent.id; // leads/{leadId}/private/data → leadId nikalna
+          const leadId = d.ref.parent.parent.id;
           map[leadId] = d.data();
         });
         setFinancials(map);
