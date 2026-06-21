@@ -17,8 +17,6 @@ const priorityClass = (p) => {
   }
 };
 
-// datetime-local input ko "YYYY-MM-DDTHH:mm" chahiye — full ISO (...Z) string
-// seedha daalne se input blank dikhta hai, isliye convert karna zaroori hai
 const toDatetimeLocal = (iso) => {
   if (!iso) return "";
   const d = new Date(iso);
@@ -38,12 +36,15 @@ export default function Tasks() {
   );
 
   const isClosed = (l) => ["Closed-Won", "Lost"].includes(l.status);
+  // FIX: "overdue" sirf date-level check kar raha tha (!isToday), isliye follow-up
+  // ka time nikal jaane ke baad bhi — agar wo aaj ka hi din hai — lead "Follow-up
+  // Today" mein hi atki rehti thi, "Overdue" mein kabhi nahi aati thi. Ab time-based
+  // check: jis follow-up ka time nikal chuka hai wo Overdue hai, chahe aaj ka ho ya purana.
+  const isPast = (l) => l.followUp && new Date(l.followUp) < new Date();
 
   const newToCall = myLeads.filter((l) => l.status === "New");
-  const followToday = myLeads.filter((l) => isToday(l.followUp) && !isClosed(l));
-  const overdue = myLeads.filter(
-    (l) => l.followUp && new Date(l.followUp) < new Date() && !isToday(l.followUp) && !isClosed(l)
-  );
+  const followToday = myLeads.filter((l) => isToday(l.followUp) && !isPast(l) && !isClosed(l));
+  const overdue = myLeads.filter((l) => isPast(l) && !isClosed(l));
 
   const buckets = { "All": myLeads, "New to Call": newToCall, "Follow-up Today": followToday, "Overdue": overdue };
 
@@ -54,10 +55,11 @@ export default function Tasks() {
 
   return (
     <Layout title="My Leads">
-      <div className="flex gap-2 mb-5">
+      {/* Mobile fix: 4 tabs squeeze hone ke bajaye horizontally scroll karte hain */}
+      <div className="flex gap-2 mb-5 overflow-x-auto pb-1 -mx-1 px-1">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+            className={`shrink-0 px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
               tab === t ? "bg-ink text-white border-ink" : "bg-white border-paper-line text-ink/60 hover:bg-paper"
             }`}>
             {t} <span className="num">({buckets[t].length})</span>
@@ -66,7 +68,7 @@ export default function Tasks() {
       </div>
 
       <div className="bg-white rounded-lg shadow-card border border-paper-line overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[700px]">
           <thead><tr className="text-left text-ink/40 border-b border-paper-line bg-paper/60">
             <th className="p-3 font-medium">Name</th><th className="font-medium">Phone</th>
             <th className="font-medium">Priority</th><th className="font-medium">Status</th>
@@ -74,7 +76,7 @@ export default function Tasks() {
           </tr></thead>
           <tbody>
             {view.map((l) => {
-              const rowOverdue = l.followUp && new Date(l.followUp) < new Date() && !isClosed(l);
+              const rowOverdue = isPast(l) && !isClosed(l);
               return (
                 <tr key={l.id} className="border-b border-paper-line last:border-0 hover:bg-paper/50">
                   <td className="p-3 font-medium">{l.name}</td>

@@ -18,10 +18,13 @@ export default function Workspace() {
 
   const myLeads = leads.filter((l) => l.assignedTo === user.id && !l.blacklisted);
   const isClosed = (l) => ["Closed-Won", "Lost"].includes(l.status);
+  // FIX: same overdue bug jo Tasks.jsx mein tha — time-based check, "aaj ka
+  // follow-up jiska time nikal gaya" ab Overdue mein aata hai.
+  const isPast = (l) => l.followUp && new Date(l.followUp) < new Date();
 
   const newToCall = myLeads.filter((l) => l.status === "New");
-  const followToday = myLeads.filter((l) => isToday(l.followUp) && !isClosed(l));
-  const overdue = myLeads.filter((l) => l.followUp && new Date(l.followUp) < new Date() && !isToday(l.followUp) && !isClosed(l));
+  const followToday = myLeads.filter((l) => isToday(l.followUp) && !isPast(l) && !isClosed(l));
+  const overdue = myLeads.filter((l) => isPast(l) && !isClosed(l));
   const hotLeads = myLeads.filter((l) => l.priority === "Hot" && !isClosed(l));
   const idleLeads = myLeads.filter((l) => !isClosed(l) && daysSince(l.lastUpdated) >= 2);
   const myNotifs = notifications.filter((n) => n.userId === user.id && !n.read);
@@ -41,8 +44,6 @@ export default function Workspace() {
 
   const saveGoal = () => { setMyGoal(user.id, goalInput); setEditingGoal(false); setGoalInput(""); };
 
-  // Quick actions ab proper author info bhejte hain — pehle note mein
-  // "System" dikhta tha, ab employee ka actual naam save hoga
   const quickCall = (lead) => {
     addNote(lead.id, "Quick-call initiated from dashboard", "call", {
       authorId: user.id, authorName: user.name, authorRole: user.role, visibility: "team",
@@ -55,13 +56,12 @@ export default function Workspace() {
     });
     window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
   };
-  // Status change ab updateLeadStatus se — "by {name}" bhi note mein save hoga
   const quickStatus = (id, status) => updateLeadStatus(id, status, user);
 
   return (
     <Layout title={`Welcome, ${user.name}`}>
       {myNotifs.length > 0 && (
-        <div className="bg-info-soft border border-info/20 rounded-lg p-4 mb-5 flex justify-between">
+        <div className="bg-info-soft border border-info/20 rounded-lg p-4 mb-5 flex flex-col sm:flex-row sm:justify-between gap-3">
           <div>
             <b className="text-info">{myNotifs.length} new notification(s)</b>
             <ul className="text-sm text-ink/70 mt-1 space-y-0.5">{myNotifs.map((n) => <li key={n.id}>{n.text}</li>)}</ul>
@@ -101,23 +101,23 @@ export default function Workspace() {
         )}
       </div>
 
-      <div className="flex justify-between items-center bg-white rounded-lg shadow-card border border-paper-line p-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white rounded-lg shadow-card border border-paper-line p-4 mb-6">
         <div>
           <p className="font-medium text-sm">{myLeads.length} leads assigned to you</p>
           <p className="text-xs text-ink/40">Sab leads ek jagah dekho, status/priority/follow-up seedha yahin se badlo.</p>
         </div>
-        <Link to="/app/tasks" className="flex items-center gap-1.5 bg-ink text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-ink/90">
+        <Link to="/app/tasks" className="flex items-center justify-center gap-1.5 bg-ink text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-ink/90">
           <ListChecks size={15} /> View all my leads
         </Link>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <StatCard label="Active pipeline" value={myLeads.length} tone="ink" />
         <StatCard label="New to call" value={newToCall.length} tone="info" />
         <StatCard label="Follow-ups today" value={followToday.length} tone="signal" icon={Clock} />
         <StatCard label="Overdue" value={overdue.length} tone="danger" />
       </div>
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <StatCard label="Conversions" value={won} tone="ok" />
         <StatCard label="Conversion rate" value={`${convRate}%`} tone="info" />
         <StatCard label="My rank" value={`#${rank} of ${totalEmployees}`} tone="signal" icon={Trophy} />
@@ -149,20 +149,20 @@ export default function Workspace() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <DayCard title="New to call" list={newToCall} settings={settings} onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={quickStatus} />
         <DayCard title="Follow-ups today" list={followToday} settings={settings} onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={quickStatus} />
         <DayCard title="Overdue" list={overdue} settings={settings} danger onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={quickStatus} />
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
           <p className="eyebrow mb-3">My weekly conversions</p>
           <ConvBar data={trend} />
         </div>
-        <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
+        <div className="bg-white rounded-lg shadow-card border border-paper-line p-5 overflow-x-auto">
           <p className="eyebrow mb-3">My source performance</p>
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[400px]">
             <thead><tr className="text-left text-ink/40 border-b border-paper-line">
               <th className="py-2 font-medium">Source</th><th className="font-medium">Leads</th>
               <th className="font-medium">Won</th><th className="font-medium">Rate</th>
@@ -208,7 +208,7 @@ function LeadRow({ lead, settings, onCall, onWhatsApp, onStatus }) {
         <p className="text-xs text-ink/40 num">{lead.phone}</p>
         <StatusLamp status={lead.status} />
       </div>
-      <div className="flex items-center gap-2 mt-2">
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
         <button onClick={() => onCall(lead)} className="flex items-center gap-1 text-xs bg-ok-soft text-ok px-2 py-1 rounded">
           <Phone size={11} /> Call
         </button>

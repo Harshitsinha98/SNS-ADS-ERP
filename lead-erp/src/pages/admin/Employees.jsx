@@ -30,14 +30,14 @@ export default function Employees() {
 
   return (
     <Layout title="Employee Performance & Management">
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Stat label="Total employees" value={employees.length} />
         <Stat label="Team leads handled" value={teamTotal} />
         <Stat label="Team conversions" value={teamWon} />
         <Stat label="Team conv. rate" value={`${teamTotal ? Math.round((teamWon / teamTotal) * 100) : 0}%`} />
       </div>
 
-      <div className="flex justify-between items-center mb-3">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-3">
         <p className="eyebrow">Performance leaderboard</p>
         <button onClick={() => setShowForm((s) => !s)} className="bg-ink text-white px-4 py-2 rounded-md text-sm">
           {showForm ? "Close" : "+ Add employee"}
@@ -45,7 +45,7 @@ export default function Employees() {
       </div>
 
       {showForm && (
-        <form onSubmit={create} className="bg-white rounded-lg shadow-card border border-paper-line p-5 mb-5 grid grid-cols-4 gap-3 items-end">
+        <form onSubmit={create} className="bg-white rounded-lg shadow-card border border-paper-line p-5 mb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <input className="border border-paper-line rounded-md p-2 text-sm" placeholder="Full Name"
             value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
           <input className="border border-paper-line rounded-md p-2 text-sm" placeholder="10-digit Mobile" maxLength={10}
@@ -60,7 +60,7 @@ export default function Employees() {
       )}
 
       <div className="bg-white rounded-lg shadow-card border border-paper-line overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[680px]">
           <thead><tr className="text-left text-ink/40 border-b border-paper-line bg-paper/60">
             <th className="p-3 font-medium">Rank</th><th className="font-medium">Employee</th><th className="font-medium">Mobile</th>
             <th className="font-medium">Assigned</th><th className="font-medium">Won</th><th className="font-medium">Conv. rate</th>

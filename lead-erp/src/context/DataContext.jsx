@@ -25,9 +25,6 @@ export function DataProvider({ children }) {
   const [goals, setGoals] = useState({});
   const [financials, setFinancials] = useState({});
 
-  // ==========================================
-  // 1. FIREBASE REALTIME LISTENERS
-  // ==========================================
   useEffect(() => {
     if (!user) {
       setLeads([]); setUsers([]); setNotifications([]); setActivity([]); setGoals({}); setFinancials({});
@@ -54,20 +51,12 @@ export function DataProvider({ children }) {
       if (d.exists()) setSettings(d.data());
     }, (err) => console.error("Settings listener error:", err));
 
-    // FIX: where("userId","==",user.id) add kiya. Rule mein isAdmin() ka koi
-    // bypass nahi hai (resource.data.userId == myPhone() hi ek condition hai),
-    // to bina filter ke ye list query admin-employee dono ke liye permission-denied
-    // thi — notification bell isi liye kabhi populate nahi ho raha tha.
     const unsubNotifs = onSnapshot(
       query(collection(db, "notifications"), where("userId", "==", user.id)),
       (snap) => setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
       (err) => console.error("Notifications listener error:", err)
     );
 
-    // FIX: Rule "activity" ko sirf isAdmin() ke liye allow karta hai. Employee ke
-    // liye listener pehle bhi unconditionally subscribe ho raha tha → uncaught
-    // permission-denied har baar console mein. State pehle se bhi khaali rehti thi
-    // (failed listener update hi nahi karta), to behavior same — ab sirf clean hai.
     let unsubActivity = () => {};
     if (user.role === "admin") {
       unsubActivity = onSnapshot(
@@ -79,10 +68,6 @@ export function DataProvider({ children }) {
       setActivity([]);
     }
 
-    // FIX: Rule "goals" ko bhi sirf isAdmin() ke liye allow karta hai — same gating
-    // financials wale pattern jaisa. Agar kisi employee-facing screen ko apna
-    // personal target dikhana ho, to data-model alag se design karna padega
-    // (e.g. goals/{empId} subcollection), batana.
     let unsubGoals = () => {};
     if (user.role === "admin") {
       unsubGoals = onSnapshot(doc(db, "goals", "config"), (d) => {
@@ -110,9 +95,6 @@ export function DataProvider({ children }) {
   }, [user]);
 
 
-  // ==========================================
-  // 2. ACTIVITY & LOGGING
-  // ==========================================
   const logActivity = async (text) => {
     try {
       await addDoc(collection(db, "activity"), { text, at: new Date().toISOString() });
@@ -120,9 +102,6 @@ export function DataProvider({ children }) {
   };
 
 
-  // ==========================================
-  // 3. LEAD OPERATIONS
-  // ==========================================
   const writeNote = async (leadId, noteData) => {
     try {
       await addDoc(collection(db, "leads", leadId, "notes"), {
@@ -223,15 +202,50 @@ export function DataProvider({ children }) {
     logActivity(`Lead ${id} reassigned to ${employeeName || employeeId}`);
   };
 
+  // NEW: deactivate/delete hone wale employee ki saari OPEN leads (Closed-Won/Lost
+  // ke alawa) ek saath kisi aur employee ko move karne ke liye — taaki koi lead
+  // orphan na ho jaaye (jisko koi bhi employee apni "My Leads" mein na dekh paaye).
+  const reassignAllLeads = async (fromEmployeeId, toEmployeeId, toEmployeeName, user) => {
+    try {
+      const openLeads = leads.filter(
+        (l) => l.assignedTo === fromEmployeeId && !["Closed-Won", "Lost"].includes(l.status)
+      );
+      if (openLeads.length === 0) return 0;
+
+      const batch = writeBatch(db);
+      openLeads.forEach((l) => {
+        batch.update(doc(db, "leads", l.id), {
+          assignedTo: toEmployeeId,
+          assignedToName: toEmployeeName || null,
+          lastUpdated: new Date().toISOString(),
+        });
+      });
+      await batch.commit();
+
+      await Promise.all(openLeads.map((l) =>
+        writeNote(l.id, {
+          type: "assignment",
+          text: `Bulk-reassigned to ${toEmployeeName || toEmployeeId}${user?.name ? ` by ${user.name}` : ""} (previous employee deactivated)`,
+          visibility: "team",
+          authorName: user?.name || "System",
+        })
+      ));
+
+      pushNotif(toEmployeeId, `${openLeads.length} lead(s) reassigned to you from a deactivated employee`);
+      logActivity(`${openLeads.length} lead(s) bulk-reassigned from ${fromEmployeeId} to ${toEmployeeName || toEmployeeId}`);
+      return openLeads.length;
+    } catch (e) {
+      console.error("Bulk reassign error:", e);
+      return 0;
+    }
+  };
+
   const blacklistLead = (id) => {
     updateLead(id, { blacklisted: true, status: "Lost" });
     logActivity(`Lead ${id} blacklisted`);
   };
 
 
-  // ==========================================
-  // 4. BULK IMPORT & ASSIGNMENT (OPTIMIZED)
-  // ==========================================
   const addBulkLeads = async (rows, assigner) => {
     try {
       const emps = users.filter((u) => u.role === "employee");
@@ -290,9 +304,6 @@ export function DataProvider({ children }) {
   };
 
 
-  // ==========================================
-  // 5. USER OPERATIONS
-  // ==========================================
   const addUser = async (u) => {
     try {
       await setDoc(doc(db, "users", "+91" + u.phone), { name: u.name, role: u.role, active: true });
@@ -307,9 +318,6 @@ export function DataProvider({ children }) {
   const deactivateUser = (id) => updateUser(id, { active: false });
 
 
-  // ==========================================
-  // 6. NOTIFICATIONS
-  // ==========================================
   const pushNotif = async (userId, text) => {
     try {
       await addDoc(collection(db, "notifications"), { userId, text, read: false, at: new Date().toISOString() });
@@ -327,9 +335,6 @@ export function DataProvider({ children }) {
   };
 
 
-  // ==========================================
-  // 7. SETTINGS & SYNC
-  // ==========================================
   const setMyGoal = async (empId, target) => {
     try { await setDoc(doc(db, "goals", "config"), { ...goals, [empId]: Number(target) || 0 }, { merge: true }); }
     catch (e) { console.error("Set goal error:", e); }
@@ -355,7 +360,7 @@ export function DataProvider({ children }) {
       leads, users, settings, notifications, activity, goals, financials,
       setSettings: setSettingsValue, updateLead, addNote, addWorknote,
       updateLeadStatus, updatePriority, updateFollowUpDate, updateLeadRevenue,
-      reassignLead, blacklistLead,
+      reassignLead, reassignAllLeads, blacklistLead,
       addBulkLeads, addUser, updateUser, deactivateUser, pushNotif, markRead, logActivity, setMyGoal,
       triggerWhatsAppSync,
     }}>

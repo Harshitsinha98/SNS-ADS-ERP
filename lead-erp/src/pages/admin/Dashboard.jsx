@@ -16,7 +16,6 @@ export default function Dashboard() {
   const activeLeads = total - converted - lost;
   const convRate = total ? ((converted / total) * 100).toFixed(1) : 0;
 
-  // Revenue ab leads/{id}/private/data se aata hai — lead.value field se nahi
   const revenueOf = (lead) => financials[lead.id]?.revenue || 0;
 
   const wonValue = active
@@ -56,14 +55,14 @@ export default function Dashboard() {
 
   return (
     <Layout title="Business Command Center">
-      <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         <StatCard label="Revenue won" value={fmtMoney(wonValue)} tone="ok" icon={IndianRupee} />
         <StatCard label="Pipeline value" value={fmtMoney(openValue)} tone="info" icon={Layers} />
         <StatCard label="Conversion rate" value={`${convRate}%`} tone="signal" icon={TrendingUp} />
         <StatCard label="Hot leads open" value={hotLeads.length} tone="danger" icon={Flame} />
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard label="Total leads" value={total} tone="ink" />
         <StatCard label="Active" value={activeLeads} tone="info" />
         <StatCard label="Converted" value={converted} tone="ok" />
@@ -77,7 +76,7 @@ export default function Dashboard() {
           </h3>
           <ul className="text-sm text-ink/70 space-y-1">
             {slaBreaches.map((l) => (
-              <li key={l.id} className="flex justify-between border-b border-paper-line last:border-0 py-1">
+              <li key={l.id} className="flex flex-wrap justify-between gap-1 border-b border-paper-line last:border-0 py-1">
                 <span>{l.name} <span className="num text-ink/40">({l.id})</span></span>
                 <span className="num text-danger">{daysSince(l.lastUpdated)}d idle</span>
               </li>
@@ -86,7 +85,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
           <p className="eyebrow mb-3">Lead status distribution</p>
           <StatusPie data={statusData} />
@@ -97,9 +96,9 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-card border border-paper-line p-5 mb-6">
+      <div className="bg-white rounded-lg shadow-card border border-paper-line p-5 mb-6 overflow-x-auto">
         <p className="eyebrow mb-3">Lead source performance</p>
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[500px]">
           <thead><tr className="text-left text-ink/40 border-b border-paper-line">
             <th className="py-2 font-medium">Source</th><th className="font-medium">Leads</th>
             <th className="font-medium">Won</th><th className="font-medium">Rate</th><th className="font-medium">Revenue</th>

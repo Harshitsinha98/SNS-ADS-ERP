@@ -27,13 +27,6 @@ export default function LeadAction() {
   const [pendingDuration, setPendingDuration] = useState(0);
   const [worknote, setWorknote] = useState("");
 
-  // FIX: orderBy hata diya. where("visibility","==","team") + orderBy("at","desc")
-  // ek saath ek composite index maangte hain jo console mein kabhi create nahi hua —
-  // isiliye query "requires an index" error deti thi aur history hamesha khaali aati
-  // thi. Timeline.jsx already entries ko client-side sort karta hai, to orderBy ki
-  // zaroorat nahi. Filter ko exactly rule jaisa banaya (!= "admin_only" instead of
-  // == "team") — isse koi bhi non-private note (apna, doosre employee ka, admin ka)
-  // automatically dikhega, future visibility values ke liye bhi safe rahega.
   useEffect(() => {
     if (!id) return;
     const q = query(
@@ -110,7 +103,9 @@ export default function LeadAction() {
     <Layout title="Lead Action Interface">
       <button onClick={() => navigate(-1)} className="text-sm text-ink/40 mb-4 hover:text-ink">← Back</button>
 
-      <div className="grid grid-cols-3 gap-6">
+      {/* FIX: grid-cols-3 → grid-cols-1 md:grid-cols-3. Mobile pe ab niche stack
+          hota hai, tablet+ (md, ≥768px) se side-by-side 3 columns. */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
           <p className="eyebrow mb-3">Client profile</p>
           <p className="text-sm mb-1"><span className="text-ink/40">Name</span> · {lead.name}</p>

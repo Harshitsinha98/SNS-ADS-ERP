@@ -1,20 +1,33 @@
+import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import Layout from "../../components/Layout";
 import { useData } from "../../context/DataContext";
+import { useAuth } from "../../context/AuthContext";
 import { employeeStats, fmtDate, daysSince, fmtMoney } from "../../utils/helpers";
 import { PriorityBadge } from "../../components/StatusLamp";
 
 export default function EmployeeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { users, leads, updateUser, reassignLead } = useData();
+  const { user } = useAuth();
+  const { users, leads, financials, updateUser, reassignLead, reassignAllLeads } = useData();
+  const [bulkTarget, setBulkTarget] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const emp = users.find((u) => u.id === id);
   if (!emp) return <Layout title="Employee"><p className="text-danger">Employee not found.</p></Layout>;
 
   const stats = employeeStats(id, leads);
   const otherEmps = users.filter((u) => u.role === "employee" && u.id !== id);
-  const revenue = stats.leads.filter((l) => l.status === "Closed-Won").reduce((s, l) => s + (l.value || 0), 0);
+
+  // FIX: revenue ab financials (leads/{id}/private/data) se aata hai. l.value
+  // kabhi exist hi nahi karta tha lead doc pe — isliye revenue hamesha ₹0
+  // dikhta tha. financials map context se aata hai (admin-only listener).
+  const revenue = stats.leads
+    .filter((l) => l.status === "Closed-Won")
+    .reduce((s, l) => s + (financials[l.id]?.revenue || 0), 0);
+
+  const openLeadsCount = stats.leads.filter((l) => !["Closed-Won", "Lost"].includes(l.status)).length;
 
   const changeNumber = () => {
     const newPhone = prompt("Naya 10-digit mobile number daalo:", emp.phone);
@@ -26,33 +39,61 @@ export default function EmployeeDetail() {
     }
   };
 
+  // NEW (Q3 fix): deactivate karne se pehle (ya kabhi bhi) saari OPEN leads ek
+  // click mein doosre employee ko move — taaki koi lead orphan na ho jaaye.
+  const handleBulkReassign = async () => {
+    if (!bulkTarget) return;
+    setBulkBusy(true);
+    const target = otherEmps.find((o) => o.id === bulkTarget);
+    const count = await reassignAllLeads(emp.id, bulkTarget, target?.name, user);
+    setBulkBusy(false);
+    setBulkTarget("");
+    alert(count > 0 ? `${count} open lead(s) reassigned to ${target?.name}.` : "Koi open lead nahi thi reassign karne ke liye.");
+  };
+
   return (
     <Layout title={`Employee Profile — ${emp.name}`}>
       <button onClick={() => navigate(-1)} className="text-sm text-ink/40 mb-4 hover:text-ink">← Back to leaderboard</button>
 
-      <div className="grid grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-full bg-ink text-white flex items-center justify-center font-display font-semibold text-lg">
+            <div className="w-12 h-12 rounded-full bg-ink text-white flex items-center justify-center font-display font-semibold text-lg shrink-0">
               {emp.name.charAt(0)}
             </div>
-            <div>
-              <p className="font-medium">{emp.name}</p>
+            <div className="min-w-0">
+              <p className="font-medium truncate">{emp.name}</p>
               <p className="text-xs text-ink/40 num">{emp.phone}</p>
             </div>
           </div>
           <p className="text-sm"><span className="text-ink/40">Role</span> · {emp.role}</p>
           <p className="text-sm"><span className="text-ink/40">Status</span> · {emp.active === false ? "Inactive" : "Active"}</p>
-          <div className="flex gap-2 mt-4">
+          <div className="flex flex-wrap gap-2 mt-4">
             <button onClick={changeNumber} className="text-xs bg-paper border border-paper-line px-3 py-1.5 rounded">Change number</button>
             <button onClick={() => updateUser(emp.id, { active: !(emp.active !== false) })}
               className="text-xs bg-danger-soft text-danger px-3 py-1.5 rounded">
               {emp.active === false ? "Activate" : "Deactivate"}
             </button>
           </div>
+
+          {openLeadsCount > 0 && (
+            <div className="mt-4 pt-4 border-t border-paper-line">
+              <p className="eyebrow mb-2">Open leads — {openLeadsCount}</p>
+              <p className="text-xs text-ink/40 mb-2">Deactivate karne se pehle (ya kisi bhi waqt) saari open leads kisi aur employee ko move karo, taaki koi lead orphan na ho.</p>
+              <select value={bulkTarget} onChange={(e) => setBulkTarget(e.target.value)}
+                className="w-full border border-paper-line rounded-md p-2 text-xs mb-2">
+                <option value="">Move all open leads to…</option>
+                {otherEmps.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </select>
+              <button onClick={handleBulkReassign} disabled={!bulkTarget || bulkBusy}
+                className="w-full bg-ink text-white rounded-md p-2 text-xs disabled:opacity-40">
+                {bulkBusy ? "Reassigning…" : `Reassign all ${openLeadsCount} open lead(s)`}
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="col-span-2 grid grid-cols-3 gap-4">
+        <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-4">
           <Metric label="Total assigned" value={stats.total} tone="ink" />
           <Metric label="Active pipeline" value={stats.active} tone="info" />
           <Metric label="Converted" value={stats.won} tone="ok" />
@@ -64,7 +105,7 @@ export default function EmployeeDetail() {
 
       <div className="bg-white rounded-lg shadow-card border border-paper-line overflow-x-auto">
         <p className="eyebrow p-4 pb-2">Assigned leads ({stats.leads.length})</p>
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[640px]">
           <thead><tr className="text-left text-ink/40 border-b border-paper-line">
             <th className="p-3 font-medium">ID</th><th className="font-medium">Name</th><th className="font-medium">Priority</th>
             <th className="font-medium">Status</th><th className="font-medium">Value</th><th className="font-medium">Idle</th><th className="font-medium">Reassign</th>
@@ -78,10 +119,11 @@ export default function EmployeeDetail() {
                   <td><Link to={`/admin/leads/${l.id}`} className="font-medium hover:underline">{l.name}</Link></td>
                   <td><PriorityBadge p={l.priority} /></td>
                   <td className="text-xs">{l.status}</td>
-                  <td className="num">{fmtMoney(l.value)}</td>
+                  <td className="num">{fmtMoney(financials[l.id]?.revenue || 0)}</td>
                   <td className={`num ${idle >= 3 ? "text-danger font-medium" : ""}`}>{idle}d</td>
                   <td>
-                    <select defaultValue="" onChange={(e) => e.target.value && reassignLead(l.id, e.target.value)}
+                    {/* FIX: employeeName + user pass kiya, pehle sirf 2 args jaate the */}
+                    <select defaultValue="" onChange={(e) => e.target.value && reassignLead(l.id, e.target.value, otherEmps.find((o) => o.id === e.target.value)?.name, user)}
                       className="border border-paper-line rounded p-1 text-xs">
                       <option value="">Move to…</option>
                       {otherEmps.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}

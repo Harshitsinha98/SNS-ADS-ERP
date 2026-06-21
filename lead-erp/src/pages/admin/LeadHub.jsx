@@ -84,7 +84,7 @@ export default function LeadHub() {
           className="flex items-center gap-1.5 bg-ok text-white px-4 py-2 rounded-md text-sm disabled:opacity-50">
           <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> {syncing ? "Syncing…" : "Sync WhatsApp now"}
         </button>
-        <select className="border border-paper-line rounded-md p-2 text-sm ml-auto" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+        <select className="border border-paper-line rounded-md p-2 text-sm sm:ml-auto" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
           <option>All</option>
           {settings.statuses.map((s) => <option key={s}>{s}</option>)}
         </select>
@@ -97,7 +97,7 @@ export default function LeadHub() {
       </div>
 
       <div className="bg-white rounded-lg shadow-card border border-paper-line overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[760px]">
           <thead><tr className="text-left text-ink/40 border-b border-paper-line bg-paper/60">
             <th className="p-3 font-medium">ID</th><th className="font-medium">Name</th><th className="font-medium">Source</th>
             <th className="font-medium">Priority</th><th className="font-medium">Status</th>
@@ -120,7 +120,10 @@ export default function LeadHub() {
                 </td>
                 <td><StatusLamp status={l.status} /></td>
                 <td>
-                  <select value={l.assignedTo || ""} onChange={(e) => reassignLead(l.id, e.target.value)}
+                  {/* FIX: employeeName + user pass kiya, pehle sirf 2 args jaate the —
+                      assignedToName hamesha null save hota tha */}
+                  <select value={l.assignedTo || ""}
+                    onChange={(e) => reassignLead(l.id, e.target.value, employees.find((u) => u.id === e.target.value)?.name, user)}
                     className="border border-paper-line rounded p-1 text-xs">
                     {employees.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
