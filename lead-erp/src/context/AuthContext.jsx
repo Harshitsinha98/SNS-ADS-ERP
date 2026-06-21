@@ -15,18 +15,22 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
       if (!fbUser) { setUser(null); setAuthLoading(false); return; }
-      // Firebase ne phone ownership verify kar diya — ab apna users collection check karo
-      const phoneId = fbUser.phoneNumber; // already "+91XXXXXXXXXX" format
-      const snap = await getDoc(doc(db, "users", phoneId));
-      if (!snap.exists() || snap.data().active === false) {
-        // Number Firebase mein verify ho gaya par humare ERP mein registered nahi hai
+      const phoneId = fbUser.phoneNumber;
+      try {
+        const snap = await getDoc(doc(db, "users", phoneId));
+        if (!snap.exists() || snap.data().active === false) {
+          await signOut(auth);
+          setUser(null);
+          return;
+        }
+        setUser({ id: phoneId, phone: phoneId.replace("+91", ""), ...snap.data() });
+      } catch (e) {
+        console.error("User profile fetch error:", e);
         await signOut(auth);
         setUser(null);
+      } finally {
         setAuthLoading(false);
-        return;
       }
-      setUser({ id: phoneId, phone: phoneId.replace("+91", ""), ...snap.data() });
-      setAuthLoading(false);
     });
     return unsub;
   }, []);
@@ -41,9 +45,14 @@ export function AuthProvider({ children }) {
   // Step 1: registered check + Firebase real OTP bhejo
   const requestOtp = async (phone) => {
     const phoneId = toE164(phone);
-    const snap = await getDoc(doc(db, "users", phoneId));
-    if (!snap.exists() || snap.data().active === false) {
-      return { ok: false, error: "Ye number registered nahi hai. Admin se contact karo." };
+    try {
+      const snap = await getDoc(doc(db, "users", phoneId));
+      if (!snap.exists() || snap.data().active === false) {
+        return { ok: false, error: "Ye number registered nahi hai. Admin se contact karo." };
+      }
+    } catch (e) {
+      console.error("Registration check error:", e);
+      return { ok: false, error: "Number check karne mein error aaya. Thodi der baad try karo." };
     }
     try {
       const verifier = ensureRecaptcha();
