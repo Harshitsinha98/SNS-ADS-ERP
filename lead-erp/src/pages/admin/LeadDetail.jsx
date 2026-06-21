@@ -11,6 +11,16 @@ import Timeline from "../../components/Timeline";
 
 const PRIORITIES = ["Hot", "Warm", "Cold"];
 
+// datetime-local input ko "YYYY-MM-DDTHH:mm" chahiye — full ISO (...Z) string
+// seedha daalne se input blank dikhta tha, isliye convert karna zaroori hai
+const toDatetimeLocal = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -35,8 +45,6 @@ export default function LeadDetail() {
   const [showWorknoteModal, setShowWorknoteModal] = useState(false);
   const [pendingDuration, setPendingDuration] = useState(0);
 
-  // Notes ab subcollection se live aate hain. Employee ke liye Firestore Rules
-  // khud admin_only documents ko snapshot se hata degi — client filter ki zaroorat nahi.
   useEffect(() => {
     if (!id) return;
     const q = query(collection(db, "leads", id, "notes"), orderBy("at", "desc"));
@@ -46,7 +54,6 @@ export default function LeadDetail() {
     return unsub;
   }, [id]);
 
-  // Financial sirf admin ke liye subscribe hota hai — employee ke liye request hi nahi jaati
   useEffect(() => {
     if (!id || user?.role !== 'admin') { setFinancial(null); return; }
     const unsub = onSnapshot(doc(db, "leads", id, "private", "data"), (snap) => {
@@ -141,7 +148,9 @@ export default function LeadDetail() {
 
               <div>
                 <label className="text-xs font-semibold text-gray-500">Follow-up Date {isOverdue && <span className="text-red-500">(Overdue)</span>}</label>
-                <input type="datetime-local" value={lead.followUp || ""} onChange={(e) => updateFollowUpDate(lead.id, e.target.value, user)} className="w-full border rounded p-2 mt-1" />
+                <input type="datetime-local" value={toDatetimeLocal(lead.followUp)}
+                  onChange={(e) => updateFollowUpDate(lead.id, e.target.value ? new Date(e.target.value).toISOString() : null, user)}
+                  className="w-full border rounded p-2 mt-1" />
               </div>
 
               {user.role === "admin" && (

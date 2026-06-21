@@ -7,21 +7,23 @@ import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import { StatusLamp, PriorityBadge } from "../../components/StatusLamp";
 import { isToday, fmtDate, daysSince, last7DaysTrend, employeeRank, toWaNumber, sourceStats } from "../../utils/helpers";
-import { Target, Flame, Clock, Trophy, Phone, MessageCircle } from "lucide-react";
+import { Target, Flame, Clock, Trophy, Phone, MessageCircle, ListChecks } from "lucide-react";
 
 export default function Workspace() {
   const { user } = useAuth();
-  const { leads, users, settings, notifications, markRead, updateLead, addNote, goals, setMyGoal } = useData();
+  const { leads, users, settings, notifications, markRead, updateLeadStatus, addNote, goals, setMyGoal } = useData();
 
   const [goalInput, setGoalInput] = useState("");
   const [editingGoal, setEditingGoal] = useState(false);
 
   const myLeads = leads.filter((l) => l.assignedTo === user.id && !l.blacklisted);
+  const isClosed = (l) => ["Closed-Won", "Lost"].includes(l.status);
+
   const newToCall = myLeads.filter((l) => l.status === "New");
-  const followToday = myLeads.filter((l) => isToday(l.followUp));
-  const overdue = myLeads.filter((l) => l.followUp && new Date(l.followUp) < new Date() && !isToday(l.followUp));
-  const hotLeads = myLeads.filter((l) => l.priority === "Hot" && !["Closed-Won", "Lost"].includes(l.status));
-  const idleLeads = myLeads.filter((l) => !["Closed-Won", "Lost"].includes(l.status) && daysSince(l.lastUpdated) >= 2);
+  const followToday = myLeads.filter((l) => isToday(l.followUp) && !isClosed(l));
+  const overdue = myLeads.filter((l) => l.followUp && new Date(l.followUp) < new Date() && !isToday(l.followUp) && !isClosed(l));
+  const hotLeads = myLeads.filter((l) => l.priority === "Hot" && !isClosed(l));
+  const idleLeads = myLeads.filter((l) => !isClosed(l) && daysSince(l.lastUpdated) >= 2);
   const myNotifs = notifications.filter((n) => n.userId === user.id && !n.read);
 
   const won = myLeads.filter((l) => l.status === "Closed-Won").length;
@@ -39,14 +41,22 @@ export default function Workspace() {
 
   const saveGoal = () => { setMyGoal(user.id, goalInput); setEditingGoal(false); setGoalInput(""); };
 
+  // Quick actions ab proper author info bhejte hain — pehle note mein
+  // "System" dikhta tha, ab employee ka actual naam save hoga
   const quickCall = (lead) => {
-  addNote(lead.id, "Quick-call initiated from dashboard", "call");
-  window.location.href = `tel:${lead.phone}`;
-};
-const quickWhatsApp = (lead) => {
-  addNote(lead.id, "WhatsApp opened from dashboard", "whatsapp");
-  window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
-};
+    addNote(lead.id, "Quick-call initiated from dashboard", "call", {
+      authorId: user.id, authorName: user.name, authorRole: user.role, visibility: "team",
+    });
+    window.location.href = `tel:${lead.phone}`;
+  };
+  const quickWhatsApp = (lead) => {
+    addNote(lead.id, "WhatsApp opened from dashboard", "whatsapp", {
+      authorId: user.id, authorName: user.name, authorRole: user.role, visibility: "team",
+    });
+    window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
+  };
+  // Status change ab updateLeadStatus se — "by {name}" bhi note mein save hoga
+  const quickStatus = (id, status) => updateLeadStatus(id, status, user);
 
   return (
     <Layout title={`Welcome, ${user.name}`}>
@@ -91,6 +101,16 @@ const quickWhatsApp = (lead) => {
         )}
       </div>
 
+      <div className="flex justify-between items-center bg-white rounded-lg shadow-card border border-paper-line p-4 mb-6">
+        <div>
+          <p className="font-medium text-sm">{myLeads.length} leads assigned to you</p>
+          <p className="text-xs text-ink/40">Sab leads ek jagah dekho, status/priority/follow-up seedha yahin se badlo.</p>
+        </div>
+        <Link to="/app/tasks" className="flex items-center gap-1.5 bg-ink text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-ink/90">
+          <ListChecks size={15} /> View all my leads
+        </Link>
+      </div>
+
       <div className="grid grid-cols-4 gap-4 mb-4">
         <StatCard label="Active pipeline" value={myLeads.length} tone="ink" />
         <StatCard label="New to call" value={newToCall.length} tone="info" />
@@ -108,7 +128,7 @@ const quickWhatsApp = (lead) => {
           <p className="eyebrow text-danger flex items-center gap-1.5 mb-3"><Flame size={13} /> Hot leads — focus first ({hotLeads.length})</p>
           <div className="space-y-2">
             {hotLeads.map((l) => (
-              <LeadRow key={l.id} lead={l} settings={settings} onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={updateLead} />
+              <LeadRow key={l.id} lead={l} settings={settings} onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={quickStatus} />
             ))}
           </div>
         </div>
@@ -130,9 +150,9 @@ const quickWhatsApp = (lead) => {
       )}
 
       <div className="grid grid-cols-3 gap-6 mb-6">
-        <DayCard title="New to call" list={newToCall} settings={settings} onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={updateLead} />
-        <DayCard title="Follow-ups today" list={followToday} settings={settings} onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={updateLead} />
-        <DayCard title="Overdue" list={overdue} settings={settings} danger onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={updateLead} />
+        <DayCard title="New to call" list={newToCall} settings={settings} onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={quickStatus} />
+        <DayCard title="Follow-ups today" list={followToday} settings={settings} onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={quickStatus} />
+        <DayCard title="Overdue" list={overdue} settings={settings} danger onCall={quickCall} onWhatsApp={quickWhatsApp} onStatus={quickStatus} />
       </div>
 
       <div className="grid grid-cols-2 gap-6">
@@ -195,7 +215,7 @@ function LeadRow({ lead, settings, onCall, onWhatsApp, onStatus }) {
         <button onClick={() => onWhatsApp(lead)} className="flex items-center gap-1 text-xs bg-info-soft text-info px-2 py-1 rounded">
           <MessageCircle size={11} /> WhatsApp
         </button>
-        <select value={lead.status} onChange={(e) => onStatus(lead.id, { status: e.target.value })}
+        <select value={lead.status} onChange={(e) => onStatus(lead.id, e.target.value)}
           className="text-xs border border-paper-line rounded px-1 py-1">
           {settings.statuses.map((s) => <option key={s}>{s}</option>)}
         </select>

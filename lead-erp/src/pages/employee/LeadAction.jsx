@@ -1,19 +1,22 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { collection, doc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { db } from "../../firebase";
 import Layout from "../../components/Layout";
 import Timeline from "../../components/Timeline";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
-import { fmtDate, fmtDuration } from "../../utils/helpers";
+import { fmtDate, fmtDuration, toWaNumber } from "../../utils/helpers";
 import { Phone, PhoneOff, MessageCircle } from "lucide-react";
 
 export default function LeadAction() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { leads, settings, updateLead, addNote } = useData();
+  const { leads, settings, updateLeadStatus, updateFollowUpDate, addNote, addWorknote } = useData();
   const lead = leads.find((l) => l.id === id);
 
+  const [notes, setNotes] = useState([]);
   const [note, setNote] = useState("");
   const [followDate, setFollowDate] = useState("");
 
@@ -23,6 +26,17 @@ export default function LeadAction() {
   const [showWorknoteModal, setShowWorknoteModal] = useState(false);
   const [pendingDuration, setPendingDuration] = useState(0);
   const [worknote, setWorknote] = useState("");
+
+  // Notes ab leads/{id}/notes subcollection se live aate hain.
+  // Firestore Rules khud admin_only notes ko yahan aane se rok degi.
+  useEffect(() => {
+    if (!id) return;
+    const q = query(collection(db, "leads", id, "notes"), orderBy("at", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, (err) => console.error("Notes listener error:", err));
+    return unsub;
+  }, [id]);
 
   useEffect(() => {
     if (!callActive) return;
@@ -47,24 +61,41 @@ export default function LeadAction() {
   };
 
   const saveCallLog = () => {
-    addNote(lead.id, worknote || "Call completed — no notes added.", "call", { duration: pendingDuration, by: user.name });
+    addNote(lead.id, worknote || "Call completed — no notes added.", "call", {
+      duration: pendingDuration,
+      authorId: user.id || user.uid,
+      authorName: user.name,
+      authorRole: user.role,
+      visibility: "team",
+    });
     setShowWorknoteModal(false);
     setWorknote("");
     setPendingDuration(0);
   };
 
-  const setStatus = (status) => updateLead(lead.id, { status });
+  const setStatus = (status) => updateLeadStatus(lead.id, status, user);
 
   const scheduleFollowUp = () => {
-    if (followDate) {
-      updateLead(lead.id, { status: "Follow-up", followUp: new Date(followDate).toISOString() });
-      addNote(lead.id, `Follow-up scheduled for ${fmtDate(new Date(followDate).toISOString())}`, "status");
-    }
+    if (!followDate) return;
+    updateFollowUpDate(lead.id, new Date(followDate).toISOString(), user);
+    updateLeadStatus(lead.id, "Follow-up", user);
+    setFollowDate("");
+  };
+
+  const saveNote = () => {
+    if (!note.trim()) return;
+    addWorknote(lead.id, note, user, { visibility: "team" });
+    setNote("");
   };
 
   const quickWhatsApp = () => {
-    addNote(lead.id, "Opened WhatsApp chat from lead page", "whatsapp");
-    window.open(`https://wa.me/91${lead.phone}`, "_blank");
+    addNote(lead.id, "Opened WhatsApp chat from lead page", "whatsapp", {
+      authorName: user.name,
+      authorId: user.id || user.uid,
+      authorRole: user.role,
+      visibility: "team",
+    });
+    window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
   };
 
   return (
@@ -110,13 +141,12 @@ export default function LeadAction() {
           <p className="eyebrow mt-5 mb-2">Add work note</p>
           <textarea className="w-full border border-paper-line rounded-md p-2 text-sm mb-2" rows="3"
             placeholder="Log conversation summary…" value={note} onChange={(e) => setNote(e.target.value)} />
-          <button onClick={() => { if (note) { addNote(lead.id, note); setNote(""); } }}
-            className="w-full bg-paper border border-paper-line rounded-md p-2 text-sm">Save note</button>
+          <button onClick={saveNote} className="w-full bg-paper border border-paper-line rounded-md p-2 text-sm">Save note</button>
         </div>
 
         <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
           <p className="eyebrow mb-3">Follow-up history</p>
-          <Timeline entries={lead.notes} />
+          <Timeline entries={notes} />
         </div>
       </div>
 

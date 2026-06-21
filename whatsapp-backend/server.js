@@ -4,7 +4,7 @@ import cors from "cors";
 import cron from "node-cron";
 import fs from "fs";
 import { initializeApp, cert } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { getNextEmployeeRoundRobin } from "./utils/assignLead.js";
 
 // 1. Firebase Initialization
@@ -21,20 +21,23 @@ app.use(express.json());
 // ============================================================
 async function importWhatsAppLead({ phone, name, requirement }) {
   try {
-    // 1. Duplicate Check: Agar number already hai, toh sirf note add karo
+    // 1. Duplicate Check: ab note subcollection mein jaata hai, admin_only
+    // (employee ke browser mein Firestore Rules ki wajah se fetch hi nahi hoga)
     const existing = await db.collection("leads").where("phone", "==", phone).limit(1).get();
-    // Duplicate Check ke andar:
+
     if (!existing.empty) {
-      await existing.docs[0].ref.update({
-        notes: FieldValue.arrayUnion({
-          type: "whatsapp",
-          text: `New WhatsApp message: ${requirement}`,
-          at: new Date().toISOString(),
-          visibility: "admin_only" // <--- YE LINE NAYI HAI
-        }),
+      const leadId = existing.docs[0].id;
+      await db.collection("leads").doc(leadId).collection("notes").add({
+        type: "whatsapp",
+        text: `New WhatsApp message: ${requirement}`,
+        authorName: "WhatsApp Sync",
+        visibility: "admin_only",
+        at: new Date().toISOString(),
+      });
+      await db.collection("leads").doc(leadId).update({
         lastUpdated: new Date().toISOString(),
       });
-      return { status: "duplicate", leadId: existing.docs[0].id };
+      return { status: "duplicate", leadId };
     }
 
     // 2. Settings Check: Assignment mode kya hai (round-robin ya workload)
@@ -42,6 +45,7 @@ async function importWhatsAppLead({ phone, name, requirement }) {
     const settings = settingsDoc.exists ? settingsDoc.data() : { autoAssign: "round-robin" };
 
     let assignedTo = null;
+    let assignedToName = null;
 
     // 3. Lead Assignment Logic
     if (settings.autoAssign === "workload") {
@@ -58,13 +62,16 @@ async function importWhatsAppLead({ phone, name, requirement }) {
           const c = await db.collection("leads").where("assignedTo", "==", e.id).get();
           counts[e.id] = c.size;
         }
-        assignedTo = emps.sort((a, b) => counts[a.id] - counts[b.id])[0].id;
+        const chosen = emps.sort((a, b) => counts[a.id] - counts[b.id])[0];
+        assignedTo = chosen.id;
+        assignedToName = chosen.name || null;
       }
     } else {
       // Transaction-safe Round Robin logic (from utils)
       const employee = await getNextEmployeeRoundRobin(db);
       if (employee) {
         assignedTo = employee.id;
+        assignedToName = employee.name || null;
       }
     }
 
@@ -72,17 +79,17 @@ async function importWhatsAppLead({ phone, name, requirement }) {
     if (!assignedTo) {
       const existingPending = await db.collection("pending_whatsapp").where("phone", "==", phone).limit(1).get();
       if (existingPending.empty) {
-        await db.collection("pending_whatsapp").add({ 
-          phone, 
-          name, 
-          requirement, 
-          queuedAt: new Date().toISOString() 
+        await db.collection("pending_whatsapp").add({
+          phone,
+          name,
+          requirement,
+          queuedAt: new Date().toISOString()
         });
       }
       return { status: "queued", reason: "no_active_employees" };
     }
 
-    // 5. Nayi Lead Create Karo
+    // 5. Nayi Lead Create Karo — 'value' aur 'notes' array array ab yahan nahi
     const leadData = {
       name: name || "WhatsApp Lead",
       phone,
@@ -91,16 +98,25 @@ async function importWhatsAppLead({ phone, name, requirement }) {
       requirement: requirement || "",
       status: "New",
       assignedTo,
+      assignedToName,
       blacklisted: false,
-      value: 0,
       priority: "Warm",
       createdAt: new Date().toISOString(),
       lastUpdated: new Date().toISOString(),
       followUp: null,
-      notes: [],
+      lastContactedAt: null,
     };
 
     const ref = await db.collection("leads").add(leadData);
+
+    // Initial activity-stream entry — Timeline khaali na dikhe lead khulte hi
+    await ref.collection("notes").add({
+      type: "system",
+      text: "Lead created via WhatsApp",
+      visibility: "team",
+      authorName: "System",
+      at: new Date().toISOString(),
+    });
 
     // 6. Notifications & Activity Log update
     await db.collection("notifications").add({
@@ -109,7 +125,7 @@ async function importWhatsAppLead({ phone, name, requirement }) {
       read: false,
       at: new Date().toISOString(),
     });
-    
+
     await db.collection("activity").add({
       text: `📲 WhatsApp lead auto-imported: ${leadData.name} → ${assignedTo}`,
       at: new Date().toISOString(),
@@ -129,16 +145,15 @@ async function processPendingQueue() {
   try {
     const snap = await db.collection("pending_whatsapp").get();
     let processed = 0;
-    
+
     for (const docSnap of snap.docs) {
       const data = docSnap.data();
-      const result = await importWhatsAppLead({ 
-        phone: data.phone, 
-        name: data.name, 
-        requirement: data.requirement 
+      const result = await importWhatsAppLead({
+        phone: data.phone,
+        name: data.name,
+        requirement: data.requirement
       });
-      
-      // Agar lead successfully create ya duplicate mark ho gayi, toh queue se hata do
+
       if (result.status !== "queued") {
         await docSnap.ref.delete();
         processed++;
@@ -158,7 +173,7 @@ app.get("/webhook", (req, res) => {
   const mode = req.query["hub.mode"];
   const token = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
-  
+
   if (mode === "subscribe" && token === process.env.WHATSAPP_VERIFY_TOKEN) {
     return res.status(200).send(challenge);
   }
@@ -175,16 +190,15 @@ app.post("/webhook", async (req, res) => {
       const phone = message.from;
       const name = contact?.profile?.name || "WhatsApp Lead";
       const requirement = message.text?.body || "[Non-text message]";
-      
+
       const result = await importWhatsAppLead({ phone, name, requirement });
       console.log("Webhook processed:", result);
     }
-    
-    // Meta ko 200 OK dena zaroori hai taaki wo retries na kare
+
     res.sendStatus(200);
   } catch (e) {
     console.error("Webhook error:", e);
-    res.sendStatus(200); 
+    res.sendStatus(200);
   }
 });
 

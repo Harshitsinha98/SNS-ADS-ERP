@@ -10,7 +10,7 @@ const adminLinks = [
 ];
 const empLinks = [
   { to: "/app", label: "My Workspace", end: true, icon: LayoutDashboard },
-  { to: "/app/tasks", label: "Tasks & Reminders", icon: ClipboardList },
+  { to: "/app/tasks", label: "My Leads", icon: ClipboardList },
 ];
 
 export default function Sidebar() {
