@@ -5,9 +5,10 @@ import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import { parseCSV, toCSV, fmtDate } from "../../utils/helpers";
 import { StatusLamp } from "../../components/StatusLamp";
-import { Upload, Download, RefreshCw } from "lucide-react";
+import { Upload, Download, RefreshCw, RotateCcw } from "lucide-react";
 
 const PRIORITIES = ["Hot", "Warm", "Cold"];
+const SECTIONS = ["Active", "Lost"];
 
 const priorityClass = (p) => {
   switch (p) {
@@ -18,20 +19,31 @@ const priorityClass = (p) => {
   }
 };
 
+// Ek lead "Lost" section mein automatically tabhi jaati hai jab blacklist ki gayi
+// ho YA status manually "Lost" set ho — dono paths cover karta hai.
+const isLost = (l) => l.blacklisted === true || l.status === "Lost";
+
 export default function LeadHub() {
   const { user } = useAuth();
-  const { leads, users, settings, reassignLead, blacklistLead, addBulkLeads, triggerWhatsAppSync, updatePriority } = useData();
+  const { leads, users, settings, updateLead, reassignLead, blacklistLead, addBulkLeads, triggerWhatsAppSync, updatePriority } = useData();
+  const [section, setSection] = useState("Active");
   const [sortBy, setSortBy] = useState("createdAt");
   const [filterStatus, setFilterStatus] = useState("All");
   const [syncing, setSyncing] = useState(false);
   const employees = users.filter((u) => u.role === "employee");
 
+  const activeLeads = useMemo(() => leads.filter((l) => !isLost(l)), [leads]);
+  const lostLeads = useMemo(() => leads.filter(isLost), [leads]);
+
+  // Active tab ke status filter se "Lost" hata diya — wo ab apna alag tab hai
+  const activeStatuses = settings.statuses.filter((s) => s !== "Lost");
+
   const view = useMemo(() => {
-    let list = [...leads];
-    if (filterStatus !== "All") list = list.filter((l) => l.status === filterStatus);
+    let list = section === "Active" ? [...activeLeads] : [...lostLeads];
+    if (section === "Active" && filterStatus !== "All") list = list.filter((l) => l.status === filterStatus);
     list.sort((a, b) => (a[sortBy] > b[sortBy] ? 1 : -1));
     return list;
-  }, [leads, sortBy, filterStatus]);
+  }, [activeLeads, lostLeads, section, sortBy, filterStatus]);
 
   const handleImport = (e) => {
     const file = e.target.files[0];
@@ -70,6 +82,12 @@ export default function LeadHub() {
     }
   };
 
+  // NEW: Lost lead ko ek click mein wapas Active mein laane ke liye —
+  // status "New" pe reset, taaki koi employee dobara usse work kar sake.
+  const restoreLead = (l) => {
+    updateLead(l.id, { blacklisted: false, status: "New" }, user);
+  };
+
   return (
     <Layout title="Centralized Lead Hub">
       <div className="flex flex-wrap gap-3 mb-5 items-center">
@@ -84,11 +102,28 @@ export default function LeadHub() {
           className="flex items-center gap-1.5 bg-ok text-white px-4 py-2 rounded-md text-sm disabled:opacity-50">
           <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> {syncing ? "Syncing…" : "Sync WhatsApp now"}
         </button>
-        <select className="border border-paper-line rounded-md p-2 text-sm sm:ml-auto" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-          <option>All</option>
-          {settings.statuses.map((s) => <option key={s}>{s}</option>)}
-        </select>
-        <select className="border border-paper-line rounded-md p-2 text-sm" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+      </div>
+
+      {/* Active / Lost tabs */}
+      <div className="flex gap-2 mb-4">
+        {SECTIONS.map((s) => (
+          <button key={s} onClick={() => setSection(s)}
+            className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+              section === s ? "bg-ink text-white border-ink" : "bg-white border-paper-line text-ink/60 hover:bg-paper"
+            }`}>
+            {s} <span className="num">({s === "Active" ? activeLeads.length : lostLeads.length})</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-3 mb-3 items-center">
+        {section === "Active" && (
+          <select className="border border-paper-line rounded-md p-2 text-sm" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option>All</option>
+            {activeStatuses.map((s) => <option key={s}>{s}</option>)}
+          </select>
+        )}
+        <select className="border border-paper-line rounded-md p-2 text-sm sm:ml-auto" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
           <option value="createdAt">Sort: Date</option>
           <option value="status">Sort: Status</option>
           <option value="source">Sort: Source</option>
@@ -100,42 +135,58 @@ export default function LeadHub() {
         <table className="w-full text-sm min-w-[760px]">
           <thead><tr className="text-left text-ink/40 border-b border-paper-line bg-paper/60">
             <th className="p-3 font-medium">ID</th><th className="font-medium">Name</th><th className="font-medium">Source</th>
-            <th className="font-medium">Priority</th><th className="font-medium">Status</th>
-            <th className="font-medium">Assigned</th><th className="font-medium">Created</th><th className="font-medium">Actions</th>
+            {section === "Active" && <th className="font-medium">Priority</th>}
+            <th className="font-medium">Status</th>
+            <th className="font-medium">Assigned</th>
+            <th className="font-medium">{section === "Active" ? "Created" : "Lost on"}</th>
+            <th className="font-medium">Actions</th>
           </tr></thead>
           <tbody>
             {view.map((l) => (
-              <tr key={l.id} className={`border-b border-paper-line last:border-0 ${l.blacklisted ? "bg-danger-soft/30 opacity-60" : "hover:bg-paper/50"}`}>
+              <tr key={l.id} className={`border-b border-paper-line last:border-0 ${section === "Lost" ? "bg-danger-soft/20" : "hover:bg-paper/50"}`}>
                 <td className="p-3 num text-ink/50">{l.id}</td>
                 <td><Link to={`/admin/leads/${l.id}`} className="font-medium hover:underline">{l.name}</Link></td>
                 <td>{l.source}</td>
-                <td>
-                  <select
-                    value={l.priority || "Warm"}
-                    onChange={(e) => updatePriority(l.id, e.target.value, user)}
-                    className={`border rounded p-1 text-xs font-medium ${priorityClass(l.priority)}`}
-                  >
-                    {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
-                  </select>
-                </td>
+                {section === "Active" && (
+                  <td>
+                    <select
+                      value={l.priority || "Warm"}
+                      onChange={(e) => updatePriority(l.id, e.target.value, user)}
+                      className={`border rounded p-1 text-xs font-medium ${priorityClass(l.priority)}`}
+                    >
+                      {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
+                    </select>
+                  </td>
+                )}
                 <td><StatusLamp status={l.status} /></td>
                 <td>
-                  {/* FIX: employeeName + user pass kiya, pehle sirf 2 args jaate the —
-                      assignedToName hamesha null save hota tha */}
-                  <select value={l.assignedTo || ""}
-                    onChange={(e) => reassignLead(l.id, e.target.value, employees.find((u) => u.id === e.target.value)?.name, user)}
-                    className="border border-paper-line rounded p-1 text-xs">
-                    {employees.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
+                  {section === "Active" ? (
+                    <select value={l.assignedTo || ""}
+                      onChange={(e) => reassignLead(l.id, e.target.value, employees.find((u) => u.id === e.target.value)?.name, user)}
+                      className="border border-paper-line rounded p-1 text-xs">
+                      {employees.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                  ) : (
+                    <span className="text-xs text-ink/50">{employees.find((u) => u.id === l.assignedTo)?.name || l.assignedTo || "—"}</span>
+                  )}
                 </td>
-                <td className="text-xs num text-ink/40">{fmtDate(l.createdAt)}</td>
+                <td className="text-xs num text-ink/40">{fmtDate(section === "Active" ? l.createdAt : l.lastUpdated)}</td>
                 <td>
-                  {!l.blacklisted && (
+                  {section === "Active" ? (
                     <button onClick={() => blacklistLead(l.id)} className="text-danger text-xs hover:underline">Blacklist</button>
+                  ) : (
+                    <button onClick={() => restoreLead(l)} className="flex items-center gap-1 text-info text-xs hover:underline">
+                      <RotateCcw size={11} /> Restore to active
+                    </button>
                   )}
                 </td>
               </tr>
             ))}
+            {view.length === 0 && (
+              <tr><td colSpan={section === "Active" ? 8 : 7} className="text-ink/40 p-4 text-center">
+                {section === "Active" ? "Koi active lead nahi mili." : "Koi lost/blacklisted lead nahi hai. 🎉"}
+              </td></tr>
+            )}
           </tbody>
         </table>
       </div>
