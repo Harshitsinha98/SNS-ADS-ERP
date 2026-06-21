@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { collection, doc, onSnapshot, query, orderBy } from "firebase/firestore";
+import { collection, doc, onSnapshot, query, where, orderBy } from "firebase/firestore";
 import { db } from "../../firebase";
 import Layout from "../../components/Layout";
 import Timeline from "../../components/Timeline";
@@ -27,11 +27,18 @@ export default function LeadAction() {
   const [pendingDuration, setPendingDuration] = useState(0);
   const [worknote, setWorknote] = useState("");
 
-  // Notes ab leads/{id}/notes subcollection se live aate hain.
-  // Firestore Rules khud admin_only notes ko yahan aane se rok degi.
+  // FIX: where("visibility","==","team") add kiya — Firestore Rules employee ke
+  // liye resource.data.visibility pe depend karta hai. Bina is filter ke ye list
+  // query Firestore khud hi reject kar deta hai (kyunki rule ke per-document
+  // condition ko query se prove nahi kiya ja sakta) — yahi wajah thi ki history
+  // hamesha khaali aati thi, refresh se koi farak nahi padta tha.
   useEffect(() => {
     if (!id) return;
-    const q = query(collection(db, "leads", id, "notes"), orderBy("at", "desc"));
+    const q = query(
+      collection(db, "leads", id, "notes"),
+      where("visibility", "==", "team"),
+      orderBy("at", "desc")
+    );
     const unsub = onSnapshot(q, (snap) => {
       setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, (err) => console.error("Notes listener error:", err));
