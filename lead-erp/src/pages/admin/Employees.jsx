@@ -2,24 +2,36 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "../../components/Layout";
 import { useData } from "../../context/DataContext";
+import { useBilling } from "../../context/BillingContext";
 import { employeeStats } from "../../utils/helpers";
 
 export default function Employees() {
   const { users, leads, addUser } = useData();
+  const { seatsUsed, seatsLimit, canAddSeat, planName, isExpired } = useBilling();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", role: "employee" });
+  const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const employees = users.filter((u) => u.role === "employee");
 
-  const create = (e) => {
+  const create = async (e) => {
     e.preventDefault();
+    setErr("");
     const cleanPhone = form.phone.replace(/\D/g, "");
-    if (cleanPhone.length !== 10) { alert("Sahi 10-digit mobile number daalo."); return; }
-    if (users.some((u) => u.phone === cleanPhone)) { alert("Ye number already registered hai."); return; }
-    addUser({ ...form, phone: cleanPhone, active: true });
+    if (cleanPhone.length !== 10) { setErr("Sahi 10-digit mobile number daalo."); return; }
+    if (users.some((u) => u.phone === cleanPhone)) { setErr("Ye number already registered hai."); return; }
+
+    setSaving(true);
+    const res = await addUser({ ...form, phone: cleanPhone, active: true });
+    setSaving(false);
+
+    if (!res?.ok) { setErr(res?.error || "Member add nahi hua."); return; }
     setForm({ name: "", phone: "", role: "employee" });
     setShowForm(false);
   };
+
+  const seatPct = seatsLimit > 0 ? Math.min(100, Math.round((seatsUsed / seatsLimit) * 100)) : 0;
 
   const ranked = employees
     .map((u) => ({ user: u, stats: employeeStats(u.id, leads) }))
@@ -37,25 +49,58 @@ export default function Employees() {
         <Stat label="Team conv. rate" value={`${teamTotal ? Math.round((teamWon / teamTotal) * 100) : 0}%`} />
       </div>
 
+      {/* Seat usage banner */}
+      <div className="bg-white rounded-xl shadow-card border border-cream-300/60 p-4 mb-5 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-sm font-semibold text-ink">
+              Seats: <span className="font-mono">{seatsUsed}</span> / <span className="font-mono">{seatsLimit}</span> used
+              <span className="ml-2 text-xs font-normal text-ink-muted">({planName} plan)</span>
+            </p>
+            <span className="text-xs text-ink-muted">{seatPct}%</span>
+          </div>
+          <div className="w-full bg-cream-200 rounded-full h-2">
+            <div
+              className={`h-2 rounded-full transition-all ${seatPct >= 100 ? "bg-danger-500" : "bg-gradient-orange"}`}
+              style={{ width: `${seatPct}%` }}
+            />
+          </div>
+        </div>
+        <Link to="/admin/billing" className="text-sm font-semibold text-orange-600 hover:underline whitespace-nowrap">
+          Manage plan →
+        </Link>
+      </div>
+
       <div className="flex flex-wrap justify-between items-center gap-3 mb-3">
         <p className="eyebrow">Performance leaderboard</p>
-        <button onClick={() => setShowForm((s) => !s)} className="bg-ink text-white px-4 py-2 rounded-md text-sm">
-          {showForm ? "Close" : "+ Add employee"}
-        </button>
+        {canAddSeat && !isExpired ? (
+          <button onClick={() => { setShowForm((s) => !s); setErr(""); }} className="bg-gradient-orange text-white px-4 py-2 rounded-lg text-sm font-semibold">
+            {showForm ? "Close" : "+ Add employee"}
+          </button>
+        ) : (
+          <Link to="/admin/billing" className="bg-cream-200 text-ember-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-cream-300">
+            {isExpired ? "Trial ended — Upgrade" : `Seat limit reached (${seatsLimit}/${seatsLimit}) — Upgrade`}
+          </Link>
+        )}
       </div>
 
       {showForm && (
-        <form onSubmit={create} className="bg-white rounded-lg shadow-card border border-paper-line p-5 mb-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-          <input className="border border-paper-line rounded-md p-2 text-sm" placeholder="Full Name"
-            value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-          <input className="border border-paper-line rounded-md p-2 text-sm" placeholder="10-digit Mobile" maxLength={10}
-            value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })} required />
-          <select className="border border-paper-line rounded-md p-2 text-sm" value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}>
-            <option value="employee">Employee</option>
-            <option value="admin">Admin</option>
-          </select>
-          <button className="bg-ink text-white rounded-md p-2 text-sm">Provision user</button>
+        <form onSubmit={create} className="bg-white rounded-xl shadow-card border border-cream-300/60 p-5 mb-5">
+          {err && <p className="text-danger-600 text-sm mb-3 bg-danger-50 border border-danger-100 rounded-lg px-3 py-2">{err}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+            <input className="border border-cream-400/70 rounded-lg p-2.5 text-sm" placeholder="Full Name"
+              value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            <input className="border border-cream-400/70 rounded-lg p-2.5 text-sm" placeholder="10-digit Mobile" maxLength={10}
+              value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })} required />
+            <select className="border border-cream-400/70 rounded-lg p-2.5 text-sm" value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}>
+              <option value="employee">Employee</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button disabled={saving} className="bg-gradient-orange text-white rounded-lg p-2.5 text-sm font-semibold disabled:opacity-60">
+              {saving ? "Adding…" : "Provision user"}
+            </button>
+          </div>
         </form>
       )}
 

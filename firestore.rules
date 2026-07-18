@@ -3,167 +3,181 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ============================================================
-    // HELPER FUNCTIONS
-    // Uses exists() + get().data (short-circuited) — the safe pattern
-    // that never errors when a membership document is absent.
+    // HELPERS
     // ============================================================
 
     function isAuthenticated() {
       return request.auth != null;
     }
 
+    // Platform super-admin (CodeSkate owner). Marked by a doc in platformAdmins.
+    function isPlatformAdmin() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
+    }
+
     function membershipPath(orgId) {
       return /databases/$(database)/documents/memberships/$(request.auth.uid + '_' + orgId);
     }
-
     function hasMembershipDoc(orgId) {
       return isAuthenticated() && exists(membershipPath(orgId));
     }
-
     function memberData(orgId) {
       return get(membershipPath(orgId)).data;
     }
-
-    // Active member of the org (any role)
     function isActiveMember(orgId) {
       return hasMembershipDoc(orgId) && memberData(orgId).active == true;
     }
-
     function hasRole(orgId, role) {
       return hasMembershipDoc(orgId)
              && memberData(orgId).active == true
              && memberData(orgId).role == role;
     }
-
     function isAdmin(orgId) {
       return hasRole(orgId, 'admin') || hasRole(orgId, 'owner');
     }
-
     function isOwner(orgId) {
       return hasRole(orgId, 'owner');
     }
 
+    // Org billing helpers (safe .get with defaults)
+    function orgData(orgId) {
+      return get(/databases/$(database)/documents/organizations/$(orgId)).data;
+    }
+    function seatAvailable(orgId) {
+      let o = orgData(orgId);
+      return o.get('seatsUsed', 0) < o.get('seatsLimit', 0);
+    }
+    // Subscription usable? active plan, OR trialing and not past trialEndsAtMs.
+    function subActive(orgId) {
+      let o = orgData(orgId);
+      return o.get('subscriptionStatus', 'trialing') == 'active'
+             || (o.get('subscriptionStatus', 'trialing') == 'trialing'
+                 && o.get('trialEndsAtMs', 0) > request.time.toMillis());
+    }
+
     // ============================================================
-    // GLOBAL USER IDENTITY  (users/{uid})
+    // PLATFORM (super-admin only)
+    // ============================================================
+
+    match /platformAdmins/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isPlatformAdmin());
+      allow write: if false; // create manually in console / via admin SDK
+    }
+
+    // Global config (trial length, plan limits/prices). Public read so the
+    // marketing site can show current pricing/trial; only owner can write.
+    match /platformConfig/{docId} {
+      allow read: if true;
+      allow write: if isPlatformAdmin();
+    }
+
+    // One free trial per phone number, ever.
+    match /trialsUsed/{phoneKey} {
+      allow read: if isAuthenticated();
+      // Only the owner of the verified phone can record its trial usage.
+      allow create: if isAuthenticated()
+                    && request.resource.data.phone == request.auth.token.phone_number;
+      allow update, delete: if false;
+    }
+
+    // ============================================================
+    // GLOBAL USER IDENTITY
     // ============================================================
 
     match /users/{uid} {
-      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow read: if isAuthenticated() && (request.auth.uid == uid || isPlatformAdmin());
       allow create: if isAuthenticated() && request.auth.uid == uid;
       allow update: if isAuthenticated() && request.auth.uid == uid;
       allow delete: if false;
     }
 
     // ============================================================
-    // MEMBERSHIPS  (memberships/{uid}_{orgId})
+    // MEMBERSHIPS
     // ============================================================
 
     match /memberships/{membershipId} {
-      // A user can read their own membership documents; admins/owners can
-      // read all memberships within organizations they manage (Team page).
       allow read: if isAuthenticated() && (
         request.auth.uid == resource.data.uid ||
-        isAdmin(resource.data.orgId)
+        isAdmin(resource.data.orgId) ||
+        isPlatformAdmin()
       );
 
-      // Self-serve signup: a user creates their OWN owner membership.
-      // OR an existing admin adds someone else to their org.
+      // Self-serve signup: own owner membership (no seat/sub gate — first seat).
+      // OR admin adds a teammate: must have a free seat AND an active subscription.
       allow create: if isAuthenticated() && (
         (request.resource.data.uid == request.auth.uid &&
          request.resource.data.role == 'owner') ||
         (request.auth.uid != request.resource.data.uid &&
-         isAdmin(request.resource.data.orgId))
+         isAdmin(request.resource.data.orgId) &&
+         seatAvailable(request.resource.data.orgId) &&
+         subActive(request.resource.data.orgId))
       );
 
-      // Admin can update memberships in their org; a user can touch their own
       allow update: if isAuthenticated() && (
         isAdmin(resource.data.orgId) ||
         request.auth.uid == resource.data.uid
       );
 
-      // Only owner can remove members
       allow delete: if isAuthenticated() && isOwner(resource.data.orgId);
     }
 
     // ============================================================
-    // ORGANIZATIONS  (organizations/{orgId})
+    // ORGANIZATIONS
     // ============================================================
 
     match /organizations/{orgId} {
-      // Read: any active member
-      allow read: if isActiveMember(orgId);
-
-      // Create: any authenticated user (self-serve signup)
+      // Members read their org; platform admin reads/lists all.
+      allow read: if isActiveMember(orgId) || isPlatformAdmin();
       allow create: if isAuthenticated();
-
-      // Update: admin/owner only
-      allow update: if isAdmin(orgId);
-
-      // Delete: disabled (soft-delete preferred)
+      // Admin/owner manage the org (incl. seat counter + plan changes);
+      // platform admin can manage any org.
+      allow update: if isAdmin(orgId) || isPlatformAdmin();
       allow delete: if false;
 
-      // ----- LEADS -----
       match /leads/{leadId} {
         allow read: if isActiveMember(orgId);
+        // New leads require an active subscription/trial.
         allow create: if isActiveMember(orgId)
-                      && request.resource.data.orgId == orgId;
+                      && request.resource.data.orgId == orgId
+                      && subActive(orgId);
         allow update: if isAdmin(orgId)
-                      || (isActiveMember(orgId)
-                          && resource.data.assignedTo == request.auth.uid);
+                      || (isActiveMember(orgId) && resource.data.assignedTo == request.auth.uid);
         allow delete: if isAdmin(orgId);
 
-        // Notes on a lead
         match /notes/{noteId} {
-          allow read: if isActiveMember(orgId)
-                      && (resource.data.visibility == 'team' || isAdmin(orgId));
+          allow read: if isActiveMember(orgId) && (resource.data.visibility == 'team' || isAdmin(orgId));
           allow create: if isActiveMember(orgId);
-          allow update: if isActiveMember(orgId)
-                        && (isAdmin(orgId) || resource.data.authorId == request.auth.uid);
+          allow update: if isActiveMember(orgId) && (isAdmin(orgId) || resource.data.authorId == request.auth.uid);
           allow delete: if isAdmin(orgId);
         }
-
-        // Private financials — admin/owner only
         match /private/{docId} {
           allow read, write: if isAdmin(orgId);
         }
       }
 
-      // ----- SETTINGS -----
       match /settings/{settingsId} {
         allow read: if isActiveMember(orgId);
         allow write: if isAdmin(orgId);
       }
-
-      // ----- META (lead assignment counter) -----
       match /meta/{metaId} {
         allow read: if isActiveMember(orgId);
         allow write: if isAdmin(orgId);
       }
-
-      // ----- ACTIVITY (immutable audit log) -----
       match /activity/{activityId} {
         allow read: if isActiveMember(orgId);
-        allow create: if isActiveMember(orgId)
-                      && request.resource.data.orgId == orgId;
+        allow create: if isActiveMember(orgId) && request.resource.data.orgId == orgId;
         allow update, delete: if false;
       }
-
-      // ----- NOTIFICATIONS -----
       match /notifications/{notifId} {
-        allow read: if isActiveMember(orgId)
-                    && resource.data.userId == request.auth.uid;
+        allow read: if isActiveMember(orgId) && resource.data.userId == request.auth.uid;
         allow create: if isActiveMember(orgId);
-        allow update, delete: if isActiveMember(orgId)
-                              && resource.data.userId == request.auth.uid;
+        allow update, delete: if isActiveMember(orgId) && resource.data.userId == request.auth.uid;
       }
-
-      // ----- GOALS -----
       match /goals/{goalsId} {
         allow read: if isActiveMember(orgId);
         allow write: if isAdmin(orgId);
       }
-
-      // ----- PENDING LEADS (WhatsApp queue) -----
       match /pending_leads/{pendingId} {
         allow read, write: if isAdmin(orgId);
       }

@@ -5,7 +5,7 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Building2, User, Phone, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 import Logo from '../components/marketing/Logo';
-import { TRIAL_DAYS } from '../data/plans';
+import { TRIAL_DAYS, getPlanById } from '../data/plans';
 
 const DEFAULT_STATUSES = [
   'New', 'Ringing', 'Meeting Fixed', 'Negotiation', 'Follow-up', 'Closed-Won', 'Lost',
@@ -32,18 +32,24 @@ export default function Setup() {
     try {
       const orgId = `org_${Date.now()}`;
       const uid = user.uid;
-      const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      const trialEndMs = Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000;
+      const g = getPlanById('growth');
 
       await setDoc(doc(db, 'organizations', orgId), {
         name: orgName.trim(),
         slug: orgName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
         createdAt: serverTimestamp(),
         createdBy: uid,
-        planName: 'Growth',
+        ownerPhone: user.phone || null,
+        planId: g.id,
+        planName: g.name,
         subscriptionStatus: 'trialing',
         seatsUsed: 1,
-        seatsLimit: 10,
-        trialEndsAt,
+        seatsLimit: g.includedSeats,
+        leadsUsed: 0,
+        leadsLimit: g.leadsLimit,
+        trialEndsAt: new Date(trialEndMs).toISOString(),
+        trialEndsAtMs: trialEndMs,
       });
 
       await setDoc(doc(db, 'users', uid), {

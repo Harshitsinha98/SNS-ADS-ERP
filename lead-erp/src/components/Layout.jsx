@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Menu, Clock } from "lucide-react";
 import Sidebar from "./Sidebar";
+import TrialBanner from "./TrialBanner";
 import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
 
@@ -97,7 +98,10 @@ export default function Layout({ children, title }) {
         </header>
 
         {/* Content */}
-        <div className="p-4 sm:p-6">{children}</div>
+        <div className="p-4 sm:p-6">
+          <TrialBanner />
+          {children}
+        </div>
       </main>
     </div>
   );

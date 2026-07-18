@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import {
   collection, collectionGroup, doc, onSnapshot, addDoc, updateDoc, setDoc,
-  query, where, orderBy, limit, writeBatch
+  query, where, orderBy, limit, writeBatch, runTransaction, increment, getDoc
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
@@ -428,26 +428,64 @@ export function DataProvider({ children }) {
   // USER MANAGEMENT - memberships-based
   // ============================================================
 
+  // Add a team member with SEAT-LIMIT enforcement.
+  // Runs in a transaction: reads the org, blocks if seatsUsed >= seatsLimit,
+  // otherwise creates the membership and atomically increments seatsUsed.
+  // Returns { ok, error } so the UI can show a precise message.
   const addUser = async (u) => {
-    if (!user?.activeOrgId) return;
+    if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
+
+    const orgRef = doc(db, "organizations", user.activeOrgId);
+    const phoneId = "+91" + u.phone;
+    const memRef = doc(db, "memberships", `${phoneId}_${user.activeOrgId}`);
+
     try {
-      // Create membership for the new user
-      // Note: In a full implementation, you'd also create the users/{uid} document
-      // and potentially invite them via Firebase Auth
-      const phoneId = "+91" + u.phone;
-      
-      // For now, we create a membership assuming the user will sign up
-      // In production, you'd use Firebase Admin SDK to create the auth user
-      await setDoc(doc(db, "memberships", `${phoneId}_${user.activeOrgId}`), { 
-        uid: phoneId, // Temporary - will be replaced with actual UID after user signs up
-        orgId: user.activeOrgId,
-        displayName: u.name, 
-        role: u.role, 
-        active: true,
-        invitedBy: user.uid,
-        joinedAt: new Date().toISOString(),
+      await runTransaction(db, async (tx) => {
+        const orgSnap = await tx.get(orgRef);
+        if (!orgSnap.exists()) throw Object.assign(new Error("org missing"), { code: "no-org" });
+
+        const org = orgSnap.data();
+        const seatsUsed = org.seatsUsed ?? 1;
+        const seatsLimit = org.seatsLimit ?? 1;
+        const active = org.subscriptionStatus;
+
+        if (active === "expired") {
+          throw Object.assign(new Error("expired"), { code: "expired" });
+        }
+        if (seatsUsed >= seatsLimit) {
+          throw Object.assign(new Error("seat limit"), { code: "seat-limit" });
+        }
+
+        const memSnap = await tx.get(memRef);
+        if (memSnap.exists() && memSnap.data().active) {
+          throw Object.assign(new Error("exists"), { code: "exists" });
+        }
+
+        tx.set(memRef, {
+          uid: phoneId, // placeholder until the invitee signs up with their UID
+          orgId: user.activeOrgId,
+          displayName: u.name,
+          phone: u.phone,
+          role: u.role,
+          active: true,
+          invitedBy: user.uid,
+          joinedAt: new Date().toISOString(),
+        });
+        tx.update(orgRef, { seatsUsed: increment(1) });
       });
-    } catch (e) { console.error("Add user error:", e); }
+
+      logActivity(`Team member added: ${u.name} (${u.role})`);
+      return { ok: true };
+    } catch (e) {
+      if (e.code === "seat-limit")
+        return { ok: false, error: "Seat limit reached. Upgrade your plan to add more team members." };
+      if (e.code === "expired")
+        return { ok: false, error: "Subscription/trial expired. Upgrade to add team members." };
+      if (e.code === "exists")
+        return { ok: false, error: "Ye number already added hai." };
+      console.error("Add user error:", e?.code, e?.message);
+      return { ok: false, error: "Member add nahi hua. Dobara try karo." };
+    }
   };
 
   const updateUser = async (uid, patch) => {
@@ -458,7 +496,50 @@ export function DataProvider({ children }) {
     } catch (e) { console.error("Update user error:", e); }
   };
 
-  const deactivateUser = (uid) => updateUser(uid, { active: false });
+  // Deactivate a member and free up their seat (atomic decrement, min 0).
+  const deactivateUser = async (uid) => {
+    if (!user?.activeOrgId) return;
+    const orgRef = doc(db, "organizations", user.activeOrgId);
+    const memRef = doc(db, "memberships", `${uid}_${user.activeOrgId}`);
+    try {
+      await runTransaction(db, async (tx) => {
+        const memSnap = await tx.get(memRef);
+        if (!memSnap.exists() || memSnap.data().active === false) return;
+        const orgSnap = await tx.get(orgRef);
+        tx.update(memRef, { active: false });
+        if (orgSnap.exists()) {
+          const used = orgSnap.data().seatsUsed ?? 1;
+          tx.update(orgRef, { seatsUsed: Math.max(0, used - 1) });
+        }
+      });
+      logActivity(`Team member deactivated (${uid})`);
+    } catch (e) {
+      console.error("Deactivate user error:", e?.code, e?.message);
+    }
+  };
+
+  // In-app plan upgrade/downgrade. Updates the org's plan and RAISES the
+  // seat & lead limits to the new plan immediately (concern #4).
+  // NOTE: with no payment gateway wired yet this is a trusted owner action;
+  // when Razorpay is added, gate this behind a verified payment.
+  const changePlan = async (limits) => {
+    if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
+    try {
+      await updateDoc(doc(db, "organizations", user.activeOrgId), {
+        planId: limits.planId,
+        planName: limits.planName,
+        seatsLimit: limits.seatsLimit,
+        leadsLimit: limits.leadsLimit,
+        subscriptionStatus: "active",
+        trialEndsAt: null,
+      });
+      logActivity(`Plan changed to ${limits.planName} (seats: ${limits.seatsLimit})`);
+      return { ok: true };
+    } catch (e) {
+      console.error("Change plan error:", e?.code, e?.message);
+      return { ok: false, error: "Plan change nahi hua. Dobara try karo." };
+    }
+  };
 
   // ============================================================
   // NOTIFICATIONS - org-scoped
@@ -531,7 +612,7 @@ export function DataProvider({ children }) {
       updateLeadStatus, updatePriority, updateFollowUpDate, updateLeadRevenue,
       reassignLead, reassignAllLeads, blacklistLead,
       addBulkLeads, addUser, updateUser, deactivateUser, pushNotif, markRead, logActivity, setMyGoal,
-      triggerWhatsAppSync,
+      triggerWhatsAppSync, changePlan,
     }}>
       {children}
     </DataContext.Provider>

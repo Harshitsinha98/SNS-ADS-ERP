@@ -11,6 +11,8 @@ import LeadDetail from "./pages/admin/LeadDetail";
 import Employees from "./pages/admin/Employees";
 import EmployeeDetail from "./pages/admin/EmployeeDetail";
 import Settings from "./pages/admin/Settings";
+import Billing from "./pages/admin/Billing";
+import PlatformDashboard from "./pages/platform/PlatformDashboard";
 import Workspace from "./pages/employee/Workspace";
 import LeadAction from "./pages/employee/LeadAction";
 import Tasks from "./pages/employee/Tasks";
@@ -46,6 +48,10 @@ export default function App() {
         <Route path="/admin/employees" element={<ProtectedRoute role="admin"><Employees /></ProtectedRoute>} />
         <Route path="/admin/employees/:id" element={<ProtectedRoute role="admin"><EmployeeDetail /></ProtectedRoute>} />
         <Route path="/admin/settings" element={<ProtectedRoute role="admin"><Settings /></ProtectedRoute>} />
+        <Route path="/admin/billing" element={<ProtectedRoute role="admin"><Billing /></ProtectedRoute>} />
+
+        {/* --- PLATFORM SUPER-ADMIN (gated inside the page by platformAdmins/{uid}) --- */}
+        <Route path="/platform" element={<ProtectedRoute><PlatformDashboard /></ProtectedRoute>} />
 
         {/* --- EMPLOYEE SECTION --- */}
         <Route path="/app" element={<ProtectedRoute role="employee"><Workspace /></ProtectedRoute>} />

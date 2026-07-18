@@ -4,12 +4,16 @@ import {
   Building2, User, Phone, ArrowRight, ArrowLeft, Loader2, ShieldCheck,
   CheckCircle2, Sparkles, Check,
 } from "lucide-react";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
 import { auth, db } from "../../firebase";
 import Logo from "../../components/marketing/Logo";
-import { PLANS, TRIAL_DAYS } from "../../data/plans";
+import { PLANS, TRIAL_DAYS, limitsForPlan } from "../../data/plans";
+import { fetchPlatformConfig } from "../../utils/platformConfig";
 import { withTimeout } from "../../utils/withTimeout";
+
+// Digits-only key for the global trial ledger (one trial per phone number).
+const phoneKey = (e164) => String(e164 || "").replace(/\D/g, "");
 
 const DEFAULT_STATUSES = [
   "New", "Ringing", "Meeting Fixed", "Negotiation", "Follow-up", "Closed-Won", "Lost",
@@ -64,23 +68,48 @@ export default function Signup() {
 
   const createOrganization = async (uid) => {
     const orgId = `org_${Date.now()}`;
-    const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const e164 = auth.currentUser?.phoneNumber || `+91${phone}`;
+    const pKey = phoneKey(e164);
+
+    // Platform-owner controlled config (trial length + plan limits).
+    const config = await fetchPlatformConfig();
+    const trialDays = config && Number.isFinite(config.trialDays) ? config.trialDays : TRIAL_DAYS;
+    const limits = limitsForPlan(planId, config); // { seatsLimit, leadsLimit, planName }
+
+    // ---- ANTI-ABUSE: one free trial per phone number, ever ----
+    // If this phone has already consumed a trial, the new workspace starts
+    // WITHOUT a trial (must upgrade to a paid plan to use it).
+    let alreadyTrialed = false;
+    try {
+      const trialSnap = await withTimeout(getDoc(doc(db, "trialsUsed", pKey)), 10000, "check trial");
+      alreadyTrialed = trialSnap.exists();
+    } catch (e) {
+      console.warn("[signup] trial-ledger check skipped:", e?.code || e?.message);
+    }
+
+    const trialEndMs = Date.now() + trialDays * 24 * 60 * 60 * 1000;
+    const trialEndsAt = alreadyTrialed ? null : new Date(trialEndMs).toISOString();
+    const trialEndsAtMs = alreadyTrialed ? 0 : trialEndMs;
+    const subscriptionStatus = alreadyTrialed ? "expired" : "trialing";
 
     // ---- CRITICAL writes: these MUST succeed for login to work ----
-    // Each is guarded with a timeout so a stalled Firestore call surfaces an
-    // error instead of spinning forever.
     // 1. Organization root
-    console.log("[signup] creating organization…", orgId);
+    console.log("[signup] creating organization…", orgId, { alreadyTrialed });
     await withTimeout(setDoc(doc(db, "organizations", orgId), {
       name: orgName.trim(),
       slug: orgName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
       createdAt: serverTimestamp(),
       createdBy: uid,
-      planName: selectedPlan.name,
-      subscriptionStatus: "trialing",
+      ownerPhone: e164,
+      planName: limits.planName,
+      planId: limits.planId,
+      subscriptionStatus,
       seatsUsed: 1,
-      seatsLimit: selectedPlan.includedSeats,
+      seatsLimit: limits.seatsLimit,
+      leadsUsed: 0,
+      leadsLimit: limits.leadsLimit,
       trialEndsAt,
+      trialEndsAtMs,
     }), 15000, "create organization");
 
     // 2. Global user identity
@@ -114,6 +143,15 @@ export default function Signup() {
     // just created. Firestore rules' get() can briefly lag behind that write,
     // so we don't let these block signup. DataContext falls back to defaults. ----
     try {
+      // Record that this phone has now consumed its one free trial.
+      if (!alreadyTrialed) {
+        await withTimeout(setDoc(doc(db, "trialsUsed", pKey), {
+          phone: e164,
+          uid,
+          orgId,
+          usedAt: new Date().toISOString(),
+        }), 8000, "trial ledger");
+      }
       await withTimeout(setDoc(doc(db, "organizations", orgId, "settings", "config"), {
         statuses: DEFAULT_STATUSES,
         autoAssign: "round-robin",
@@ -122,7 +160,7 @@ export default function Signup() {
         lastIndex: 0,
       }), 8000, "meta");
       await withTimeout(setDoc(doc(db, "organizations", orgId, "activity", `welcome_${Date.now()}`), {
-        text: `🎉 ${fullName.trim()} created ${orgName.trim()} on the ${selectedPlan.name} plan (${TRIAL_DAYS}-day trial)`,
+        text: `🎉 ${fullName.trim()} created ${orgName.trim()} on the ${limits.planName} plan${alreadyTrialed ? " (trial already used — upgrade to activate)" : ` (${trialDays}-day trial)`}`,
         at: new Date().toISOString(),
         orgId,
       }), 8000, "activity");
