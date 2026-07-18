@@ -65,7 +65,9 @@ export default function Signup() {
     const orgId = `org_${Date.now()}`;
     const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
+    // ---- CRITICAL writes: these MUST succeed for login to work ----
     // 1. Organization root
+    console.log("[signup] creating organization…", orgId);
     await setDoc(doc(db, "organizations", orgId), {
       name: orgName.trim(),
       slug: orgName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
@@ -79,6 +81,7 @@ export default function Signup() {
     });
 
     // 2. Global user identity
+    console.log("[signup] creating user identity…");
     await setDoc(
       doc(db, "users", uid),
       {
@@ -91,7 +94,8 @@ export default function Signup() {
       { merge: true }
     );
 
-    // 3. Membership (owner)
+    // 3. Membership (owner) — required so security rules recognise this user as admin
+    console.log("[signup] creating owner membership…");
     await setDoc(doc(db, "memberships", `${uid}_${orgId}`), {
       uid,
       orgId,
@@ -103,23 +107,29 @@ export default function Signup() {
       lastActiveAt: serverTimestamp(),
     });
 
-    // 4. Settings
-    await setDoc(doc(db, "organizations", orgId, "settings", "config"), {
-      statuses: DEFAULT_STATUSES,
-      autoAssign: "round-robin",
-    });
+    // ---- BEST-EFFORT writes: rely on isAdmin() which reads the membership we
+    // just created. Firestore rules' get() can briefly lag behind that write,
+    // so we don't let these block signup. DataContext falls back to defaults. ----
+    try {
+      await setDoc(doc(db, "organizations", orgId, "settings", "config"), {
+        statuses: DEFAULT_STATUSES,
+        autoAssign: "round-robin",
+      });
+      await setDoc(doc(db, "organizations", orgId, "meta", "leadAssignment"), {
+        lastIndex: 0,
+      });
+      await setDoc(doc(db, "organizations", orgId, "activity", `welcome_${Date.now()}`), {
+        text: `🎉 ${fullName.trim()} created ${orgName.trim()} on the ${selectedPlan.name} plan (${TRIAL_DAYS}-day trial)`,
+        at: new Date().toISOString(),
+        orgId,
+      });
+    } catch (nonCritical) {
+      // Non-fatal: workspace still usable; these self-heal from the app later.
+      console.warn("[signup] optional workspace setup skipped:", nonCritical?.code || nonCritical?.message);
+    }
 
-    // 5. Lead assignment meta
-    await setDoc(doc(db, "organizations", orgId, "meta", "leadAssignment"), {
-      lastIndex: 0,
-    });
-
-    // 6. Welcome activity
-    await setDoc(doc(db, "organizations", orgId, "activity", `welcome_${Date.now()}`), {
-      text: `🎉 ${fullName.trim()} created ${orgName.trim()} on the ${selectedPlan.name} plan (${TRIAL_DAYS}-day trial)`,
-      at: new Date().toISOString(),
-      orgId,
-    });
+    console.log("[signup] workspace ready:", orgId);
+    return orgId;
   };
 
   const submitOtp = async (e) => {
@@ -137,16 +147,25 @@ export default function Signup() {
     // Auth succeeded — create the tenant workspace
     try {
       const uid = auth.currentUser?.uid;
-      if (!uid) throw new Error("Authentication lost, please retry.");
+      if (!uid) throw new Error("Authentication lost — please resend the code.");
       await createOrganization(uid);
       setStep("done");
       // Full reload so AuthContext re-reads membership and routes to dashboard
       setTimeout(() => {
         window.location.assign("/admin");
-      }, 1800);
+      }, 1600);
     } catch (e2) {
-      console.error("Org creation failed:", e2);
-      setErr(e2.message || "Could not create your workspace. Please try again.");
+      console.error("[signup] org creation failed:", e2?.code, e2?.message);
+      const code = e2?.code;
+      let msg;
+      if (code === "permission-denied") {
+        msg = "Workspace nahi bana — Firestore Security Rules deploy nahi hui hmain. (permission-denied)";
+      } else if (code === "unavailable" || code === "failed-precondition") {
+        msg = "Firestore reach nahi ho raha. Internet/Firestore setup check karo.";
+      } else {
+        msg = `Workspace banane me error: ${code || e2?.message || "unknown"}`;
+      }
+      setErr(msg);
       setLoading(false);
     }
   };

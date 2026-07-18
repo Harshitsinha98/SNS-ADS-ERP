@@ -65,22 +65,32 @@ export default function Setup() {
         lastActiveAt: serverTimestamp(),
       });
 
-      await setDoc(doc(db, 'organizations', orgId, 'settings', 'config'), {
-        statuses: DEFAULT_STATUSES,
-        autoAssign: 'round-robin',
-      });
-
-      await setDoc(doc(db, 'organizations', orgId, 'meta', 'leadAssignment'), {
-        lastIndex: 0,
-      });
+      // Best-effort: rules' get() can lag behind the membership we just wrote,
+      // so don't let these block workspace creation.
+      try {
+        await setDoc(doc(db, 'organizations', orgId, 'settings', 'config'), {
+          statuses: DEFAULT_STATUSES,
+          autoAssign: 'round-robin',
+        });
+        await setDoc(doc(db, 'organizations', orgId, 'meta', 'leadAssignment'), {
+          lastIndex: 0,
+        });
+      } catch (nonCritical) {
+        console.warn('Optional setup skipped:', nonCritical?.code || nonCritical?.message);
+      }
 
       setSuccess(true);
       setTimeout(() => {
         window.location.assign('/admin');
-      }, 1800);
+      }, 1600);
     } catch (err) {
-      console.error('Setup error:', err);
-      setError(err.message || 'Failed to create organization');
+      console.error('Setup error:', err?.code, err?.message);
+      const code = err?.code;
+      setError(
+        code === 'permission-denied'
+          ? 'Workspace nahi bana — Firestore Security Rules deploy karo. (permission-denied)'
+          : (err?.message || 'Failed to create organization')
+      );
       setLoading(false);
     }
   };
