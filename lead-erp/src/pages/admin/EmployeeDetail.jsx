@@ -10,9 +10,14 @@ export default function EmployeeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { users, leads, financials, updateUser, reassignLead, reassignAllLeads } = useData();
+  const { users, leads, financials, updateUser, deactivateUser, activateUser, reassignLead, reassignAllLeads } = useData();
   const [bulkTarget, setBulkTarget] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
+
+  const toggleActive = async (currentlyActive) => {
+    const res = currentlyActive ? await deactivateUser(emp.id) : await activateUser(emp.id);
+    if (!res?.ok && res?.error) alert(res.error);
+  };
 
   const emp = users.find((u) => u.id === id);
   if (!emp) return <Layout title="Employee"><p className="text-danger">Employee not found.</p></Layout>;
@@ -70,7 +75,7 @@ export default function EmployeeDetail() {
           <p className="text-sm"><span className="text-ink/40">Status</span> · {emp.active === false ? "Inactive" : "Active"}</p>
           <div className="flex flex-wrap gap-2 mt-4">
             <button onClick={changeNumber} className="text-xs bg-paper border border-paper-line px-3 py-1.5 rounded">Change number</button>
-            <button onClick={() => updateUser(emp.id, { active: !(emp.active !== false) })}
+            <button onClick={() => toggleActive(emp.active !== false)}
               className="text-xs bg-danger-soft text-danger px-3 py-1.5 rounded">
               {emp.active === false ? "Activate" : "Deactivate"}
             </button>

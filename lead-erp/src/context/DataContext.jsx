@@ -498,7 +498,7 @@ export function DataProvider({ children }) {
 
   // Deactivate a member and free up their seat (atomic decrement, min 0).
   const deactivateUser = async (uid) => {
-    if (!user?.activeOrgId) return;
+    if (!user?.activeOrgId) return { ok: false };
     const orgRef = doc(db, "organizations", user.activeOrgId);
     const memRef = doc(db, "memberships", `${uid}_${user.activeOrgId}`);
     try {
@@ -513,8 +513,42 @@ export function DataProvider({ children }) {
         }
       });
       logActivity(`Team member deactivated (${uid})`);
+      return { ok: true };
     } catch (e) {
       console.error("Deactivate user error:", e?.code, e?.message);
+      return { ok: false, error: "Deactivate nahi hua." };
+    }
+  };
+
+  // Re-activate a member — consumes a seat, so it's blocked when the plan is
+  // full or the subscription/trial has expired.
+  const activateUser = async (uid) => {
+    if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
+    const orgRef = doc(db, "organizations", user.activeOrgId);
+    const memRef = doc(db, "memberships", `${uid}_${user.activeOrgId}`);
+    try {
+      await runTransaction(db, async (tx) => {
+        const memSnap = await tx.get(memRef);
+        if (!memSnap.exists()) throw Object.assign(new Error("missing"), { code: "missing" });
+        if (memSnap.data().active === true) return; // already active
+        const orgSnap = await tx.get(orgRef);
+        const org = orgSnap.exists() ? orgSnap.data() : {};
+        if (org.subscriptionStatus === "expired")
+          throw Object.assign(new Error("expired"), { code: "expired" });
+        if ((org.seatsUsed ?? 0) >= (org.seatsLimit ?? 0))
+          throw Object.assign(new Error("seat"), { code: "seat-limit" });
+        tx.update(memRef, { active: true });
+        tx.update(orgRef, { seatsUsed: increment(1) });
+      });
+      logActivity(`Team member re-activated (${uid})`);
+      return { ok: true };
+    } catch (e) {
+      if (e.code === "seat-limit")
+        return { ok: false, error: "Seat limit reached. Upgrade your plan to re-activate this member." };
+      if (e.code === "expired")
+        return { ok: false, error: "Subscription/trial expired. Upgrade to re-activate members." };
+      console.error("Activate user error:", e?.code, e?.message);
+      return { ok: false, error: "Activate nahi hua." };
     }
   };
 
@@ -611,7 +645,7 @@ export function DataProvider({ children }) {
       setSettings: setSettingsValue, updateLead, addNote, addWorknote,
       updateLeadStatus, updatePriority, updateFollowUpDate, updateLeadRevenue,
       reassignLead, reassignAllLeads, blacklistLead,
-      addBulkLeads, addUser, updateUser, deactivateUser, pushNotif, markRead, logActivity, setMyGoal,
+      addBulkLeads, addUser, updateUser, deactivateUser, activateUser, pushNotif, markRead, logActivity, setMyGoal,
       triggerWhatsAppSync, changePlan,
     }}>
       {children}
