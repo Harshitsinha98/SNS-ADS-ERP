@@ -77,8 +77,6 @@ export default function Signup() {
     const limits = limitsForPlan(planId, config); // { seatsLimit, leadsLimit, planName }
 
     // ---- ANTI-ABUSE: one free trial per phone number, ever ----
-    // If this phone has already consumed a trial, the new workspace starts
-    // WITHOUT a trial (must upgrade to a paid plan to use it).
     let alreadyTrialed = false;
     try {
       const trialSnap = await withTimeout(getDoc(doc(db, "trialsUsed", pKey)), 10000, "check trial");
@@ -87,10 +85,15 @@ export default function Signup() {
       console.warn("[signup] trial-ledger check skipped:", e?.code || e?.message);
     }
 
+    // Only the STARTER plan gets a free trial. Growth/Enterprise are paid —
+    // they start "expired" (inactive) and must be activated via payment.
+    const isStarter = limits.planId === "starter";
+    const getsTrial = isStarter && !alreadyTrialed;
+
     const trialEndMs = Date.now() + trialDays * 24 * 60 * 60 * 1000;
-    const trialEndsAt = alreadyTrialed ? null : new Date(trialEndMs).toISOString();
-    const trialEndsAtMs = alreadyTrialed ? 0 : trialEndMs;
-    const subscriptionStatus = alreadyTrialed ? "expired" : "trialing";
+    const trialEndsAt = getsTrial ? new Date(trialEndMs).toISOString() : null;
+    const trialEndsAtMs = getsTrial ? trialEndMs : 0;
+    const subscriptionStatus = getsTrial ? "trialing" : "expired";
 
     // ---- CRITICAL writes: these MUST succeed for login to work ----
     // 1. Organization root
@@ -144,7 +147,7 @@ export default function Signup() {
     // so we don't let these block signup. DataContext falls back to defaults. ----
     try {
       // Record that this phone has now consumed its one free trial.
-      if (!alreadyTrialed) {
+      if (getsTrial) {
         await withTimeout(setDoc(doc(db, "trialsUsed", pKey), {
           phone: e164,
           uid,
@@ -160,7 +163,7 @@ export default function Signup() {
         lastIndex: 0,
       }), 8000, "meta");
       await withTimeout(setDoc(doc(db, "organizations", orgId, "activity", `welcome_${Date.now()}`), {
-        text: `🎉 ${fullName.trim()} created ${orgName.trim()} on the ${limits.planName} plan${alreadyTrialed ? " (trial already used — upgrade to activate)" : ` (${trialDays}-day trial)`}`,
+        text: `🎉 ${fullName.trim()} created ${orgName.trim()} on the ${limits.planName} plan${getsTrial ? ` (${trialDays}-day free trial)` : " (activate via payment)"}`,
         at: new Date().toISOString(),
         orgId,
       }), 8000, "activity");

@@ -16,6 +16,7 @@ export const PLANS = [
     includedSeats: 3,
     leadsLimit: 1000,
     pricePerSeat: 299,
+    trial: true, // only Starter offers a free trial
     features: [
       { text: "Up to 1,000 leads / month", included: true },
       { text: "WhatsApp lead capture", included: true },
@@ -65,8 +66,11 @@ export const PLANS = [
 ];
 
 // Default free-trial length (days). Overridable by the platform owner via
-// platformConfig/global.trialDays.
-export const TRIAL_DAYS = 14;
+// platformConfig/global.trialDays. Only the Starter plan gets a trial.
+export const TRIAL_DAYS = 7;
+
+// Does this plan offer a free trial? (Only Starter.)
+export const planHasTrial = (planId) => getPlanById(planId)?.trial === true;
 
 // ---- Helpers -------------------------------------------------------------
 

@@ -1,8 +1,56 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, query, where, getDocs, setDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { withTimeout } from "../utils/withTimeout";
+import { PLATFORM_OWNER_PHONE } from "../data/constants";
+
+// When an invited employee logs in, turn their pending invite(s) into real
+// UID-keyed membership(s) so their login resolves to the employee dashboard
+// instead of the "create organization" prompt.
+async function claimPendingInvites(uid, phone) {
+  if (!phone) return 0;
+  let claimed = 0;
+  try {
+    const invSnap = await getDocs(
+      query(collection(db, "invites"), where("phone", "==", phone), where("active", "==", true))
+    );
+    for (const inv of invSnap.docs) {
+      const d = inv.data();
+      try {
+        await setDoc(doc(db, "memberships", `${uid}_${d.orgId}`), {
+          uid,
+          orgId: d.orgId,
+          role: d.role || "employee",
+          displayName: d.displayName || "Member",
+          email: d.email || "",
+          phone: phone, // E164 — for team display & dedup
+          active: true,
+          invitedBy: d.invitedBy || null,
+          joinedAt: new Date().toISOString(),
+          lastActiveAt: new Date().toISOString(),
+        });
+        await updateDoc(inv.ref, {
+          active: false,
+          claimed: true,
+          claimedByUid: uid,
+          claimedAt: new Date().toISOString(),
+        });
+        await setDoc(
+          doc(db, "users", uid),
+          { phone, displayName: d.displayName || "Member", defaultOrgId: d.orgId, lastLoginAt: new Date().toISOString() },
+          { merge: true }
+        );
+        claimed++;
+      } catch (e) {
+        console.error("Invite claim failed for org", d.orgId, e?.code, e?.message);
+      }
+    }
+  } catch (e) {
+    console.warn("Invite lookup skipped:", e?.code || e?.message);
+  }
+  return claimed;
+}
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -30,28 +78,35 @@ export function AuthProvider({ children }) {
         // Step 1: Get user's global profile (users/{uid})
         const userSnap = await withTimeout(getDoc(doc(db, "users", uid)), 15000, "load profile");
         
+        const isPlatformOwner = phone === PLATFORM_OWNER_PHONE;
+
         // Step 2: Get user's active memberships
         const membershipsQuery = query(
           collection(db, "memberships"),
           where("uid", "==", uid),
           where("active", "==", true)
         );
-        const membershipsSnap = await withTimeout(getDocs(membershipsQuery), 15000, "load memberships");
+        let membershipsSnap = await withTimeout(getDocs(membershipsQuery), 15000, "load memberships");
+
+        // Step 2b: If none, this might be an invited employee logging in for the
+        // first time — claim their pending invite(s) into real memberships.
+        if (membershipsSnap.empty) {
+          const claimed = await claimPendingInvites(uid, phone);
+          if (claimed > 0) {
+            membershipsSnap = await withTimeout(getDocs(membershipsQuery), 15000, "reload memberships");
+          }
+        }
 
         if (membershipsSnap.empty) {
-          // No organization membership - allow access to Setup page
+          // Platform owner has no org membership but still needs the /platform
+          // dashboard — don't force org setup on them.
+          if (isPlatformOwner) {
+            setUser({ uid, id: uid, phone, displayName: null, isPlatformOwner: true });
+            setAuthLoading(false);
+            return;
+          }
           console.log("No organization membership found for user:", uid, "- redirecting to setup");
-          
-          // Create minimal user object for setup
-          const userData = {
-            uid: uid,
-            phone: phone,
-            displayName: null,
-            needsSetup: true, // Flag to indicate setup is needed
-          };
-          userData.id = uid;
-          
-          setUser(userData);
+          setUser({ uid, id: uid, phone, displayName: null, needsSetup: true });
           setAuthLoading(false);
           return;
         }
@@ -109,6 +164,8 @@ export function AuthProvider({ children }) {
         userData.id = uid;
         // Map role for backward compatibility with existing DataContext
         userData.role = activeMembership.role;
+        // Platform owner flag (for /platform access + redirect)
+        userData.isPlatformOwner = isPlatformOwner;
 
         setUser(userData);
 

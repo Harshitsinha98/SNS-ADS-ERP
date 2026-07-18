@@ -10,10 +10,13 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Platform super-admin (CodeSkate owner). Marked by a doc in platformAdmins.
+    // Platform super-admin (CodeSkate owner). The hardcoded owner phone always
+    // qualifies; additional admins can be added via the platformAdmins collection.
     function isPlatformAdmin() {
-      return isAuthenticated()
-        && exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid));
+      return isAuthenticated() && (
+        request.auth.token.phone_number == '+919653043939' ||
+        exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid))
+      );
     }
 
     function membershipPath(orgId) {
@@ -85,6 +88,34 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Employee INVITES (pending until the invitee logs in and claims them).
+    // Keyed by {phoneE164}_{orgId}.
+    match /invites/{inviteId} {
+      allow read: if isAuthenticated() && (
+        request.auth.token.phone_number == resource.data.phone ||
+        isAdmin(resource.data.orgId) ||
+        isPlatformAdmin()
+      );
+      allow create: if isAuthenticated() && isAdmin(request.resource.data.orgId);
+      // Admin manages the invite; the invited user can deactivate it on claim.
+      allow update: if isAuthenticated() && (
+        isAdmin(resource.data.orgId) ||
+        request.auth.token.phone_number == resource.data.phone
+      );
+      allow delete: if isAuthenticated() && (
+        isAdmin(resource.data.orgId) ||
+        request.auth.token.phone_number == resource.data.phone
+      );
+    }
+
+    // WhatsApp number → org routing map (phoneNumberId is the doc id).
+    // Backend reads this with the Admin SDK (bypasses rules).
+    match /whatsappConfigs/{phoneNumberId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && isAdmin(request.resource.data.orgId);
+      allow delete: if isAuthenticated() && isAdmin(resource.data.orgId);
+    }
+
     // ============================================================
     // GLOBAL USER IDENTITY
     // ============================================================
@@ -107,11 +138,19 @@ service cloud.firestore {
         isPlatformAdmin()
       );
 
-      // Self-serve signup: own owner membership (no seat/sub gate — first seat).
-      // OR admin adds a teammate: must have a free seat AND an active subscription.
+      // Membership creation is allowed when:
+      // 1. Self-serve signup — creating your OWN owner membership, OR
+      // 2. Claiming an invite — an invite for your verified phone + this org
+      //    exists and the role matches (invited employee's first login), OR
+      // 3. An admin adds a teammate with a free seat + active subscription.
       allow create: if isAuthenticated() && (
         (request.resource.data.uid == request.auth.uid &&
          request.resource.data.role == 'owner') ||
+
+        (request.resource.data.uid == request.auth.uid &&
+         exists(/databases/$(database)/documents/invites/$(request.auth.token.phone_number + '_' + request.resource.data.orgId)) &&
+         get(/databases/$(database)/documents/invites/$(request.auth.token.phone_number + '_' + request.resource.data.orgId)).data.role == request.resource.data.role) ||
+
         (request.auth.uid != request.resource.data.uid &&
          isAdmin(request.resource.data.orgId) &&
          seatAvailable(request.resource.data.orgId) &&

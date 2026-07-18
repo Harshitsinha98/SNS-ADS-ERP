@@ -1,10 +1,12 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import {
-  collection, collectionGroup, doc, onSnapshot, addDoc, updateDoc, setDoc,
+  collection, collectionGroup, doc, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc,
   query, where, orderBy, limit, writeBatch, runTransaction, increment, getDoc
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
+
+const toE164 = (phone) => "+91" + String(phone).replace(/\D/g, "").slice(-10);
 
 const DataContext = createContext();
 export const useData = () => useContext(DataContext);
@@ -52,8 +54,28 @@ export function DataProvider({ children }) {
   const { user } = useAuth();
 
   const [leads, setLeads] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [members, setMembers] = useState([]);       // claimed memberships (real UID)
+  const [pendingInvites, setPendingInvites] = useState([]); // invited but not yet logged in
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+
+  // Team = claimed members + pending invites (deduped by phone; member wins).
+  const users = useMemo(() => {
+    const memberPhones = new Set(members.map((m) => m.phone).filter(Boolean));
+    const pend = pendingInvites
+      .filter((i) => !memberPhones.has(i.phone))
+      .map((i) => ({
+        id: i.id,
+        inviteId: i.id,
+        uid: null,
+        phone: i.phone,
+        name: i.displayName,
+        email: i.email || "",
+        role: i.role,
+        active: true,
+        pending: true,
+      }));
+    return [...members, ...pend];
+  }, [members, pendingInvites]);
   const [notifications, setNotifications] = useState([]);
   const [activity, setActivity] = useState([]);
   const [goals, setGoals] = useState({});
@@ -61,7 +83,7 @@ export function DataProvider({ children }) {
 
   useEffect(() => {
     if (!user || !user.activeOrgId) {
-      setLeads([]); setUsers([]); setNotifications([]); setActivity([]); setGoals({}); setFinancials({});
+      setLeads([]); setMembers([]); setPendingInvites([]); setNotifications([]); setActivity([]); setGoals({}); setFinancials({});
       return;
     }
 
@@ -92,17 +114,33 @@ export function DataProvider({ children }) {
 
     const unsubUsers = onSnapshot(
       usersQuery,
-      (snap) => setUsers(snap.docs.map((d) => ({ 
+      (snap) => setMembers(snap.docs.map((d) => ({ 
         id: d.data().uid, // Use uid as id for compatibility
         uid: d.data().uid,
-        phone: d.data().phone, // Will be null for now, need to join with users collection
+        phone: d.data().phone,
         name: d.data().displayName,
+        email: d.data().email || "",
         role: d.data().role,
         active: d.data().active,
+        pending: false,
         ...d.data() 
       }))),
-      (err) => console.error("Users listener error:", err)
+      (err) => console.error("Members listener error:", err)
     );
+
+    // ============================================================
+    // PENDING INVITES - employees added by admin, not yet logged in
+    // ============================================================
+    let unsubInvites = () => {};
+    if (isAdmin) {
+      unsubInvites = onSnapshot(
+        query(collection(db, "invites"), where("orgId", "==", orgId), where("active", "==", true)),
+        (snap) => setPendingInvites(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        (err) => console.error("Invites listener error:", err)
+      );
+    } else {
+      setPendingInvites([]);
+    }
 
     // ============================================================
     // SETTINGS - org-scoped
@@ -172,6 +210,7 @@ export function DataProvider({ children }) {
     return () => { 
       unsubLeads(); 
       unsubUsers(); 
+      unsubInvites();
       unsubSettings(); 
       unsubNotifs(); 
       unsubActivity(); 
@@ -368,9 +407,10 @@ export function DataProvider({ children }) {
   const addBulkLeads = async (rows, assigner) => {
     if (!user?.activeOrgId) return 0;
     try {
-      const emps = users.filter((u) => u.role === "employee");
+      // Only claimed members (real UID, logged in at least once) can receive leads.
+      const emps = users.filter((u) => u.role === "employee" && !u.pending && u.uid);
       if (emps.length === 0) {
-        alert("No employees available to assign leads.");
+        alert("No active (logged-in) employees available to assign leads. Pending invitees can't receive leads until they log in.");
         return 0;
       }
 
@@ -432,12 +472,18 @@ export function DataProvider({ children }) {
   // Runs in a transaction: reads the org, blocks if seatsUsed >= seatsLimit,
   // otherwise creates the membership and atomically increments seatsUsed.
   // Returns { ok, error } so the UI can show a precise message.
+  // Invite a team member. Creates an INVITE keyed by phone (invites/{E164}_{orgId})
+  // and reserves a seat. When that person logs in with OTP, AuthContext claims
+  // the invite into a real-UID membership (so their login works — no org prompt).
+  // u = { name, phone (10-digit), email?, role }
   const addUser = async (u) => {
     if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
 
-    const orgRef = doc(db, "organizations", user.activeOrgId);
-    const phoneId = "+91" + u.phone;
-    const memRef = doc(db, "memberships", `${phoneId}_${user.activeOrgId}`);
+    const orgId = user.activeOrgId;
+    const phoneE164 = toE164(u.phone);
+    const orgRef = doc(db, "organizations", orgId);
+    const inviteRef = doc(db, "invites", `${phoneE164}_${orgId}`);
+    const claimedMemRef = doc(db, "memberships", `${phoneE164}_${orgId}`); // legacy placeholder id
 
     try {
       await runTransaction(db, async (tx) => {
@@ -447,34 +493,31 @@ export function DataProvider({ children }) {
         const org = orgSnap.data();
         const seatsUsed = org.seatsUsed ?? 1;
         const seatsLimit = org.seatsLimit ?? 1;
-        const active = org.subscriptionStatus;
-
-        if (active === "expired") {
+        if (org.subscriptionStatus === "expired")
           throw Object.assign(new Error("expired"), { code: "expired" });
-        }
-        if (seatsUsed >= seatsLimit) {
+        if (seatsUsed >= seatsLimit)
           throw Object.assign(new Error("seat limit"), { code: "seat-limit" });
-        }
 
-        const memSnap = await tx.get(memRef);
-        if (memSnap.exists() && memSnap.data().active) {
+        const invSnap = await tx.get(inviteRef);
+        if (invSnap.exists() && invSnap.data().active)
           throw Object.assign(new Error("exists"), { code: "exists" });
-        }
 
-        tx.set(memRef, {
-          uid: phoneId, // placeholder until the invitee signs up with their UID
-          orgId: user.activeOrgId,
+        tx.set(inviteRef, {
+          phone: phoneE164,
+          orgId,
           displayName: u.name,
-          phone: u.phone,
-          role: u.role,
+          email: u.email || "",
+          role: u.role || "employee",
           active: true,
+          claimed: false,
           invitedBy: user.uid,
-          joinedAt: new Date().toISOString(),
+          invitedByName: user.displayName || user.name || "Admin",
+          createdAt: new Date().toISOString(),
         });
         tx.update(orgRef, { seatsUsed: increment(1) });
       });
 
-      logActivity(`Team member added: ${u.name} (${u.role})`);
+      logActivity(`Team member invited: ${u.name} (${u.role}) — ${phoneE164}`);
       return { ok: true };
     } catch (e) {
       if (e.code === "seat-limit")
@@ -482,7 +525,7 @@ export function DataProvider({ children }) {
       if (e.code === "expired")
         return { ok: false, error: "Trial/subscription khatam. Billing page se plan activate/upgrade karo." };
       if (e.code === "exists")
-        return { ok: false, error: "Ye number already added hai." };
+        return { ok: false, error: "Ye number already invite/add ho chuka hai." };
       if (e.code === "permission-denied")
         return { ok: false, error: "Permission denied — subscription expired ya rules publish nahi hui. Billing page check karo." };
       console.error("Add user error:", e?.code, e?.message);
@@ -493,16 +536,42 @@ export function DataProvider({ children }) {
   const updateUser = async (uid, patch) => {
     if (!user?.activeOrgId) return;
     try { 
-      // Update the membership document
       await updateDoc(doc(db, "memberships", `${uid}_${user.activeOrgId}`), patch); 
     } catch (e) { console.error("Update user error:", e); }
   };
 
-  // Deactivate a member and free up their seat (atomic decrement, min 0).
-  const deactivateUser = async (uid) => {
+  // Deactivate a team member (works for both claimed members and pending invites)
+  // and free up their seat. `target` is the user object from the team list.
+  const deactivateUser = async (target) => {
     if (!user?.activeOrgId) return { ok: false };
-    const orgRef = doc(db, "organizations", user.activeOrgId);
-    const memRef = doc(db, "memberships", `${uid}_${user.activeOrgId}`);
+    const orgId = user.activeOrgId;
+    const orgRef = doc(db, "organizations", orgId);
+
+    // Pending invite (not yet claimed) → deactivate the invite
+    if (target && target.pending && target.inviteId) {
+      try {
+        await runTransaction(db, async (tx) => {
+          const invRef = doc(db, "invites", target.inviteId);
+          const invSnap = await tx.get(invRef);
+          if (!invSnap.exists() || invSnap.data().active === false) return;
+          const orgSnap = await tx.get(orgRef);
+          tx.update(invRef, { active: false });
+          if (orgSnap.exists()) {
+            const used = orgSnap.data().seatsUsed ?? 1;
+            tx.update(orgRef, { seatsUsed: Math.max(0, used - 1) });
+          }
+        });
+        logActivity(`Pending invite removed (${target.phone})`);
+        return { ok: true };
+      } catch (e) {
+        console.error("Deactivate invite error:", e?.code, e?.message);
+        return { ok: false, error: "Remove nahi hua." };
+      }
+    }
+
+    // Claimed member → deactivate membership by uid
+    const uid = typeof target === "string" ? target : target?.uid || target?.id;
+    const memRef = doc(db, "memberships", `${uid}_${orgId}`);
     try {
       await runTransaction(db, async (tx) => {
         const memSnap = await tx.get(memRef);

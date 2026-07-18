@@ -16,7 +16,9 @@ export default function Login() {
 
   useEffect(() => {
     if (user) {
-      if (user.needsSetup) {
+      if (user.isPlatformOwner && !user.role) {
+        navigate("/platform", { replace: true });
+      } else if (user.needsSetup) {
         navigate("/setup", { replace: true });
       } else {
         const isAdminish = user.role === "admin" || user.role === "owner";

@@ -12,6 +12,7 @@ import Employees from "./pages/admin/Employees";
 import EmployeeDetail from "./pages/admin/EmployeeDetail";
 import Settings from "./pages/admin/Settings";
 import Billing from "./pages/admin/Billing";
+import WhatsApp from "./pages/admin/WhatsApp";
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
 import Workspace from "./pages/employee/Workspace";
 import LeadAction from "./pages/employee/LeadAction";
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/admin/employees/:id" element={<ProtectedRoute role="admin"><EmployeeDetail /></ProtectedRoute>} />
         <Route path="/admin/settings" element={<ProtectedRoute role="admin"><Settings /></ProtectedRoute>} />
         <Route path="/admin/billing" element={<ProtectedRoute role="admin"><Billing /></ProtectedRoute>} />
+        <Route path="/admin/whatsapp" element={<ProtectedRoute role="admin"><WhatsApp /></ProtectedRoute>} />
 
         {/* --- PLATFORM SUPER-ADMIN (gated inside the page by platformAdmins/{uid}) --- */}
         <Route path="/platform" element={<ProtectedRoute><PlatformDashboard /></ProtectedRoute>} />

@@ -48,17 +48,30 @@ app.use("/api/billing", createBillingRouter(db));
 const orgCollection = (orgId, collectionName) => 
   db.collection('organizations').doc(orgId).collection(collectionName);
 
+// Resolve which org a WhatsApp message belongs to, using the incoming
+// phone_number_id → whatsappConfigs/{phoneNumberId} → orgId mapping.
+// Falls back to DEFAULT_ORG_ID (single-tenant legacy) if no mapping.
+async function resolveOrgId(phoneNumberId) {
+  if (phoneNumberId) {
+    try {
+      const snap = await db.collection("whatsappConfigs").doc(String(phoneNumberId)).get();
+      if (snap.exists && snap.data().orgId) return snap.data().orgId;
+    } catch (e) {
+      console.warn("whatsappConfigs lookup failed:", e?.message);
+    }
+  }
+  return DEFAULT_ORG_ID || null;
+}
+
 // ============================================================
 // CORE: WhatsApp lead ko Firestore mein import karna (dedup + auto-assign)
 // Multi-tenant version - writes to org-scoped collections
 // ============================================================
-async function importWhatsAppLead({ phone, name, requirement }) {
-  if (!DEFAULT_ORG_ID) {
-    console.error("❌ Cannot import lead: DEFAULT_ORG_ID not configured");
-    return { status: "error", reason: "org_not_configured" };
+async function importWhatsAppLead({ phone, name, requirement, orgId }) {
+  if (!orgId) {
+    console.error("❌ Cannot import lead: no org resolved for this WhatsApp number");
+    return { status: "error", reason: "org_not_resolved" };
   }
-
-  const orgId = DEFAULT_ORG_ID;
 
   try {
     // 1. Duplicate Check - org-scoped leads
@@ -210,7 +223,8 @@ async function processPendingQueue() {
       const result = await importWhatsAppLead({
         phone: data.phone,
         name: data.name,
-        requirement: data.requirement
+        requirement: data.requirement,
+        orgId: data.orgId || DEFAULT_ORG_ID,
       });
 
       if (result.status !== "queued") {
@@ -244,14 +258,20 @@ app.post("/webhook", async (req, res) => {
     const change = req.body?.entry?.[0]?.changes?.[0]?.value;
     const message = change?.messages?.[0];
     const contact = change?.contacts?.[0];
+    const phoneNumberId = change?.metadata?.phone_number_id;
 
     if (message) {
+      const orgId = await resolveOrgId(phoneNumberId);
+      if (!orgId) {
+        console.warn("⚠️  No org mapped for phone_number_id:", phoneNumberId, "- lead dropped");
+        return res.sendStatus(200);
+      }
       const phone = message.from;
       const name = contact?.profile?.name || "WhatsApp Lead";
       const requirement = message.text?.body || "[Non-text message]";
 
-      const result = await importWhatsAppLead({ phone, name, requirement });
-      console.log("Webhook processed:", result);
+      const result = await importWhatsAppLead({ phone, name, requirement, orgId });
+      console.log(`Webhook processed for org ${orgId}:`, result);
     }
 
     res.sendStatus(200);

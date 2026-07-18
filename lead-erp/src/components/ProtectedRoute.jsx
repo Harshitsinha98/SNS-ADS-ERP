@@ -20,7 +20,12 @@ export default function ProtectedRoute({ children, role }) {
 
   // owner is treated as admin for route access
   const isAdminish = user.role === "admin" || user.role === "owner";
-  const home = isAdminish ? "/admin" : "/app";
+  const home = user.isPlatformOwner && !user.role ? "/platform" : isAdminish ? "/admin" : "/app";
+
+  // Platform owner (no org) can always reach /platform without an org setup.
+  if (user.isPlatformOwner && location.pathname === "/platform") {
+    return children;
+  }
 
   // If user needs setup, redirect to setup page (unless already there)
   if (user.needsSetup && location.pathname !== "/setup") {

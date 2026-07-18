@@ -15,7 +15,7 @@ export default function EmployeeDetail() {
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const toggleActive = async (currentlyActive) => {
-    const res = currentlyActive ? await deactivateUser(emp.id) : await activateUser(emp.id);
+    const res = currentlyActive ? await deactivateUser(emp) : await activateUser(emp.uid || emp.id);
     if (!res?.ok && res?.error) alert(res.error);
   };
 

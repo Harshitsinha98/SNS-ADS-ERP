@@ -85,9 +85,14 @@ function PlanCard({ plan, cycle, onSelect }) {
             : "btn-secondary"
         }`}
       >
-        Start free trial
+        {plan.trial ? "Start free trial" : "Get started"}
         <ArrowRight size={16} />
       </button>
+      {plan.trial ? (
+        <p className="text-center text-xs text-success-600 -mt-4 mb-5 font-medium">7-day free trial included</p>
+      ) : (
+        <p className="text-center text-xs text-ink-muted -mt-4 mb-5">Paid plan · no trial</p>
+      )}
 
       <ul className="space-y-3 mt-auto">
         {plan.features.map((f, i) => (

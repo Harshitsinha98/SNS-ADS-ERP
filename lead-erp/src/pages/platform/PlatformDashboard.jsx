@@ -5,6 +5,7 @@ import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import { subscribePlatformConfig, savePlatformConfig } from "../../utils/platformConfig";
 import { mergePlansWithConfig, limitsForPlan } from "../../data/plans";
+import { PLATFORM_OWNER_PHONE } from "../../data/constants";
 import Logo from "../../components/marketing/Logo";
 import {
   Building2, Users, IndianRupee, Clock, ShieldAlert, LogOut, Save, Loader2,
@@ -28,10 +29,16 @@ export default function PlatformDashboard() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
 
-  // 1. Verify the signed-in user is a platform super-admin
+  // 1. Verify the signed-in user is a platform super-admin.
+  //    The hardcoded platform owner phone always qualifies (matches rules).
   useEffect(() => {
     if (authLoading) return;
     if (!user?.uid) { setChecking(false); return; }
+    if (user.isPlatformOwner || user.phone === PLATFORM_OWNER_PHONE) {
+      setIsPlatformAdmin(true);
+      setChecking(false);
+      return;
+    }
     getDoc(doc(db, "platformAdmins", user.uid))
       .then((snap) => setIsPlatformAdmin(snap.exists()))
       .catch(() => setIsPlatformAdmin(false))

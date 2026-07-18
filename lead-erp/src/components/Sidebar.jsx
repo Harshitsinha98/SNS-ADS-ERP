@@ -11,12 +11,14 @@ import {
   X,
   ChevronRight,
   CreditCard,
+  MessageCircle,
 } from "lucide-react";
 
 const adminLinks = [
   { to: "/admin", label: "Dashboard", end: true, icon: LayoutDashboard },
   { to: "/admin/leads", label: "Lead Hub", icon: Inbox },
   { to: "/admin/employees", label: "Team", icon: Users },
+  { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/admin/billing", label: "Billing", icon: CreditCard },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];

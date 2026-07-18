@@ -9,25 +9,27 @@ export default function Employees() {
   const { users, leads, addUser } = useData();
   const { seatsUsed, seatsLimit, canAddSeat, planName, isExpired } = useBilling();
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", phone: "", role: "employee" });
+  const [form, setForm] = useState({ name: "", phone: "", email: "", role: "employee" });
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
   const employees = users.filter((u) => u.role === "employee");
+  const norm = (p) => String(p || "").replace(/\D/g, "").slice(-10);
 
   const create = async (e) => {
     e.preventDefault();
     setErr("");
     const cleanPhone = form.phone.replace(/\D/g, "");
+    if (!form.name.trim()) { setErr("Employee ka naam daalo."); return; }
     if (cleanPhone.length !== 10) { setErr("Sahi 10-digit mobile number daalo."); return; }
-    if (users.some((u) => u.phone === cleanPhone)) { setErr("Ye number already registered hai."); return; }
+    if (users.some((u) => norm(u.phone) === cleanPhone)) { setErr("Ye number already added/invited hai."); return; }
 
     setSaving(true);
-    const res = await addUser({ ...form, phone: cleanPhone, active: true });
+    const res = await addUser({ name: form.name.trim(), phone: cleanPhone, email: form.email.trim(), role: form.role });
     setSaving(false);
 
     if (!res?.ok) { setErr(res?.error || "Member add nahi hua."); return; }
-    setForm({ name: "", phone: "", role: "employee" });
+    setForm({ name: "", phone: "", email: "", role: "employee" });
     setShowForm(false);
   };
 
@@ -87,20 +89,25 @@ export default function Employees() {
       {showForm && (
         <form onSubmit={create} className="bg-white rounded-xl shadow-card border border-cream-300/60 p-5 mb-5">
           {err && <p className="text-danger-600 text-sm mb-3 bg-danger-50 border border-danger-100 rounded-lg px-3 py-2">{err}</p>}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
             <input className="border border-cream-400/70 rounded-lg p-2.5 text-sm" placeholder="Full Name"
               value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
             <input className="border border-cream-400/70 rounded-lg p-2.5 text-sm" placeholder="10-digit Mobile" maxLength={10}
               value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })} required />
+            <input className="border border-cream-400/70 rounded-lg p-2.5 text-sm" placeholder="Email (optional)" type="email"
+              value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             <select className="border border-cream-400/70 rounded-lg p-2.5 text-sm" value={form.role}
               onChange={(e) => setForm({ ...form, role: e.target.value })}>
               <option value="employee">Employee</option>
               <option value="admin">Admin</option>
             </select>
             <button disabled={saving} className="bg-gradient-orange text-white rounded-lg p-2.5 text-sm font-semibold disabled:opacity-60">
-              {saving ? "Adding…" : "Provision user"}
+              {saving ? "Adding…" : "Send invite"}
             </button>
           </div>
+          <p className="text-xs text-ink-muted mt-3">
+            Invite bhejne ke baad employee apne number se OTP login karega — automatically uska employee dashboard khul jayega (dobara org banane ka prompt nahi aayega).
+          </p>
         </form>
       )}
 
@@ -128,8 +135,18 @@ export default function Employees() {
                   </div>
                 </td>
                 <td className="num">{stats.stale > 0 ? <span className="text-danger font-medium">{stats.stale}</span> : "0"}</td>
-                <td>{u.active === false ? <span className="text-danger text-xs">Inactive</span> : <span className="text-ok text-xs">Active</span>}</td>
-                <td><Link to={`/admin/employees/${u.id}`} className="text-info text-xs font-medium hover:underline">View →</Link></td>
+                <td>
+                  {u.pending
+                    ? <span className="badge badge-warning text-xs">Invited</span>
+                    : u.active === false
+                      ? <span className="text-danger text-xs">Inactive</span>
+                      : <span className="text-ok text-xs">Active</span>}
+                </td>
+                <td>
+                  {u.pending
+                    ? <span className="text-ink/30 text-xs">Awaiting login</span>
+                    : <Link to={`/admin/employees/${u.id}`} className="text-info text-xs font-medium hover:underline">View →</Link>}
+                </td>
               </tr>
             ))}
           </tbody>
