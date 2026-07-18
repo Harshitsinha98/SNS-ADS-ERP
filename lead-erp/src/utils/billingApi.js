@@ -35,6 +35,11 @@ export const createRazorpayOrder = (body) => authedPost("/api/billing/razorpay/o
 export const verifyRazorpayPayment = (body) => authedPost("/api/billing/razorpay/verify", body);
 export const getPayuHash = (body) => authedPost("/api/billing/payu/hash", body);
 
+// ---- paid SIGNUP (no org yet — backend provisions after payment) ----
+export const createSignupOrder = (body) => authedPost("/api/billing/signup/order", body);
+export const verifySignupPayment = (body) => authedPost("/api/billing/signup/verify", body);
+export const getSignupPayuHash = (body) => authedPost("/api/billing/signup/payu/hash", body);
+
 // ---- checkout helpers ----
 
 export function loadRazorpayScript() {
