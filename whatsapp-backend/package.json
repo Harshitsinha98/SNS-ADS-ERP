@@ -11,7 +11,8 @@
     "dotenv": "^16.6.1",
     "express": "^4.22.2",
     "firebase-admin": "^14.0.0",
-    "node-cron": "^4.4.1"
+    "node-cron": "^4.4.1",
+    "razorpay": "^2.9.4"
   },
   "description": "",
   "main": "server.js",

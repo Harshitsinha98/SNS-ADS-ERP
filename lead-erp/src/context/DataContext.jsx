@@ -480,11 +480,13 @@ export function DataProvider({ children }) {
       if (e.code === "seat-limit")
         return { ok: false, error: "Seat limit reached. Upgrade your plan to add more team members." };
       if (e.code === "expired")
-        return { ok: false, error: "Subscription/trial expired. Upgrade to add team members." };
+        return { ok: false, error: "Trial/subscription khatam. Billing page se plan activate/upgrade karo." };
       if (e.code === "exists")
         return { ok: false, error: "Ye number already added hai." };
+      if (e.code === "permission-denied")
+        return { ok: false, error: "Permission denied — subscription expired ya rules publish nahi hui. Billing page check karo." };
       console.error("Add user error:", e?.code, e?.message);
-      return { ok: false, error: "Member add nahi hua. Dobara try karo." };
+      return { ok: false, error: `Member add nahi hua (${e?.code || "error"}). Dobara try karo.` };
     }
   };
 

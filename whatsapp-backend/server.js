@@ -6,6 +6,7 @@ import fs from "fs";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getNextEmployeeRoundRobin, getNextEmployeeByWorkload } from "./utils/assignLead.js";
+import createBillingRouter from "./billing.js";
 
 // 1. Firebase Initialization
 const serviceAccount = JSON.parse(fs.readFileSync("./serviceAccountKey.json", "utf-8"));
@@ -23,6 +24,10 @@ if (!DEFAULT_ORG_ID) {
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Billing / payments (Razorpay + PayU). Mounted before the JSON-only routes
+// so the PayU callback can use its own urlencoded parser.
+app.use("/api/billing", createBillingRouter(db));
 
 // ============================================================
 // HELPER: Get org-scoped collection reference

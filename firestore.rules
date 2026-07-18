@@ -49,11 +49,15 @@ service cloud.firestore {
       return o.get('seatsUsed', 0) < o.get('seatsLimit', 0);
     }
     // Subscription usable? active plan, OR trialing and not past trialEndsAtMs.
+    // If trialEndsAtMs is missing (older orgs created before this field), we
+    // give the benefit of the doubt so existing workspaces keep working.
     function subActive(orgId) {
       let o = orgData(orgId);
-      return o.get('subscriptionStatus', 'trialing') == 'active'
-             || (o.get('subscriptionStatus', 'trialing') == 'trialing'
-                 && o.get('trialEndsAtMs', 0) > request.time.toMillis());
+      let status = o.get('subscriptionStatus', 'trialing');
+      return status == 'active'
+             || (status == 'trialing'
+                 && (o.get('trialEndsAtMs', 0) == 0
+                     || o.get('trialEndsAtMs', 0) > request.time.toMillis()));
     }
 
     // ============================================================
