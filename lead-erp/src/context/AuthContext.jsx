@@ -149,43 +149,83 @@ export function AuthProvider({ children }) {
     return window.recaptchaVerifier;
   };
 
-  // Step 1: Check if user exists (by phone) - check memberships collection
+  // Clear a stale/expired reCAPTCHA so the next attempt starts fresh
+  const resetRecaptcha = () => {
+    try {
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+      }
+    } catch (e) {
+      console.warn("Recaptcha clear failed:", e);
+    }
+    window.recaptchaVerifier = null;
+  };
+
+  // Map Firebase auth error codes -> readable messages
+  const otpErrorMessage = (code) => {
+    switch (code) {
+      case "auth/invalid-phone-number":
+        return "Phone number galat hai. 10-digit sahi number daalo.";
+      case "auth/missing-phone-number":
+        return "Phone number missing hai.";
+      case "auth/quota-exceeded":
+        return "Aaj ka OTP quota khatam. Kal try karo ya Firebase billing enable karo.";
+      case "auth/too-many-requests":
+        return "Bahut zyada attempts. Thodi der baad try karo.";
+      case "auth/captcha-check-failed":
+        return "reCAPTCHA verify nahi hua. Domain authorize karo aur dobara try karo.";
+      case "auth/invalid-app-credential":
+        return "reCAPTCHA/App credential invalid. Firebase config aur authorized domains check karo.";
+      case "auth/operation-not-allowed":
+        return "Phone sign-in enable nahi hai. Firebase Console → Authentication → Sign-in method → Phone enable karo.";
+      case "auth/billing-not-enabled":
+        return "Firebase billing enable nahi hai (Phone Auth ke liye zaroori).";
+      default:
+        return `OTP bhejne mein error: ${code || "unknown"}. Console check karo.`;
+    }
+  };
+
+  // Step 1: Send OTP to phone
   const requestOtp = async (phone) => {
     const phoneId = toE164(phone);
-    
-    try {
-      // For Phase 1, we need to check if a user with this phone exists
-      // After migration, user documents are keyed by UID, so we need to:
-      // 1. Check all users collection for this phone number
-      // 2. Or query memberships by phone (if we add phone field there)
-      // For now, let's check the new users collection structure
-      
-      // Note: This query requires a composite index in production
-      // For now, we'll proceed with OTP and validate membership after auth
-      // This is a security consideration for Phase 1
-      
-    } catch (e) {
-      console.error("Registration check error:", e);
-      return { ok: false, error: "Number check karne mein error aaya. Thodi der baad try karo." };
+
+    // Guard: make sure Firebase config actually loaded (.env missing = no apiKey)
+    if (!import.meta.env.VITE_FIREBASE_API_KEY) {
+      return {
+        ok: false,
+        error: "Firebase config missing hai. .env file banao (VITE_FIREBASE_* keys) aur app restart karo.",
+      };
     }
-    
+
     try {
       const verifier = ensureRecaptcha();
       const confirmation = await signInWithPhoneNumber(auth, phoneId, verifier);
       return { ok: true, confirmation };
     } catch (e) {
-      console.error(e);
-      return { ok: false, error: "OTP bhejne mein error aaya. Recaptcha ya billing check karo." };
+      console.error("requestOtp error:", e.code, e.message);
+      // reset so the user can retry without a stale captcha
+      resetRecaptcha();
+      return { ok: false, error: otpErrorMessage(e.code) };
     }
   };
 
   // Step 2: OTP verify
   const verifyOtp = async (confirmation, otp) => {
+    if (!confirmation) {
+      return { ok: false, error: "Session expired. Phir se OTP bhejo." };
+    }
     try {
       await confirmation.confirm(otp);
       return { ok: true };
-    } catch {
-      return { ok: false, error: "Galat ya expired OTP." };
+    } catch (e) {
+      console.error("verifyOtp error:", e.code, e.message);
+      if (e.code === "auth/invalid-verification-code") {
+        return { ok: false, error: "Galat OTP. Dobara check karo." };
+      }
+      if (e.code === "auth/code-expired") {
+        return { ok: false, error: "OTP expire ho gaya. Naya OTP bhejo." };
+      }
+      return { ok: false, error: "OTP verify nahi hua. Dobara try karo." };
     }
   };
 
