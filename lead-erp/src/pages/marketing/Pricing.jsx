@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, X, ArrowRight, Sparkles, ChevronDown } from "lucide-react";
 import MarketingNav from "../../components/marketing/MarketingNav";
 import MarketingFooter from "../../components/marketing/MarketingFooter";
-import { PLANS, TRIAL_DAYS } from "../../data/plans";
+import { TRIAL_DAYS, mergePlansWithConfig } from "../../data/plans";
+import { fetchPlatformConfig } from "../../utils/platformConfig";
 
-const FAQS = [
+const buildFaqs = (trialDays) => [
   {
-    q: `What happens after my ${TRIAL_DAYS}-day trial ends?`,
+    q: `What happens after my ${trialDays}-day trial ends?`,
     a: "Your data is always preserved. If you haven't subscribed, your workspace downgrades to a read-only state until you pick a plan. Upgrade anytime to unlock everything again.",
   },
   {
@@ -135,7 +136,16 @@ function FaqItem({ q, a }) {
 
 export default function Pricing() {
   const [cycle, setCycle] = useState("monthly");
+  const [config, setConfig] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    fetchPlatformConfig().then(setConfig);
+  }, []);
+
+  // Dynamic: reflect the platform owner's configured prices/limits/trial days.
+  const { plans: PLANS, trialDays: TRIAL_DAYS } = mergePlansWithConfig(config);
+  const FAQS = buildFaqs(TRIAL_DAYS);
 
   const selectPlan = (plan) => {
     navigate("/signup", { state: { planId: plan.id, cycle } });

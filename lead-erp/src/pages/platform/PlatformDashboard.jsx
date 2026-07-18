@@ -1,22 +1,26 @@
 import { useState, useEffect } from "react";
-import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
+import { collection, doc, getDoc, onSnapshot, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import { subscribePlatformConfig, savePlatformConfig } from "../../utils/platformConfig";
-import { mergePlansWithConfig } from "../../data/plans";
+import { mergePlansWithConfig, limitsForPlan } from "../../data/plans";
 import Logo from "../../components/marketing/Logo";
 import {
   Building2, Users, IndianRupee, Clock, ShieldAlert, LogOut, Save, Loader2,
-  TrendingUp, Search,
+  TrendingUp, Search, Zap, RotateCcw, LogIn,
 } from "lucide-react";
 
 export default function PlatformDashboard() {
   const { user, authLoading, logout } = useAuth();
+  const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [orgs, setOrgs] = useState([]);
   const [config, setConfig] = useState(null);
   const [q, setQ] = useState("");
+  const [rowBusy, setRowBusy] = useState(null);
+  const [rowMsg, setRowMsg] = useState("");
 
   // config editor state
   const [trialDays, setTrialDays] = useState(14);
@@ -77,6 +81,69 @@ export default function PlatformDashboard() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // ---- per-org owner actions (platform admin can manage any org) ----
+  const activateOrg = async (org) => {
+    setRowBusy(org.id); setRowMsg("");
+    try {
+      const limits = limitsForPlan(org.planId || "growth", config);
+      await updateDoc(doc(db, "organizations", org.id), {
+        planId: limits.planId,
+        planName: limits.planName,
+        seatsLimit: limits.seatsLimit,
+        leadsLimit: limits.leadsLimit,
+        subscriptionStatus: "active",
+        trialEndsAt: null,
+        trialEndsAtMs: 0,
+      });
+      setRowMsg(`✅ ${org.name || org.id} activated (${limits.planName}).`);
+    } catch (e) {
+      setRowMsg("❌ " + (e?.code || e?.message));
+    } finally { setRowBusy(null); }
+  };
+
+  const startTrialOrg = async (org) => {
+    setRowBusy(org.id); setRowMsg("");
+    try {
+      const days = config && Number.isFinite(config.trialDays) ? config.trialDays : 14;
+      const endMs = Date.now() + days * 24 * 60 * 60 * 1000;
+      const limits = limitsForPlan(org.planId || "growth", config);
+      await updateDoc(doc(db, "organizations", org.id), {
+        subscriptionStatus: "trialing",
+        seatsLimit: limits.seatsLimit,
+        leadsLimit: limits.leadsLimit,
+        trialEndsAt: new Date(endMs).toISOString(),
+        trialEndsAtMs: endMs,
+      });
+      setRowMsg(`✅ ${org.name || org.id} par ${days}-din ka trial set ho gaya.`);
+    } catch (e) {
+      setRowMsg("❌ " + (e?.code || e?.message));
+    } finally { setRowBusy(null); }
+  };
+
+  // Create an owner membership for the current platform admin, then jump into
+  // that org's admin dashboard. Lets the owner get into any workspace.
+  const joinAsOwner = async (org) => {
+    setRowBusy(org.id); setRowMsg("");
+    try {
+      await setDoc(doc(db, "memberships", `${user.uid}_${org.id}`), {
+        uid: user.uid,
+        orgId: org.id,
+        role: "owner",
+        displayName: user.displayName || "Owner",
+        active: true,
+        invitedBy: user.uid,
+        joinedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }, { merge: true });
+      await setDoc(doc(db, "users", user.uid), { defaultOrgId: org.id }, { merge: true });
+      localStorage.setItem("activeOrgId", org.id);
+      setRowMsg(`✅ Aap ab ${org.name || org.id} ke owner ho. Dashboard khol raha hoon…`);
+      setTimeout(() => { window.location.assign("/admin"); }, 1200);
+    } catch (e) {
+      setRowMsg("❌ " + (e?.code || e?.message));
+    } finally { setRowBusy(null); }
   };
 
   // ---- gates ----
@@ -238,6 +305,14 @@ export default function PlatformDashboard() {
                 className="pl-9 pr-3 py-2 text-sm border border-cream-400/70 rounded-lg" />
             </div>
           </div>
+          {rowMsg && (
+            <div className="px-4 py-2.5 bg-cream-50 border-b border-cream-200 text-sm text-ink-soft">{rowMsg}</div>
+          )}
+          <div className="px-4 py-2 text-xs text-ink-muted flex items-center gap-4 border-b border-cream-100">
+            <span className="flex items-center gap-1"><Zap size={12} className="text-success-600" /> Activate</span>
+            <span className="flex items-center gap-1"><RotateCcw size={12} className="text-warning-600" /> Fresh trial</span>
+            <span className="flex items-center gap-1"><LogIn size={12} className="text-orange-600" /> Join as owner</span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[760px]">
               <thead>
@@ -249,6 +324,7 @@ export default function PlatformDashboard() {
                   <th className="font-medium">Seats</th>
                   <th className="font-medium">Trial ends</th>
                   <th className="font-medium">Created</th>
+                  <th className="font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -261,10 +337,29 @@ export default function PlatformDashboard() {
                     <td className="font-mono">{(o.seatsUsed ?? "—")}/{(o.seatsLimit ?? "—")}</td>
                     <td>{fmtDate(o.trialEndsAt)}</td>
                     <td>{fmtDate(o.createdAt)}</td>
+                    <td>
+                      <div className="flex items-center gap-1.5">
+                        <button title="Activate (paid)" disabled={rowBusy === o.id}
+                          onClick={() => activateOrg(o)}
+                          className="p-1.5 rounded-lg bg-success-100 text-success-700 hover:bg-success-200 disabled:opacity-50">
+                          {rowBusy === o.id ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                        </button>
+                        <button title="Start fresh trial" disabled={rowBusy === o.id}
+                          onClick={() => startTrialOrg(o)}
+                          className="p-1.5 rounded-lg bg-warning-100 text-warning-700 hover:bg-warning-200 disabled:opacity-50">
+                          <RotateCcw size={14} />
+                        </button>
+                        <button title="Join as owner & open" disabled={rowBusy === o.id}
+                          onClick={() => joinAsOwner(o)}
+                          className="p-1.5 rounded-lg bg-orange-100 text-orange-700 hover:bg-orange-200 disabled:opacity-50">
+                          <LogIn size={14} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan="7" className="p-6 text-center text-ink-muted">Koi organization nahi mila.</td></tr>
+                  <tr><td colSpan="8" className="p-6 text-center text-ink-muted">Koi organization nahi mila.</td></tr>
                 )}
               </tbody>
             </table>
