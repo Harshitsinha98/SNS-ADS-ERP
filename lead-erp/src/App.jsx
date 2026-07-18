@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
+import Setup from "./pages/Setup";
 import AdminDashboard from "./pages/admin/Dashboard";
 import LeadHub from "./pages/admin/LeadHub";
 import LeadDetail from "./pages/admin/LeadDetail";
@@ -28,6 +29,7 @@ export default function App() {
 
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/setup" element={<ProtectedRoute><Setup /></ProtectedRoute>} />
 
         {/* --- ADMIN SECTION --- */}
         <Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />

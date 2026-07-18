@@ -1,14 +1,67 @@
-const TONE = { ink: "bg-ink", signal: "bg-signal", ok: "bg-ok", danger: "bg-danger", info: "bg-info" };
+const TONE = {
+  ink: {
+    bg: "bg-gray-100",
+    icon: "text-gray-600",
+    dot: "bg-gray-400",
+  },
+  primary: {
+    bg: "bg-primary-50",
+    icon: "text-primary-600",
+    dot: "bg-primary-500",
+  },
+  signal: {
+    bg: "bg-purple-50",
+    icon: "text-purple-600",
+    dot: "bg-purple-500",
+  },
+  ok: {
+    bg: "bg-success-50",
+    icon: "text-success-600",
+    dot: "bg-success-500",
+  },
+  danger: {
+    bg: "bg-danger-50",
+    icon: "text-danger-600",
+    dot: "bg-danger-500",
+  },
+  info: {
+    bg: "bg-blue-50",
+    icon: "text-blue-600",
+    dot: "bg-blue-500",
+  },
+};
 
-export default function StatCard({ label, value, tone = "ink", icon: Icon }) {
+export default function StatCard({ label, value, tone = "ink", icon: Icon, onClick }) {
+  const toneStyles = TONE[tone] || TONE.ink;
+
   return (
-    <div className="bg-paper-card rounded-lg shadow-card border border-paper-line relative overflow-hidden pl-4 pr-4 py-4">
-      <span className={`absolute left-0 top-0 bottom-0 w-[3px] ${TONE[tone]}`} />
-      <div className="flex items-center justify-between mb-1.5">
-        <p className="eyebrow">{label}</p>
-        {Icon && <Icon size={14} className="text-ink/30" />}
-      </div>
-      <p className="text-2xl font-display font-semibold num">{value}</p>
+    <div
+      onClick={onClick}
+      className={`bg-white rounded-xl shadow-card border border-gray-100 p-5 relative overflow-hidden hover:shadow-card-hover hover:border-gray-200 transition-all ${
+        onClick ? "cursor-pointer" : ""
+      }`}
+    >
+      {/* Accent dot */}
+      <span
+        className={`absolute left-0 top-0 bottom-0 w-[3px] ${toneStyles.dot}`}
+      />
+
+      {/* Icon */}
+      {Icon && (
+        <div className={`w-10 h-10 ${toneStyles.bg} rounded-lg flex items-center justify-center mb-3`}>
+          <Icon size={18} className={toneStyles.icon} />
+        </div>
+      )}
+
+      {/* Label */}
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+        {label}
+      </p>
+
+      {/* Value */}
+      <p className="text-2xl font-display font-bold text-gray-800 num">
+        {value}
+      </p>
     </div>
   );
 }

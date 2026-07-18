@@ -38,10 +38,19 @@ export function AuthProvider({ children }) {
         const membershipsSnap = await getDocs(membershipsQuery);
 
         if (membershipsSnap.empty) {
-          // No organization membership - sign out
-          console.error("No active organization membership found for user:", uid);
-          await signOut(auth);
-          setUser(null);
+          // No organization membership - allow access to Setup page
+          console.log("No organization membership found for user:", uid, "- redirecting to setup");
+          
+          // Create minimal user object for setup
+          const userData = {
+            uid: uid,
+            phone: phone,
+            displayName: null,
+            needsSetup: true, // Flag to indicate setup is needed
+          };
+          userData.id = uid;
+          
+          setUser(userData);
           setAuthLoading(false);
           return;
         }

@@ -1,19 +1,155 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-paper text-ink font-body antialiased;
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-800 font-body antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full hover:bg-gray-400;
+  }
+
+  /* Focus states */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+  }
+
+  /* Smooth transitions */
+  * {
+    @apply transition-colors duration-150;
+  }
 }
 
-.eyebrow {
-  @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-ink/50;
+@layer components {
+  /* Typography helpers */
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-wider text-gray-500;
+  }
+
+  .num {
+    @apply font-mono;
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-white rounded-xl shadow-card border border-gray-100 overflow-hidden;
+  }
+
+  .card-hover {
+    @apply hover:shadow-card-hover hover:border-gray-200 transition-all duration-200;
+  }
+
+  /* Button base */
+  .btn {
+    @apply px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 inline-flex items-center justify-center gap-2;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary-600 to-accent-600 text-white hover:from-primary-700 hover:to-accent-700 shadow-button hover:shadow-button-hover;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300;
+  }
+
+  .btn-ghost {
+    @apply text-gray-600 hover:text-gray-800 hover:bg-gray-100;
+  }
+
+  .btn-danger {
+    @apply bg-danger-500 text-white hover:bg-danger-600;
+  }
+
+  /* Input styles */
+  .input {
+    @apply w-full px-4 py-3 rounded-lg border border-gray-200 bg-white text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-all outline-none;
+  }
+
+  .input-error {
+    @apply border-danger-300 focus:border-danger-500 focus:ring-danger-100;
+  }
+
+  /* Badge styles */
+  .badge {
+    @apply px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply bg-primary-100 text-primary-700;
+  }
+
+  .badge-success {
+    @apply bg-success-100 text-success-700;
+  }
+
+  .badge-warning {
+    @apply bg-warning-100 text-warning-700;
+  }
+
+  .badge-danger {
+    @apply bg-danger-100 text-danger-700;
+  }
+
+  /* Glassmorphism */
+  .glass {
+    @apply bg-white/80 backdrop-blur-lg;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent;
+  }
 }
 
-.num {
-  @apply font-mono;
-}
+@layer utilities {
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
 
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Custom gradient backgrounds */
+  .bg-gradient-shine {
+    background: linear-gradient(
+      135deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.4) 50%,
+      transparent 100%
+    );
+    background-size: 200% 200%;
+    animation: shine 2s infinite;
+  }
+
+  @keyframes shine {
+    to {
+      background-position: -200% -200%;
+    }
+  }
 }
