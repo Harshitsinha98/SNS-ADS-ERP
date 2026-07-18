@@ -9,8 +9,21 @@ import { getNextEmployeeRoundRobin, getNextEmployeeByWorkload } from "./utils/as
 import createBillingRouter from "./billing.js";
 
 // 1. Firebase Initialization
-const serviceAccount = JSON.parse(fs.readFileSync("./serviceAccountKey.json", "utf-8"));
-initializeApp({ credential: cert(serviceAccount) });
+// Deploy-friendly: prefer the FIREBASE_SERVICE_ACCOUNT env var (raw JSON or
+// base64-encoded JSON) so no file upload is needed on cloud hosts. Falls back
+// to a local serviceAccountKey.json file for local development.
+function loadServiceAccount() {
+  const envVal = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (envVal) {
+    const raw = envVal.trim().startsWith("{")
+      ? envVal
+      : Buffer.from(envVal, "base64").toString("utf-8");
+    return JSON.parse(raw);
+  }
+  return JSON.parse(fs.readFileSync("./serviceAccountKey.json", "utf-8"));
+}
+
+initializeApp({ credential: cert(loadServiceAccount()) });
 const db = getFirestore();
 
 // Multi-tenant configuration
