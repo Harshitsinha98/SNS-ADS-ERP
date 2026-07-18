@@ -52,8 +52,10 @@ export default function App() {
         <Route path="/admin/billing" element={<ProtectedRoute role="admin"><Billing /></ProtectedRoute>} />
         <Route path="/admin/whatsapp" element={<ProtectedRoute role="admin"><WhatsApp /></ProtectedRoute>} />
 
-        {/* --- PLATFORM SUPER-ADMIN (gated inside the page by platformAdmins/{uid}) --- */}
-        <Route path="/platform" element={<ProtectedRoute><PlatformDashboard /></ProtectedRoute>} />
+        {/* --- PLATFORM OWNER PORTAL (self-contained owner login inside the page;
+                only +919653043939 can enter). Accessible at /owner or /platform. --- */}
+        <Route path="/owner" element={<PlatformDashboard />} />
+        <Route path="/platform" element={<PlatformDashboard />} />
 
         {/* --- EMPLOYEE SECTION --- */}
         <Route path="/app" element={<ProtectedRoute role="employee"><Workspace /></ProtectedRoute>} />
