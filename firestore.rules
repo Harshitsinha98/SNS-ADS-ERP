@@ -13,7 +13,7 @@ service cloud.firestore {
     }
 
     function membershipPath(orgId) {
-      return /databases/$(database)/documents/memberships/$(request.auth.uid)_$(orgId);
+      return /databases/$(database)/documents/memberships/$(request.auth.uid + '_' + orgId);
     }
 
     function hasMembershipDoc(orgId) {
