@@ -421,8 +421,10 @@ export default function createBillingRouter(db) {
       });
       res.json({ subscriptionId: sub.id, keyId: process.env.RAZORPAY_KEY_ID, planName: plan.name });
     } catch (e) {
-      console.error("subscription/create error:", e?.message);
-      res.status(500).json({ error: "Could not create subscription" });
+      // Surface the real Razorpay error so the exact cause is visible.
+      const detail = e?.error?.description || e?.message || "Could not create subscription";
+      console.error("subscription/create error:", detail, JSON.stringify(e?.error || {}));
+      res.status(500).json({ error: `Razorpay: ${detail}` });
     }
   });
 
