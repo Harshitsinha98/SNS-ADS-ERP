@@ -94,7 +94,7 @@ export default function Setup() {
       const code = err?.code;
       setError(
         code === 'permission-denied'
-          ? 'Workspace nahi bana — Firestore Security Rules deploy karo. (permission-denied)'
+          ? 'Workspace could not be created — please deploy the Firestore Security Rules. (permission-denied)'
           : (err?.message || 'Failed to create organization')
       );
       setLoading(false);

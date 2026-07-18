@@ -69,7 +69,7 @@ async function resolveOrgId(phoneNumberId) {
 }
 
 // ============================================================
-// CORE: WhatsApp lead ko Firestore mein import karna (dedup + auto-assign)
+// CORE: Import a WhatsApp lead into Firestore (dedup + auto-assign)
 // Multi-tenant version - writes to org-scoped collections
 // ============================================================
 async function importWhatsAppLead({ phone, name, requirement, orgId }) {
@@ -211,7 +211,7 @@ async function importWhatsAppLead({ phone, name, requirement, orgId }) {
 }
 
 // ============================================================
-// QUEUE PROCESSOR: Pending leads ko assign karna
+// QUEUE PROCESSOR: Assign pending leads
 // ============================================================
 async function processPendingQueue() {
   if (!DEFAULT_ORG_ID) {
@@ -365,7 +365,7 @@ async function runSubscriptionLifecycle() {
         renewalRemindedFor: null,
       });
       await ref.collection("activity").add({ text: `⬇️ Plan changed to ${target.name} (scheduled downgrade applied)`, at: new Date().toISOString(), orgId: docSnap.id });
-      await notifyOrgAdmins(docSnap.id, `Aapka plan ab ${target.name} hai. Wapas upgrade karke zyada seats & leads paayein!`);
+      await notifyOrgAdmins(docSnap.id, `Your plan is now ${target.name}. Upgrade again to get more seats & leads!`);
       downgraded++;
       continue;
     }
@@ -374,18 +374,18 @@ async function runSubscriptionLifecycle() {
       const daysLeft = Math.ceil((periodEnd - now) / DAY_MS);
       // Renewal reminder for MANUAL payers (autopay auto-charges).
       if (!org.autopay && daysLeft <= 5 && daysLeft >= 0 && org.renewalRemindedFor !== String(periodEnd)) {
-        await notifyOrgAdmins(docSnap.id, `⏰ Aapka ${org.planName} plan ${daysLeft} din me expire hoga. Billing page se renew karo.`);
+        await notifyOrgAdmins(docSnap.id, `⏰ Your ${org.planName} plan expires in ${daysLeft} day(s). Renew it from the Billing page.`);
         await ref.update({ renewalRemindedFor: String(periodEnd) });
         reminded++;
       }
       if (now >= periodEnd) {
         await ref.update({ subscriptionStatus: "past_due" });
-        await notifyOrgAdmins(docSnap.id, `⚠️ Aapka plan expire ho gaya. ${GRACE_DAYS} din me renew karo warna features lock ho jayenge.`);
+        await notifyOrgAdmins(docSnap.id, `⚠️ Your plan has expired. Renew within ${GRACE_DAYS} day(s) or features will be locked.`);
         pastDue++;
       }
     } else if (status === "past_due" && periodEnd && now >= periodEnd + GRACE_DAYS * DAY_MS) {
       await ref.update({ subscriptionStatus: "expired" });
-      await notifyOrgAdmins(docSnap.id, `🔒 Grace period khatam — features locked. Renew karke wapas activate karo.`);
+      await notifyOrgAdmins(docSnap.id, `🔒 Grace period over — features locked. Renew to reactivate your workspace.`);
       expired++;
     }
   }

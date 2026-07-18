@@ -2,14 +2,14 @@ import { Phone, MessageCircle, MessageSquare, RefreshCw, UserCheck, Clock } from
 import { fmtDuration } from "../utils/helpers";
 
 export default function Timeline({ entries = [] }) {
-  // Timeline ko latest activity ke hisaab se sort karo
+  // Sort the timeline by latest activity first
   const sorted = [...entries].sort((a, b) => new Date(b.at || b.createdAt) - new Date(a.at || a.createdAt));
 
   if (!sorted.length) {
     return <p className="text-gray-400 text-sm text-center mt-10">No activity logged yet.</p>;
   }
 
-  // Type ke hisaab se sahi icon aur color return karna
+  // Return the right icon and color based on the type
   const getIcon = (type) => {
     if (type === 'worknote') return <MessageSquare size={16} className="text-blue-500" />;
     if (type === 'status' || type === 'status_change') return <RefreshCw size={16} className="text-orange-500" />;

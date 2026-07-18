@@ -523,13 +523,13 @@ export function DataProvider({ children }) {
       if (e.code === "seat-limit")
         return { ok: false, error: "Seat limit reached. Upgrade your plan to add more team members." };
       if (e.code === "expired")
-        return { ok: false, error: "Trial/subscription khatam. Billing page se plan activate/upgrade karo." };
+        return { ok: false, error: "Trial/subscription ended. Activate or upgrade your plan from the Billing page." };
       if (e.code === "exists")
-        return { ok: false, error: "Ye number already invite/add ho chuka hai." };
+        return { ok: false, error: "This number is already invited/added." };
       if (e.code === "permission-denied")
-        return { ok: false, error: "Permission denied — subscription expired ya rules publish nahi hui. Billing page check karo." };
+        return { ok: false, error: "Permission denied — subscription expired or security rules not published. Check the Billing page." };
       console.error("Add user error:", e?.code, e?.message);
-      return { ok: false, error: `Member add nahi hua (${e?.code || "error"}). Dobara try karo.` };
+      return { ok: false, error: `Could not add member (${e?.code || "error"}). Please try again.` };
     }
   };
 
@@ -565,7 +565,7 @@ export function DataProvider({ children }) {
         return { ok: true };
       } catch (e) {
         console.error("Deactivate invite error:", e?.code, e?.message);
-        return { ok: false, error: "Remove nahi hua." };
+        return { ok: false, error: "Could not remove." };
       }
     }
 
@@ -587,7 +587,7 @@ export function DataProvider({ children }) {
       return { ok: true };
     } catch (e) {
       console.error("Deactivate user error:", e?.code, e?.message);
-      return { ok: false, error: "Deactivate nahi hua." };
+      return { ok: false, error: "Could not deactivate." };
     }
   };
 
@@ -619,7 +619,7 @@ export function DataProvider({ children }) {
       if (e.code === "expired")
         return { ok: false, error: "Subscription/trial expired. Upgrade to re-activate members." };
       console.error("Activate user error:", e?.code, e?.message);
-      return { ok: false, error: "Activate nahi hua." };
+      return { ok: false, error: "Could not activate." };
     }
   };
 
@@ -642,7 +642,7 @@ export function DataProvider({ children }) {
       return { ok: true };
     } catch (e) {
       console.error("Change plan error:", e?.code, e?.message);
-      return { ok: false, error: "Plan change nahi hua. Dobara try karo." };
+      return { ok: false, error: "Could not change plan. Please try again." };
     }
   };
 
@@ -658,7 +658,7 @@ export function DataProvider({ children }) {
       return { ok: true };
     } catch (e) {
       console.error("Schedule downgrade error:", e?.code, e?.message);
-      return { ok: false, error: "Downgrade schedule nahi hua." };
+      return { ok: false, error: "Could not schedule downgrade." };
     }
   };
 
@@ -670,7 +670,7 @@ export function DataProvider({ children }) {
       return { ok: true };
     } catch (e) {
       console.error("Cancel downgrade error:", e?.code, e?.message);
-      return { ok: false, error: "Cancel nahi hua." };
+      return { ok: false, error: "Could not cancel." };
     }
   };
 

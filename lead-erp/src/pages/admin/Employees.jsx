@@ -20,15 +20,15 @@ export default function Employees() {
     e.preventDefault();
     setErr("");
     const cleanPhone = form.phone.replace(/\D/g, "");
-    if (!form.name.trim()) { setErr("Employee ka naam daalo."); return; }
-    if (cleanPhone.length !== 10) { setErr("Sahi 10-digit mobile number daalo."); return; }
-    if (users.some((u) => norm(u.phone) === cleanPhone)) { setErr("Ye number already added/invited hai."); return; }
+    if (!form.name.trim()) { setErr("Please enter the employee's name."); return; }
+    if (cleanPhone.length !== 10) { setErr("Please enter a valid 10-digit mobile number."); return; }
+    if (users.some((u) => norm(u.phone) === cleanPhone)) { setErr("This number is already added/invited."); return; }
 
     setSaving(true);
     const res = await addUser({ name: form.name.trim(), phone: cleanPhone, email: form.email.trim(), role: form.role });
     setSaving(false);
 
-    if (!res?.ok) { setErr(res?.error || "Member add nahi hua."); return; }
+    if (!res?.ok) { setErr(res?.error || "Could not add member."); return; }
     setForm({ name: "", phone: "", email: "", role: "employee" });
     setShowForm(false);
   };
@@ -106,7 +106,7 @@ export default function Employees() {
             </button>
           </div>
           <p className="text-xs text-ink-muted mt-3">
-            Invite bhejne ke baad employee apne number se OTP login karega — automatically uska employee dashboard khul jayega (dobara org banane ka prompt nahi aayega).
+            After you send the invite, the employee signs in via OTP with their number — their employee dashboard opens automatically (they won't be prompted to create an organization again).
           </p>
         </form>
       )}

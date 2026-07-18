@@ -42,9 +42,9 @@ export default function Billing() {
     });
     const params = new URLSearchParams(location.search);
     const payu = params.get("payu");
-    if (payu === "success") setMsg("✅ Payment successful — plan activate ho gaya!");
-    else if (payu === "failed") setMsg("❌ PayU payment fail hua.");
-    else if (payu === "error") setMsg("⚠️ PayU me error aaya.");
+    if (payu === "success") setMsg("✅ Payment successful — your plan is now active!");
+    else if (payu === "failed") setMsg("❌ PayU payment failed.");
+    else if (payu === "error") setMsg("⚠️ Something went wrong with the PayU payment.");
   }, [location.search]);
 
   const { plans } = mergePlansWithConfig(config);
@@ -63,12 +63,12 @@ export default function Billing() {
   const doPayment = async (plan, { autopay = false } = {}) => {
     if (!anyGateway) {
       const res = await changePlan(limitsForPlan(plan.id, config));
-      setMsg(res?.ok ? `✅ (Dev) ${plan.name} activate ho gaya — payment gateway configure nahi hai.` : (res?.error || "Activate nahi hua."));
+      setMsg(res?.ok ? `✅ (Dev) ${plan.name} activated — no payment gateway configured.` : (res?.error || "Could not activate."));
       return;
     }
     if (method === "razorpay" && gateways.razorpay) {
       const ok = await loadRazorpayScript();
-      if (!ok) throw new Error("Razorpay load nahi hua.");
+      if (!ok) throw new Error("Razorpay checkout failed to load.");
       if (autopay) {
         const sub = await createSubscription({ orgId: b.org.id, planId: plan.id, cycle });
         await new Promise((resolve, reject) => {
@@ -84,7 +84,7 @@ export default function Billing() {
                 resolve();
               } catch (e) { reject(e); }
             },
-            modal: { ondismiss: () => reject(new Error("Autopay setup cancel kiya gaya.")) },
+            modal: { ondismiss: () => reject(new Error("Autopay setup was cancelled.")) },
           });
           rzp.open();
         });
@@ -103,7 +103,7 @@ export default function Billing() {
                 resolve();
               } catch (e) { reject(e); }
             },
-            modal: { ondismiss: () => reject(new Error("Payment cancel kiya gaya.")) },
+            modal: { ondismiss: () => reject(new Error("Payment was cancelled.")) },
           });
           rzp.open();
         });
@@ -120,8 +120,8 @@ export default function Billing() {
     setMsg(""); setBusy(plan.id + (opts?.autopay ? "-auto" : ""));
     try {
       const r = await doPayment(plan, opts);
-      if (r !== "redirect") setMsg(`✅ Ho gaya — ${plan.name} plan active hai!`);
-    } catch (e) { setMsg(e.message || "Payment fail hua."); }
+      if (r !== "redirect") setMsg(`✅ Done — the ${plan.name} plan is now active!`);
+    } catch (e) { setMsg(e.message || "Payment failed."); }
     finally { setBusy(null); }
   };
 
@@ -133,19 +133,19 @@ export default function Billing() {
     const res = await scheduleDowngrade(target.id, cycle, b.currentPeriodEndMs);
     setBusy(null);
     setMsg(res?.ok
-      ? `Downgrade ${fmtDate(b.currentPeriodEndMs)} ko ${target.name} me apply hoga. Tab tak aap ${currentPlan.name} enjoy karo!`
-      : (res?.error || "Downgrade schedule nahi hua."));
+      ? `Downgrade to ${target.name} will apply on ${fmtDate(b.currentPeriodEndMs)}. Until then, enjoy ${currentPlan.name}!`
+      : (res?.error || "Could not schedule downgrade."));
   };
 
   const undoDowngrade = async () => {
     setBusy("undo"); const res = await cancelDowngrade(); setBusy(null);
-    setMsg(res?.ok ? `Great choice! Aap ${currentPlan.name} par bane rahenge. 🎉` : "");
+    setMsg(res?.ok ? `Great choice! You'll stay on ${currentPlan.name}. 🎉` : "");
   };
 
   const stopAutopay = async () => {
     setBusy("cancelauto"); setMsg("");
-    try { await cancelAutopay({ orgId: b.org.id }); setMsg("Autopay band kar diya. Current period tak plan active rahega."); }
-    catch (e) { setMsg(e.message || "Cancel nahi hua."); }
+    try { await cancelAutopay({ orgId: b.org.id }); setMsg("Autopay turned off. Your plan stays active until the current period ends."); }
+    catch (e) { setMsg(e.message || "Could not cancel."); }
     finally { setBusy(null); }
   };
 
@@ -156,10 +156,10 @@ export default function Billing() {
         <div className="bg-warning-50 border border-warning-200 rounded-xl p-4 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
           <TrendingUp className="text-warning-600 shrink-0" size={20} />
           <div className="flex-1 text-sm text-ink-soft">
-            <span className="font-semibold text-ink">{fmtDate(b.currentPeriodEndMs)}</span> ko aap{" "}
-            <span className="font-semibold">{getPlanById(b.pendingPlanChange.toPlanId)?.name}</span> par chale jaoge —
-            aur <span className="font-semibold text-ember-600">{currentPlan.name}</span> ke ye faayde kho doge.
-            Mann badla?
+            On <span className="font-semibold text-ink">{fmtDate(b.currentPeriodEndMs)}</span> you'll move to{" "}
+            <span className="font-semibold">{getPlanById(b.pendingPlanChange.toPlanId)?.name}</span> —
+            and lose the benefits of <span className="font-semibold text-ember-600">{currentPlan.name}</span>.
+            Changed your mind?
           </div>
           <button onClick={undoDowngrade} disabled={busy === "undo"} className="btn btn-primary text-sm whitespace-nowrap">
             {busy === "undo" ? <Loader2 size={15} className="animate-spin" /> : <>Keep {currentPlan.name}</>}
@@ -171,7 +171,7 @@ export default function Billing() {
       {b.isPastDue && (
         <div className="bg-danger-50 border border-danger-200 rounded-xl p-4 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
           <AlertTriangle className="text-danger-600 shrink-0" size={20} />
-          <p className="flex-1 text-sm text-danger-700">Aapka plan expire ho gaya — grace period chal raha hai. Turant renew karo warna features lock ho jayenge.</p>
+          <p className="flex-1 text-sm text-danger-700">Your plan has expired — you're in the grace period. Renew now or your features will be locked.</p>
           <button onClick={handleRenew} disabled={busy} className="btn btn-primary text-sm whitespace-nowrap">
             {busy ? <Loader2 size={15} className="animate-spin" /> : <><RefreshCw size={15} /> Renew now</>}
           </button>
@@ -198,7 +198,7 @@ export default function Billing() {
                 {b.daysToRenewal != null && b.daysToRenewal >= 0 && <span className="text-ink-muted">({b.daysToRenewal}d)</span>}
               </p>
             )}
-            {b.isTrialing && <p className="text-sm text-ink-soft mt-1">Free trial — kabhi bhi neeche se paid plan activate karo.</p>}
+            {b.isTrialing && <p className="text-sm text-ink-soft mt-1">Free trial — activate a paid plan anytime from below.</p>}
           </div>
           <div className="w-14 h-14 rounded-2xl bg-gradient-orange flex items-center justify-center shadow-glow">
             <Sparkles className="text-white" size={26} />
@@ -235,12 +235,12 @@ export default function Billing() {
           <div className="mt-4 pt-4 border-t border-cream-200 space-y-3">
             {b.autopay && (
               <button onClick={stopAutopay} disabled={busy === "cancelauto"} className="text-sm text-ink-soft hover:text-danger-600">
-                {busy === "cancelauto" ? "Cancelling…" : "Turn off autopay (current period tak active rahega)"}
+                {busy === "cancelauto" ? "Cancelling…" : "Turn off autopay (stays active until the current period ends)"}
               </button>
             )}
             {lowerPlans.length > 0 && !b.pendingPlanChange && (
               <div>
-                <p className="text-xs text-ink-muted mb-2">Downgrade to a smaller plan (period end pe apply hoga):</p>
+                <p className="text-xs text-ink-muted mb-2">Downgrade to a smaller plan (applies at the end of the current period):</p>
                 <div className="flex flex-wrap gap-2">
                   {lowerPlans.map((p) => (
                     <button key={p.id} onClick={() => setDowngradeModal(p)}
@@ -276,7 +276,7 @@ export default function Billing() {
 
       {!anyGateway && (
         <p className="text-xs text-warning-700 bg-warning-50 border border-warning-200 rounded-lg px-3 py-2 mb-4">
-          Payment gateway reach nahi ho raha (VITE_BACKEND_URL set karo). Tab tak "Activate (dev)" se test kar sakte ho.
+          Payment gateway is unreachable (set VITE_BACKEND_URL). Until then, you can test with "Activate (dev)".
         </p>
       )}
 
@@ -300,7 +300,7 @@ export default function Billing() {
             })}
           </div>
           {higherPlans.length === 0 && (
-            <p className="text-center text-sm text-ink-muted mt-6">🎉 Aap top plan par ho — isse upar kuch nahi!</p>
+            <p className="text-center text-sm text-ink-muted mt-6">🎉 You're on the top plan — nothing higher!</p>
           )}
         </>
       ) : (
@@ -319,7 +319,7 @@ export default function Billing() {
 
       <p className="text-xs text-ink-muted mt-6 flex items-center gap-1.5">
         <ShieldCheck size={13} />
-        Payment verify hone ke baad hi limits badhte hain. Autopay se har cycle apne aap renew hoga; warna expiry se pehle reminder aayega.
+        Limits increase only after payment is verified. With autopay it renews automatically each cycle; otherwise you'll get a reminder before expiry.
       </p>
 
       {/* ===== Downgrade retention modal ===== */}
@@ -330,9 +330,9 @@ export default function Billing() {
               <div className="w-12 h-12 rounded-xl bg-warning-100 flex items-center justify-center"><TrendingUp className="text-warning-600" size={22} /></div>
               <button onClick={() => setDowngradeModal(null)} className="text-ink-muted hover:text-ink"><X size={20} /></button>
             </div>
-            <h3 className="font-display font-bold text-xl text-ink mb-2">Pakka {downgradeModal.name} par jaana hai?</h3>
+            <h3 className="font-display font-bold text-xl text-ink mb-2">Are you sure you want to move to {downgradeModal.name}?</h3>
             <p className="text-sm text-ink-soft mb-4">
-              {currentPlan.name} chhodne par aap ye kho denge:
+              By leaving {currentPlan.name}, you'll lose:
             </p>
             <ul className="space-y-2 mb-5 text-sm">
               <li className="flex items-center gap-2 text-ink-soft"><X size={15} className="text-danger-500" /> {currentPlan.includedSeats - downgradeModal.includedSeats > 0 ? `${currentPlan.includedSeats - downgradeModal.includedSeats} team seats` : "Extra seats"}</li>
@@ -342,14 +342,14 @@ export default function Billing() {
               ))}
             </ul>
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-5 text-sm text-ember-700">
-              💡 {currentPlan.name} ke saath aapki team tezi se aur zyada deals close karti hai. Ruk jao?
+              💡 With {currentPlan.name}, your team closes more deals, faster. Stay?
             </div>
             <div className="flex gap-3">
               <button onClick={() => setDowngradeModal(null)} className="btn btn-primary flex-1">
-                {currentPlan.name} par ruko
+                Stay on {currentPlan.name}
               </button>
               <button onClick={confirmDowngrade} className="btn btn-secondary flex-1 text-ink-muted">
-                Phir bhi downgrade
+                Downgrade anyway
               </button>
             </div>
           </div>

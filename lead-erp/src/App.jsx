@@ -18,10 +18,10 @@ import Workspace from "./pages/employee/Workspace";
 import LeadAction from "./pages/employee/LeadAction";
 import Tasks from "./pages/employee/Tasks";
 
-// 1. 📲 Native Android Call Tracker Hook import kiya
+// 1. 📲 Imported the native Android Call Tracker hook
 import { useCallTracker } from "./hooks/useCallTracker";
 
-// 2. 🤫 Background Engine Component (Bina koi UI banaye pichhe se dialer sunega)
+// 2. 🤫 Background engine component (listens to the dialer in the background without rendering any UI)
 function CallTrackerEngine() {
   useCallTracker();
   return null;
@@ -30,7 +30,7 @@ function CallTrackerEngine() {
 export default function App() {
   return (
     <>
-      {/* 🔥 Asli jadoo: Pandal ke andar Watchman ko duty par bitha diya */}
+      {/* 🔥 The real magic: mount the background call-tracker watchman */}
       <CallTrackerEngine />
 
       <Routes>

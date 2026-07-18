@@ -82,7 +82,7 @@ export default function PlatformDashboard() {
         { trialDays: Number(trialDays) || 14, plans: plansDraft },
         user.uid
       );
-      setSavedMsg("✅ Saved — website aur naye signups par turant apply hoga.");
+      setSavedMsg("✅ Saved — applies immediately to the website and new signups.");
     } catch (e) {
       setSavedMsg("❌ Save failed: " + (e?.code || e?.message));
     } finally {
@@ -123,7 +123,7 @@ export default function PlatformDashboard() {
         trialEndsAt: new Date(endMs).toISOString(),
         trialEndsAtMs: endMs,
       });
-      setRowMsg(`✅ ${org.name || org.id} par ${days}-din ka trial set ho gaya.`);
+      setRowMsg(`✅ A ${days}-day trial has been set for ${org.name || org.id}.`);
     } catch (e) {
       setRowMsg("❌ " + (e?.code || e?.message));
     } finally { setRowBusy(null); }
@@ -146,7 +146,7 @@ export default function PlatformDashboard() {
       }, { merge: true });
       await setDoc(doc(db, "users", user.uid), { defaultOrgId: org.id }, { merge: true });
       localStorage.setItem("activeOrgId", org.id);
-      setRowMsg(`✅ Aap ab ${org.name || org.id} ke owner ho. Dashboard khol raha hoon…`);
+      setRowMsg(`✅ You're now the owner of ${org.name || org.id}. Opening the dashboard…`);
       setTimeout(() => { window.location.assign("/admin"); }, 1200);
     } catch (e) {
       setRowMsg("❌ " + (e?.code || e?.message));
@@ -185,7 +185,7 @@ export default function PlatformDashboard() {
           </div>
           <h1 className="font-display font-bold text-xl text-ink mb-2">Owner access only</h1>
           <p className="text-sm text-ink-soft mb-5">
-            Ye portal sirf CodeSkate owner ke liye hai. Aapke number ko access nahi hai.
+            This portal is only for the CodeSkate owner. Your number doesn't have access.
           </p>
           <button onClick={logout} className="btn btn-secondary w-full">
             <LogOut size={15} /> Sign out
@@ -244,7 +244,7 @@ export default function PlatformDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <h1 className="font-display font-bold text-2xl text-ink mb-1">Platform Control Center</h1>
-        <p className="text-sm text-ink-soft mb-6">Saare organizations, subscriptions aur global settings ek jagah.</p>
+        <p className="text-sm text-ink-soft mb-6">All organizations, subscriptions and global settings in one place.</p>
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
@@ -259,7 +259,7 @@ export default function PlatformDashboard() {
         <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 mb-8">
           <h2 className="font-display font-semibold text-lg text-ink mb-1">Global settings</h2>
           <p className="text-sm text-ink-soft mb-5">
-            Yahan jo set karoge wahi website (pricing/signup) par dikhega aur naye workspaces me enforce hoga.
+            Whatever you set here appears on the website (pricing/signup) and is enforced for new workspaces.
           </p>
 
           <div className="mb-6 max-w-xs">
@@ -380,7 +380,7 @@ export default function PlatformDashboard() {
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan="8" className="p-6 text-center text-ink-muted">Koi organization nahi mila.</td></tr>
+                  <tr><td colSpan="8" className="p-6 text-center text-ink-muted">No organizations found.</td></tr>
                 )}
               </tbody>
             </table>
@@ -460,7 +460,7 @@ function OwnerLogin({ requestOtp, verifyOtp }) {
             </h1>
             <p className="text-sm text-cream-300/70 mb-6">
               {step === "phone"
-                ? "Sirf CodeSkate owner ka number allowed hai."
+                ? "Only the CodeSkate owner's number is allowed."
                 : `Code sent to +91${phone}`}
             </p>
 

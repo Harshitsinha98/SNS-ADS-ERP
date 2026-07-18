@@ -21,7 +21,7 @@ export default function TasksAndReminders() {
 
   const matchesTab = (lead) => {
     const f = getLeadFlags(lead);
-    if (f.isClosed) return false; // closed leads kisi tab mein nahi
+    if (f.isClosed) return false; // closed leads don't belong in any tab
     if (activeTab === "All") return true;
     if (activeTab === "New to Call") return f.isNew;
     if (activeTab === "Follow-up Today") return f.isFollowUpToday;

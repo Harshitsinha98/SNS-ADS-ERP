@@ -1,31 +1,31 @@
 // src/utils/leadLifecycle.js
 
 export function getLeadFlags(lead) {
-  // 1. Agar lead close ho chuki hai, toh usko list se bahar karo
+  // 1. If the lead is already closed, keep it out of the list
   if (["Won", "Lost", "Closed", "Closed-Won"].includes(lead.status)) {
     return { isClosed: true, isNew: false, isFollowUpToday: false, isOverdue: false };
   }
 
-  // 2. Aaj ke din ka start aur end time set karo
+  // 2. Set the start and end time for today
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  // 3. Follow-up date nikaalo. Agar manually set nahi hai, toh lead create hone wali date uthao
-  // (Isse aaj ki nayi leads automatically 'Follow-up Today' me bhi aa jayengi)
+  // 3. Determine the follow-up date. If not set manually, use the lead's created date
+  // (so today's new leads automatically also show up under 'Follow-up Today')
   const followUp = new Date(lead.followUpDate || lead.createdAt);
 
-  // 4. Return flags (Ek lead ab multiple conditions pass kar sakti hai)
+  // 4. Return flags (a lead can now satisfy multiple conditions)
   return {
     isClosed: false,
-    
-    // Nayi lead tab tak "New to Call" me rahegi jab tak admin/employee usme pehla worknote/call add nahi karta
+
+    // A new lead stays under "New to Call" until an admin/employee adds the first worknote/call
     isNew: !lead.lastContactedAt, 
     
-    // Agar followUp date aaj ki hai
+    // Whether the followUp date is today
     isFollowUpToday: followUp >= todayStart && followUp < todayEnd, 
     
-    // Agar followUp date guzar chuki hai (past date)
+    // Whether the followUp date is in the past
     isOverdue: followUp < todayStart, 
   };
 }

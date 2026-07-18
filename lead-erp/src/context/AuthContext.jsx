@@ -230,23 +230,23 @@ export function AuthProvider({ children }) {
   const otpErrorMessage = (code) => {
     switch (code) {
       case "auth/invalid-phone-number":
-        return "Phone number galat hai. 10-digit sahi number daalo.";
+        return "Invalid phone number. Please enter a valid 10-digit number.";
       case "auth/missing-phone-number":
-        return "Phone number missing hai.";
+        return "Phone number is missing.";
       case "auth/quota-exceeded":
-        return "Aaj ka OTP quota khatam. Kal try karo ya Firebase billing enable karo.";
+        return "Today's OTP quota is exhausted. Try again tomorrow or enable Firebase billing.";
       case "auth/too-many-requests":
-        return "Bahut zyada attempts. Thodi der baad try karo.";
+        return "Too many attempts. Please try again after a while.";
       case "auth/captcha-check-failed":
-        return "reCAPTCHA verify nahi hua. Domain authorize karo aur dobara try karo.";
+        return "reCAPTCHA verification failed. Authorize the domain and try again.";
       case "auth/invalid-app-credential":
-        return "reCAPTCHA/App credential invalid. Firebase config aur authorized domains check karo.";
+        return "Invalid reCAPTCHA/app credential. Check your Firebase config and authorized domains.";
       case "auth/operation-not-allowed":
-        return "Phone sign-in enable nahi hai. Firebase Console → Authentication → Sign-in method → Phone enable karo.";
+        return "Phone sign-in is not enabled. Enable it in Firebase Console → Authentication → Sign-in method → Phone.";
       case "auth/billing-not-enabled":
-        return "Firebase billing enable nahi hai (Phone Auth ke liye zaroori).";
+        return "Firebase billing is not enabled (required for Phone Auth).";
       default:
-        return `OTP bhejne mein error: ${code || "unknown"}. Console check karo.`;
+        return `Error sending OTP: ${code || "unknown"}. Please check the console.`;
     }
   };
 
@@ -258,7 +258,7 @@ export function AuthProvider({ children }) {
     if (!import.meta.env.VITE_FIREBASE_API_KEY) {
       return {
         ok: false,
-        error: "Firebase config missing hai. .env file banao (VITE_FIREBASE_* keys) aur app restart karo.",
+        error: "Firebase config missing. Create a .env file (VITE_FIREBASE_* keys) and restart the app.",
       };
     }
 
@@ -277,7 +277,7 @@ export function AuthProvider({ children }) {
   // Step 2: OTP verify
   const verifyOtp = async (confirmation, otp) => {
     if (!confirmation) {
-      return { ok: false, error: "Session expired. Phir se OTP bhejo." };
+      return { ok: false, error: "Session expired. Please request a new OTP." };
     }
     try {
       await confirmation.confirm(otp);
@@ -285,12 +285,12 @@ export function AuthProvider({ children }) {
     } catch (e) {
       console.error("verifyOtp error:", e.code, e.message);
       if (e.code === "auth/invalid-verification-code") {
-        return { ok: false, error: "Galat OTP. Dobara check karo." };
+        return { ok: false, error: "Incorrect OTP. Please check and try again." };
       }
       if (e.code === "auth/code-expired") {
-        return { ok: false, error: "OTP expire ho gaya. Naya OTP bhejo." };
+        return { ok: false, error: "OTP expired. Please request a new one." };
       }
-      return { ok: false, error: "OTP verify nahi hua. Dobara try karo." };
+      return { ok: false, error: "OTP verification failed. Please try again." };
     }
   };
 

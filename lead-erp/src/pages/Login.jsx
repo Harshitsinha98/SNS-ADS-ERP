@@ -31,7 +31,7 @@ export default function Login() {
 
     // Authenticated but no workspace → not a valid login (must sign up).
     if (user.needsSetup) {
-      setRoleError("Is number se koi workspace nahi mila. Pehle signup karo ya sahi number use karo.");
+      setRoleError("No workspace found for this number. Please sign up first or use the correct number.");
       logout();
       return;
     }
@@ -46,12 +46,12 @@ export default function Login() {
 
     // Portal ↔ role verification (backend truth = membership role).
     if (portal === "admin" && !isAdminish) {
-      setRoleError("Access denied — aap employee ho. Admin login use nahi kar sakte. Employee login choose karo.");
+      setRoleError("Access denied — you're an employee. You can't use the admin login. Please choose employee login.");
       logout();
       return;
     }
     if (portal === "employee" && isAdminish) {
-      setRoleError("Access denied — aap admin/owner ho. Admin login use karo.");
+      setRoleError("Access denied — you're an admin/owner. Please use the admin login.");
       logout();
       return;
     }
@@ -112,7 +112,7 @@ export default function Login() {
             <div className="h-1.5 bg-gradient-orange" />
             <div className="p-7 sm:p-9">
               <h1 className="font-display font-bold text-2xl text-ink mb-1 text-center">Sign in to CodeSkate</h1>
-              <p className="text-sm text-ink-soft mb-7 text-center">Aap kis role se login kar rahe ho?</p>
+              <p className="text-sm text-ink-soft mb-7 text-center">Which role are you signing in as?</p>
               <div className="space-y-3">
                 <button onClick={() => setPortal("admin")}
                   className="w-full flex items-center gap-4 p-4 rounded-2xl border border-cream-300 hover:border-orange-300 hover:bg-orange-50 transition-all text-left group">
@@ -121,7 +121,7 @@ export default function Login() {
                   </div>
                   <div className="flex-1">
                     <p className="font-display font-semibold text-ink">Admin / Owner login</p>
-                    <p className="text-xs text-ink-muted">Organization, team & billing manage karo</p>
+                    <p className="text-xs text-ink-muted">Manage organization, team & billing</p>
                   </div>
                   <ArrowRight size={18} className="text-ink-muted group-hover:text-orange-600" />
                 </button>
@@ -133,7 +133,7 @@ export default function Login() {
                   </div>
                   <div className="flex-1">
                     <p className="font-display font-semibold text-ink">Employee login</p>
-                    <p className="text-xs text-ink-muted">Apne assigned leads pe kaam karo</p>
+                    <p className="text-xs text-ink-muted">Work on your assigned leads</p>
                   </div>
                   <ArrowRight size={18} className="text-ink-muted group-hover:text-orange-600" />
                 </button>
@@ -162,7 +162,7 @@ export default function Login() {
                 {step === "phone" ? "Enter your number" : "Enter your code"}
               </h1>
               <p className="text-sm text-ink-soft mb-6">
-                {step === "phone" ? "OTP se secure sign in." : `Code sent to +91${phone}`}
+                {step === "phone" ? "Secure sign in with OTP." : `Code sent to +91${phone}`}
               </p>
 
               {err && (
@@ -200,7 +200,7 @@ export default function Login() {
         )}
 
         <p className="text-center text-xs text-ink-muted mt-6">
-          {portal ? "Wrong role? Back jaake doosra login choose karo." : "Aapka role backend se verify hota hai."}
+          {portal ? "Wrong role? Go back and choose the other login." : "Your role is verified by the backend."}
         </p>
       </div>
     </div>

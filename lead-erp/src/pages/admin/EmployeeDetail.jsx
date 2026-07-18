@@ -25,9 +25,9 @@ export default function EmployeeDetail() {
   const stats = employeeStats(id, leads);
   const otherEmps = users.filter((u) => u.role === "employee" && u.id !== id);
 
-  // FIX: revenue ab financials (leads/{id}/private/data) se aata hai. l.value
-  // kabhi exist hi nahi karta tha lead doc pe — isliye revenue hamesha ₹0
-  // dikhta tha. financials map context se aata hai (admin-only listener).
+  // FIX: revenue now comes from financials (leads/{id}/private/data). l.value
+  // never actually existed on the lead doc — that's why revenue always showed
+  // as ₹0. The financials map comes from context (admin-only listener).
   const revenue = stats.leads
     .filter((l) => l.status === "Closed-Won")
     .reduce((s, l) => s + (financials[l.id]?.revenue || 0), 0);
@@ -35,17 +35,17 @@ export default function EmployeeDetail() {
   const openLeadsCount = stats.leads.filter((l) => !["Closed-Won", "Lost"].includes(l.status)).length;
 
   const changeNumber = () => {
-    const newPhone = prompt("Naya 10-digit mobile number daalo:", emp.phone);
+    const newPhone = prompt("Enter the new 10-digit mobile number:", emp.phone);
     if (newPhone && /^\d{10}$/.test(newPhone)) {
       updateUser(emp.id, { phone: newPhone });
       alert("Mobile number updated!");
     } else if (newPhone) {
-      alert("Sahi 10-digit number daalo.");
+      alert("Please enter a valid 10-digit number.");
     }
   };
 
-  // NEW (Q3 fix): deactivate karne se pehle (ya kabhi bhi) saari OPEN leads ek
-  // click mein doosre employee ko move — taaki koi lead orphan na ho jaaye.
+  // NEW (Q3 fix): before deactivating (or at any time) move all OPEN leads to
+  // another employee in one click — so that no lead is orphaned.
   const handleBulkReassign = async () => {
     if (!bulkTarget) return;
     setBulkBusy(true);
@@ -53,7 +53,7 @@ export default function EmployeeDetail() {
     const count = await reassignAllLeads(emp.id, bulkTarget, target?.name, user);
     setBulkBusy(false);
     setBulkTarget("");
-    alert(count > 0 ? `${count} open lead(s) reassigned to ${target?.name}.` : "Koi open lead nahi thi reassign karne ke liye.");
+    alert(count > 0 ? `${count} open lead(s) reassigned to ${target?.name}.` : "There were no open leads to reassign.");
   };
 
   return (
@@ -84,7 +84,7 @@ export default function EmployeeDetail() {
           {openLeadsCount > 0 && (
             <div className="mt-4 pt-4 border-t border-paper-line">
               <p className="eyebrow mb-2">Open leads — {openLeadsCount}</p>
-              <p className="text-xs text-ink/40 mb-2">Deactivate karne se pehle (ya kisi bhi waqt) saari open leads kisi aur employee ko move karo, taaki koi lead orphan na ho.</p>
+              <p className="text-xs text-ink/40 mb-2">Before deactivating (or at any time), move all open leads to another employee so that no lead is orphaned.</p>
               <select value={bulkTarget} onChange={(e) => setBulkTarget(e.target.value)}
                 className="w-full border border-paper-line rounded-md p-2 text-xs mb-2">
                 <option value="">Move all open leads to…</option>
@@ -127,7 +127,7 @@ export default function EmployeeDetail() {
                   <td className="num">{fmtMoney(financials[l.id]?.revenue || 0)}</td>
                   <td className={`num ${idle >= 3 ? "text-danger font-medium" : ""}`}>{idle}d</td>
                   <td>
-                    {/* FIX: employeeName + user pass kiya, pehle sirf 2 args jaate the */}
+                    {/* FIX: pass employeeName + user; previously only 2 args were passed */}
                     <select defaultValue="" onChange={(e) => e.target.value && reassignLead(l.id, e.target.value, otherEmps.find((o) => o.id === e.target.value)?.name, user)}
                       className="border border-paper-line rounded p-1 text-xs">
                       <option value="">Move to…</option>

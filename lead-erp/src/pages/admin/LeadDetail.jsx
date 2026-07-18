@@ -11,8 +11,8 @@ import Timeline from "../../components/Timeline";
 
 const PRIORITIES = ["Hot", "Warm", "Cold"];
 
-// datetime-local input ko "YYYY-MM-DDTHH:mm" chahiye — full ISO (...Z) string
-// seedha daalne se input blank dikhta tha, isliye convert karna zaroori hai
+// A datetime-local input needs "YYYY-MM-DDTHH:mm" — passing a full ISO (...Z)
+// string directly showed a blank input, so the conversion is necessary
 const toDatetimeLocal = (iso) => {
   if (!iso) return "";
   const d = new Date(iso);
@@ -196,7 +196,7 @@ export default function LeadDetail() {
 
           <div className="bg-white rounded-xl shadow border p-5">
             <h3 className="font-semibold mb-3">Add Worknote</h3>
-            <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows="3" className="w-full border rounded p-3 text-sm" placeholder="Client ne kya kaha? Next steps?"></textarea>
+            <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows="3" className="w-full border rounded p-3 text-sm" placeholder="What did the client say? Next steps?"></textarea>
 
             {user.role === 'admin' && (
               <div className="flex items-center gap-2 mt-3 mb-1">

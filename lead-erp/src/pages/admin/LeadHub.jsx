@@ -19,8 +19,8 @@ const priorityClass = (p) => {
   }
 };
 
-// Ek lead "Lost" section mein automatically tabhi jaati hai jab blacklist ki gayi
-// ho YA status manually "Lost" set ho — dono paths cover karta hai.
+// A lead moves to the "Lost" section automatically only when it has been
+// blacklisted OR its status is manually set to "Lost" — covers both paths.
 const isLost = (l) => l.blacklisted === true || l.status === "Lost";
 
 export default function LeadHub() {
@@ -35,7 +35,7 @@ export default function LeadHub() {
   const activeLeads = useMemo(() => leads.filter((l) => !isLost(l)), [leads]);
   const lostLeads = useMemo(() => leads.filter(isLost), [leads]);
 
-  // Active tab ke status filter se "Lost" hata diya — wo ab apna alag tab hai
+  // Removed "Lost" from the Active tab's status filter — it now has its own tab
   const activeStatuses = settings.statuses.filter((s) => s !== "Lost");
 
   const view = useMemo(() => {
@@ -72,18 +72,18 @@ export default function LeadHub() {
       alert(
         result.imported > 0
           ? `${result.imported} new WhatsApp lead(s) imported.`
-          : "Koi naya pending lead nahi mila. Naye leads webhook se real-time aate hain — ye button sirf pehle se atki hui leads ko retry karta hai."
+          : "No new pending leads found. New leads arrive in real time via the webhook — this button only retries leads that were previously stuck."
       );
     } catch (e) {
       console.error("Sync error:", e);
-      alert("Sync failed — backend se connect nahi ho paaya. Render logs check karo, service down ho sakti hai.");
+      alert("Sync failed — couldn't connect to the backend. Check the Render logs; the service may be down.");
     } finally {
       setSyncing(false);
     }
   };
 
-  // NEW: Lost lead ko ek click mein wapas Active mein laane ke liye —
-  // status "New" pe reset, taaki koi employee dobara usse work kar sake.
+  // NEW: bring a Lost lead back to Active in one click —
+  // reset the status to "New" so an employee can work on it again.
   const restoreLead = (l) => {
     updateLead(l.id, { blacklisted: false, status: "New" }, user);
   };
@@ -184,7 +184,7 @@ export default function LeadHub() {
             ))}
             {view.length === 0 && (
               <tr><td colSpan={section === "Active" ? 8 : 7} className="text-ink/40 p-4 text-center">
-                {section === "Active" ? "Koi active lead nahi mili." : "Koi lost/blacklisted lead nahi hai. 🎉"}
+                {section === "Active" ? "No active leads found." : "No lost/blacklisted leads. 🎉"}
               </td></tr>
             )}
           </tbody>

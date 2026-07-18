@@ -69,9 +69,9 @@ export default function Signup() {
   const submitDetails = async (e) => {
     e.preventDefault();
     setErr("");
-    if (!fullName.trim()) return setErr("Apna naam daalo.");
-    if (!orgName.trim()) return setErr("Organization ka naam daalo.");
-    if (phone.length !== 10) return setErr("Sahi 10-digit mobile number daalo.");
+    if (!fullName.trim()) return setErr("Please enter your name.");
+    if (!orgName.trim()) return setErr("Please enter your organization name.");
+    if (phone.length !== 10) return setErr("Please enter a valid 10-digit mobile number.");
     setLoading(true);
     const res = await requestOtp(phone.trim());
     setLoading(false);
@@ -83,7 +83,7 @@ export default function Signup() {
   const submitOtp = async (e) => {
     e.preventDefault();
     setErr("");
-    if (otp.length !== 6) return setErr("6-digit code daalo.");
+    if (otp.length !== 6) return setErr("Please enter the 6-digit code.");
     setLoading(true);
     const res = await verifyOtp(confirmation, otp.trim());
     if (!res.ok) { setLoading(false); return setErr(res.error); }
@@ -104,7 +104,7 @@ export default function Signup() {
     setErr(""); setPayBusy(true);
     try {
       const uid = auth.currentUser?.uid;
-      if (!uid) throw new Error("Session expired — dobara login karo.");
+      if (!uid) throw new Error("Session expired — please sign in again.");
       await createTrialWorkspace(uid);
       setStep("done");
       setTimeout(() => window.location.assign("/admin"), 1600);
@@ -119,11 +119,11 @@ export default function Signup() {
   const payAndCreate = async () => {
     setErr(""); setPayBusy(true);
     try {
-      if (!anyGateway) throw new Error("Payment gateway abhi available nahi hai. VITE_BACKEND_URL set karo.");
+      if (!anyGateway) throw new Error("Payment gateway is not available yet. Please set VITE_BACKEND_URL.");
 
       if (method === "razorpay" && gateways.razorpay) {
         const ok = await loadRazorpayScript();
-        if (!ok) throw new Error("Razorpay load nahi hua.");
+        if (!ok) throw new Error("Razorpay checkout failed to load.");
         const order = await createSignupOrder({ planId: plan.id, cycle });
         await new Promise((resolve, reject) => {
           const rzp = new window.Razorpay({
@@ -142,7 +142,7 @@ export default function Signup() {
                 resolve();
               } catch (e) { reject(e); }
             },
-            modal: { ondismiss: () => reject(new Error("Payment cancel kiya gaya — workspace nahi bana.")) },
+            modal: { ondismiss: () => reject(new Error("Payment cancelled — no workspace was created.")) },
           });
           rzp.open();
         });
@@ -152,19 +152,19 @@ export default function Signup() {
         const { action, params } = await getSignupPayuHash({ orgName, fullName, planId: plan.id, cycle });
         submitPayuForm(action, params); // redirects to PayU; backend provisions on callback
       } else {
-        throw new Error("Ye payment method configure nahi hai.");
+        throw new Error("This payment method is not configured.");
       }
     } catch (e2) {
       console.error("[signup] pay failed:", e2?.code, e2?.message);
-      setErr(e2.message || "Payment fail hua.");
+      setErr(e2.message || "Payment failed.");
       setPayBusy(false);
     }
   };
 
   const errMsg = (e2) => {
-    if (e2?.code === "permission-denied") return "Firestore rules publish nahi hui. Console → Rules me publish karo.";
-    if (e2?.code === "deadline-exceeded") return "Firestore reach nahi ho raha. Database create hui hai check karo.";
-    return e2?.message || "Kuch galat hua. Dobara try karo.";
+    if (e2?.code === "permission-denied") return "Firestore rules are not published. Publish them in Console → Rules.";
+    if (e2?.code === "deadline-exceeded") return "Can't reach Firestore. Check that the database has been created.";
+    return e2?.message || "Something went wrong. Please try again.";
   };
 
   // Client-side trial workspace (Starter free trial only).
@@ -224,10 +224,10 @@ export default function Signup() {
           </h2>
           <ul className="space-y-4">
             {[
-              "Starter par 7-day free trial",
-              "Apna isolated, secure workspace",
+              "7-day free trial on Starter",
+              "Your own isolated, secure workspace",
               "WhatsApp lead capture built-in",
-              "Poori team invite karo instantly",
+              "Invite your whole team instantly",
             ].map((t) => (
               <li key={t} className="flex items-center gap-3 text-cream-200">
                 <span className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
@@ -239,7 +239,7 @@ export default function Signup() {
         </div>
         <div className="relative bg-white/5 border border-white/10 rounded-2xl p-5">
           <div className="flex gap-1 mb-2">{[...Array(5)].map((_, i) => <Sparkles key={i} size={13} className="text-orange-400" fill="currentColor" />)}</div>
-          <p className="text-cream-200 text-sm leading-relaxed mb-3">"Setup ke ek ghante me hi pehla WhatsApp lead mila. Game changer."</p>
+          <p className="text-cream-200 text-sm leading-relaxed mb-3">"We captured our first WhatsApp lead within an hour of setup. Game changer."</p>
           <p className="text-xs text-cream-400/70">— Rohan Mehta, Founder at EduLeap</p>
         </div>
       </div>
@@ -257,7 +257,7 @@ export default function Signup() {
                 <CheckCircle2 className="w-11 h-11 text-success-600" />
               </div>
               <h1 className="font-display font-bold text-2xl text-ink mb-2">Workspace ready! 🎉</h1>
-              <p className="text-ink-soft mb-6"><span className="font-semibold text-ink">{orgName}</span> set up ho gaya. Dashboard khol raha hoon…</p>
+              <p className="text-ink-soft mb-6"><span className="font-semibold text-ink">{orgName}</span> is all set up. Taking you to your dashboard…</p>
               <Loader2 className="w-6 h-6 animate-spin text-orange-500 mx-auto" />
             </div>
           ) : (
@@ -278,7 +278,7 @@ export default function Signup() {
                   <>
                     <p className="eyebrow mb-2">Step 1 of 3</p>
                     <h1 className="font-display font-bold text-2xl text-ink mb-1">Create your workspace</h1>
-                    <p className="text-sm text-ink-soft mb-6">Details bharo — agla step verification.</p>
+                    <p className="text-sm text-ink-soft mb-6">Enter your details — verification is the next step.</p>
                     <form onSubmit={submitDetails} className="space-y-4">
                       <Field icon={User} label="Your name" value={fullName} onChange={setFullName} placeholder="Rohan Mehta" disabled={loading} />
                       <Field icon={Building2} label="Organization name" value={orgName} onChange={setOrgName} placeholder="EduLeap Technologies" disabled={loading} />
@@ -320,7 +320,7 @@ export default function Signup() {
                     <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4"><ShieldCheck className="text-orange-600" size={24} /></div>
                     <p className="eyebrow mb-2">Step 2 of 3</p>
                     <h1 className="font-display font-bold text-2xl text-ink mb-1">Verify your number</h1>
-                    <p className="text-sm text-ink-soft mb-6">Code bheja gaya <span className="font-semibold text-ink">+91{phone}</span> par</p>
+                    <p className="text-sm text-ink-soft mb-6">Code sent to <span className="font-semibold text-ink">+91{phone}</span></p>
                     <form onSubmit={submitOtp} className="space-y-4">
                       <input className="input text-center text-2xl tracking-[0.5em] font-mono" placeholder="000000" value={otp}
                         onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} maxLength={6} autoFocus disabled={loading} />
@@ -392,15 +392,15 @@ export default function Signup() {
                       </button>
 
                       {planIsStarter && !canFreeTrial && (
-                        <p className="text-xs text-warning-700 text-center">Is number ka free trial pehle use ho chuka hai — activate karne ke liye payment karo.</p>
+                        <p className="text-xs text-warning-700 text-center">This number has already used its free trial — pay to activate.</p>
                       )}
                       {!planIsStarter && (
                         <p className="text-xs text-ink-muted text-center flex items-center justify-center gap-1.5">
-                          <Lock size={12} /> {plan.name} paid plan hai — payment ke baad hi workspace banega.
+                          <Lock size={12} /> {plan.name} is a paid plan — your workspace is created only after payment.
                         </p>
                       )}
                       {!anyGateway && (
-                        <p className="text-xs text-danger-600 text-center">Payment gateway reach nahi ho raha (VITE_BACKEND_URL set karo).</p>
+                        <p className="text-xs text-danger-600 text-center">Payment gateway is unreachable (set VITE_BACKEND_URL).</p>
                       )}
                     </div>
                   </>

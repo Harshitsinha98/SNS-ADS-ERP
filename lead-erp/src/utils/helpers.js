@@ -29,7 +29,7 @@ export const toCSV = (leads) => {
   return lines.join("\n");
 };
 
-// --- Naye Employee & Business Metrics ---
+// --- New Employee & Business Metrics ---
 
 export const employeeStats = (empId, leads) => {
   const mine = leads.filter((l) => l.assignedTo === empId && !l.blacklisted);
@@ -73,7 +73,7 @@ export const sourceStats = (leads) => {
     };
   });
 };
-// Last 7 din ka conversion trend (ek employee ke liye)
+// Conversion trend for the last 7 days (for a single employee)
 export const last7DaysTrend = (leads, empId) => {
   const days = [];
   for (let i = 6; i >= 0; i--) {
@@ -92,7 +92,7 @@ export const last7DaysTrend = (leads, empId) => {
   return days;
 };
 
-// Employee ka rank team mein (conversions ke hisaab se)
+// Employee's rank within the team (based on conversions)
 export const employeeRank = (empId, users, leads) => {
   const emps = users.filter((u) => u.role === "employee");
   const ranked = emps
@@ -105,7 +105,7 @@ export const employeeRank = (empId, users, leads) => {
   return { rank: idx + 1, totalEmployees: emps.length };
 };
 
-// WhatsApp ke liye phone number ko international format mein convert karo
+// Convert a phone number to international format for WhatsApp
 export const toWaNumber = (phone) => {
   const clean = (phone || "").replace(/\D/g, "");
   return clean.length === 10 ? "91" + clean : clean;

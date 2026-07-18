@@ -16,7 +16,7 @@ export default function TrialBanner() {
         <div className="flex items-start gap-2.5 flex-1">
           <AlertTriangle size={18} className="text-danger-600 mt-0.5 shrink-0" />
           <p className="text-sm text-danger-700">
-            Aapka trial/subscription khatam ho gaya hai. Naye leads aur team members add karne ke liye plan activate karo.
+            Your trial/subscription has ended. Activate a plan to add new leads and team members.
           </p>
         </div>
         {isAdminish && (
@@ -37,7 +37,7 @@ export default function TrialBanner() {
         <div className="flex items-center gap-2.5 flex-1">
           <Clock size={18} className={urgent ? "text-warning-600" : "text-orange-600"} />
           <p className="text-sm text-ink-soft">
-            <span className="font-semibold text-ink">{trialDaysLeft} din</span> ka free trial bacha hai
+            <span className="font-semibold text-ink">{trialDaysLeft} days</span> left in your free trial
             <span className="text-ink-muted"> · {planName} plan</span>
           </p>
         </div>

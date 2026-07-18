@@ -51,7 +51,7 @@ export default function WhatsApp() {
     setMsg("");
     const pid = phoneNumberId.trim();
     if (!/^\d{6,}$/.test(pid)) {
-      setMsg("Phone Number ID sahi daalo (Meta se milta hai, sirf numbers).");
+      setMsg("Please enter a valid Phone Number ID (from Meta, numbers only).");
       return;
     }
     setSaving(true);
@@ -79,12 +79,12 @@ export default function WhatsApp() {
 
       setConnected(true);
       setSavedNumberId(pid);
-      setMsg("✅ WhatsApp connected! Ab is number pe aane wale leads automatically aa jayenge.");
+      setMsg("✅ WhatsApp connected! Leads arriving on this number will now come in automatically.");
     } catch (err) {
       console.error("WhatsApp connect error:", err?.code, err?.message);
       setMsg(err?.code === "permission-denied"
-        ? "Permission denied — rules publish karo ya admin access check karo."
-        : "Connect nahi hua: " + (err?.code || err?.message));
+        ? "Permission denied — publish the rules or check your admin access."
+        : "Connection failed: " + (err?.code || err?.message));
     } finally {
       setSaving(false);
     }
@@ -97,9 +97,9 @@ export default function WhatsApp() {
       await setDoc(doc(db, "organizations", orgId, "settings", "whatsapp"),
         { connected: false }, { merge: true });
       setConnected(false);
-      setMsg("WhatsApp disconnect ho gaya.");
+      setMsg("WhatsApp disconnected.");
     } catch (err) {
-      setMsg("Disconnect nahi hua: " + (err?.code || err?.message));
+      setMsg("Disconnect failed: " + (err?.code || err?.message));
     } finally {
       setSaving(false);
     }
@@ -126,8 +126,8 @@ export default function WhatsApp() {
             </h2>
             <p className="text-sm text-ink-soft mt-0.5">
               {connected
-                ? `Number ID ${savedNumberId} se leads automatically fetch ho rahe hain.`
-                : "Apna WhatsApp Business number connect karo — leads apne aap CRM me aayenge."}
+                ? `Leads are being fetched automatically from Number ID ${savedNumberId}.`
+                : "Connect your WhatsApp Business number — leads will flow into the CRM automatically."}
             </p>
           </div>
           {connected && (
@@ -148,10 +148,10 @@ export default function WhatsApp() {
         <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
           <h3 className="font-display font-semibold text-lg text-ink mb-1 flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-700 text-xs font-bold flex items-center justify-center">1</span>
-            Meta me webhook set karo
+            Set up the webhook in Meta
           </h3>
           <p className="text-sm text-ink-soft mb-4">
-            Meta Developer → WhatsApp → Configuration me ye webhook URL aur verify token daalo (ek baar):
+            In Meta Developer → WhatsApp → Configuration, enter this webhook URL and verify token (one time):
           </p>
 
           <label className="block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1">Callback URL</label>
@@ -171,7 +171,7 @@ export default function WhatsApp() {
           </div>
           <p className="text-xs text-ink-muted mt-3 flex items-start gap-1.5">
             <Info size={13} className="mt-0.5 shrink-0" />
-            Backend me <code className="bg-cream-200 px-1 rounded">WHATSAPP_VERIFY_TOKEN=codeskate_verify</code> set hona chahiye. Field "messages" subscribe karo.
+            The backend must have <code className="bg-cream-200 px-1 rounded">WHATSAPP_VERIFY_TOKEN=codeskate_verify</code> set. Subscribe to the "messages" field.
           </p>
         </div>
 
@@ -179,10 +179,10 @@ export default function WhatsApp() {
         <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
           <h3 className="font-display font-semibold text-lg text-ink mb-1 flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-700 text-xs font-bold flex items-center justify-center">2</span>
-            Apna number connect karo
+            Connect your number
           </h3>
           <p className="text-sm text-ink-soft mb-4">
-            Meta → WhatsApp → API Setup me <strong>Phone number ID</strong> milta hai. Wahi yahan daalo.
+            You'll find the <strong>Phone number ID</strong> in Meta → WhatsApp → API Setup. Enter it here.
           </p>
           <form onSubmit={connect} className="space-y-4">
             <div>
@@ -206,7 +206,7 @@ export default function WhatsApp() {
 
       <p className="text-xs text-ink-muted mt-6 flex items-center gap-1.5">
         <Info size={13} />
-        Ek WhatsApp number sirf ek organization se connect ho sakta hai. Leads us number ke Phone Number ID se aapke org me route hote hain.
+        A WhatsApp number can be connected to only one organization. Leads are routed to your org based on that number's Phone Number ID.
       </p>
     </Layout>
   );

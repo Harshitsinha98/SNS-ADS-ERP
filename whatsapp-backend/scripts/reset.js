@@ -50,8 +50,8 @@ async function run() {
     try { await wipe(c); }
     catch (e) { console.warn(`  • ${c}: skipped (${e?.message})`); }
   }
-  console.log("\n✅ Reset complete. Ab fresh signup se sab test kar sakte ho.");
-  console.log("   Owner (+919653043939) ko phone se /platform access milta rahega.");
+  console.log("\n✅ Reset complete. You can now test everything with a fresh signup.");
+  console.log("   The owner (+919653043939) will keep /platform access via their phone number.");
   process.exit(0);
 }
 

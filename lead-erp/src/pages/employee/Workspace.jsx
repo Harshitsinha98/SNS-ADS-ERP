@@ -18,8 +18,8 @@ export default function Workspace() {
 
   const myLeads = leads.filter((l) => l.assignedTo === user.id && !l.blacklisted);
   const isClosed = (l) => ["Closed-Won", "Lost"].includes(l.status);
-  // FIX: same overdue bug jo Tasks.jsx mein tha — time-based check, "aaj ka
-  // follow-up jiska time nikal gaya" ab Overdue mein aata hai.
+  // FIX: same overdue bug that was in Tasks.jsx — time-based check, so "today's
+  // follow-up whose time has passed" now correctly shows up as Overdue.
   const isPast = (l) => l.followUp && new Date(l.followUp) < new Date();
 
   const newToCall = myLeads.filter((l) => l.status === "New");
@@ -104,7 +104,7 @@ export default function Workspace() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white rounded-lg shadow-card border border-paper-line p-4 mb-6">
         <div>
           <p className="font-medium text-sm">{myLeads.length} leads assigned to you</p>
-          <p className="text-xs text-ink/40">Sab leads ek jagah dekho, status/priority/follow-up seedha yahin se badlo.</p>
+          <p className="text-xs text-ink/40">See all your leads in one place and change status/priority/follow-up right from here.</p>
         </div>
         <Link to="/app/tasks" className="flex items-center justify-center gap-1.5 bg-ink text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-ink/90">
           <ListChecks size={15} /> View all my leads

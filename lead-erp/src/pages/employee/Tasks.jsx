@@ -36,10 +36,10 @@ export default function Tasks() {
   );
 
   const isClosed = (l) => ["Closed-Won", "Lost"].includes(l.status);
-  // FIX: "overdue" sirf date-level check kar raha tha (!isToday), isliye follow-up
-  // ka time nikal jaane ke baad bhi — agar wo aaj ka hi din hai — lead "Follow-up
-  // Today" mein hi atki rehti thi, "Overdue" mein kabhi nahi aati thi. Ab time-based
-  // check: jis follow-up ka time nikal chuka hai wo Overdue hai, chahe aaj ka ho ya purana.
+  // FIX: "overdue" was only a date-level check (!isToday), so even after the
+  // follow-up time had passed — if it was still today's date — the lead stayed
+  // stuck under "Follow-up Today" and never moved to "Overdue". Now it's a
+  // time-based check: any follow-up whose time has passed is Overdue, whether it's today or older.
   const isPast = (l) => l.followUp && new Date(l.followUp) < new Date();
 
   const newToCall = myLeads.filter((l) => l.status === "New");
@@ -55,7 +55,7 @@ export default function Tasks() {
 
   return (
     <Layout title="My Leads">
-      {/* Mobile fix: 4 tabs squeeze hone ke bajaye horizontally scroll karte hain */}
+      {/* Mobile fix: instead of squeezing 4 tabs, let them scroll horizontally */}
       <div className="flex gap-2 mb-5 overflow-x-auto pb-1 -mx-1 px-1">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
@@ -103,7 +103,7 @@ export default function Tasks() {
                 </tr>
               );
             })}
-            {view.length === 0 && <tr><td colSpan="7" className="text-ink/40 py-6 text-center">Is tab mein koi lead nahi hai.</td></tr>}
+            {view.length === 0 && <tr><td colSpan="7" className="text-ink/40 py-6 text-center">No leads in this tab.</td></tr>}
           </tbody>
         </table>
       </div>
