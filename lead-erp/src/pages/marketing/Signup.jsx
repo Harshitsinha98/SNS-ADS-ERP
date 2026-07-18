@@ -9,6 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { auth, db } from "../../firebase";
 import Logo from "../../components/marketing/Logo";
 import { PLANS, TRIAL_DAYS } from "../../data/plans";
+import { withTimeout } from "../../utils/withTimeout";
 
 const DEFAULT_STATUSES = [
   "New", "Ringing", "Meeting Fixed", "Negotiation", "Follow-up", "Closed-Won", "Lost",
@@ -66,9 +67,11 @@ export default function Signup() {
     const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
     // ---- CRITICAL writes: these MUST succeed for login to work ----
+    // Each is guarded with a timeout so a stalled Firestore call surfaces an
+    // error instead of spinning forever.
     // 1. Organization root
     console.log("[signup] creating organization…", orgId);
-    await setDoc(doc(db, "organizations", orgId), {
+    await withTimeout(setDoc(doc(db, "organizations", orgId), {
       name: orgName.trim(),
       slug: orgName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
       createdAt: serverTimestamp(),
@@ -78,11 +81,11 @@ export default function Signup() {
       seatsUsed: 1,
       seatsLimit: selectedPlan.includedSeats,
       trialEndsAt,
-    });
+    }), 15000, "create organization");
 
     // 2. Global user identity
     console.log("[signup] creating user identity…");
-    await setDoc(
+    await withTimeout(setDoc(
       doc(db, "users", uid),
       {
         phone: auth.currentUser?.phoneNumber || `+91${phone}`,
@@ -92,11 +95,11 @@ export default function Signup() {
         defaultOrgId: orgId,
       },
       { merge: true }
-    );
+    ), 15000, "create user");
 
     // 3. Membership (owner) — required so security rules recognise this user as admin
     console.log("[signup] creating owner membership…");
-    await setDoc(doc(db, "memberships", `${uid}_${orgId}`), {
+    await withTimeout(setDoc(doc(db, "memberships", `${uid}_${orgId}`), {
       uid,
       orgId,
       role: "owner",
@@ -105,24 +108,24 @@ export default function Signup() {
       invitedBy: uid,
       joinedAt: serverTimestamp(),
       lastActiveAt: serverTimestamp(),
-    });
+    }), 15000, "create membership");
 
     // ---- BEST-EFFORT writes: rely on isAdmin() which reads the membership we
     // just created. Firestore rules' get() can briefly lag behind that write,
     // so we don't let these block signup. DataContext falls back to defaults. ----
     try {
-      await setDoc(doc(db, "organizations", orgId, "settings", "config"), {
+      await withTimeout(setDoc(doc(db, "organizations", orgId, "settings", "config"), {
         statuses: DEFAULT_STATUSES,
         autoAssign: "round-robin",
-      });
-      await setDoc(doc(db, "organizations", orgId, "meta", "leadAssignment"), {
+      }), 8000, "settings");
+      await withTimeout(setDoc(doc(db, "organizations", orgId, "meta", "leadAssignment"), {
         lastIndex: 0,
-      });
-      await setDoc(doc(db, "organizations", orgId, "activity", `welcome_${Date.now()}`), {
+      }), 8000, "meta");
+      await withTimeout(setDoc(doc(db, "organizations", orgId, "activity", `welcome_${Date.now()}`), {
         text: `🎉 ${fullName.trim()} created ${orgName.trim()} on the ${selectedPlan.name} plan (${TRIAL_DAYS}-day trial)`,
         at: new Date().toISOString(),
         orgId,
-      });
+      }), 8000, "activity");
     } catch (nonCritical) {
       // Non-fatal: workspace still usable; these self-heal from the app later.
       console.warn("[signup] optional workspace setup skipped:", nonCritical?.code || nonCritical?.message);
@@ -159,7 +162,9 @@ export default function Signup() {
       const code = e2?.code;
       let msg;
       if (code === "permission-denied") {
-        msg = "Workspace nahi bana — Firestore Security Rules deploy nahi hui hmain. (permission-denied)";
+        msg = "Workspace nahi bana — Firestore Security Rules deploy nahi hui. Firebase Console → Firestore → Rules me publish karo. (permission-denied)";
+      } else if (code === "deadline-exceeded") {
+        msg = "Firestore respond nahi kar raha. Check karo ki Firebase me Firestore Database CREATE hui hai (Console → Firestore Database → Create database).";
       } else if (code === "unavailable" || code === "failed-precondition") {
         msg = "Firestore reach nahi ho raha. Internet/Firestore setup check karo.";
       } else {

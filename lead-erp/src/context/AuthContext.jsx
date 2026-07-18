@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 import { RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { withTimeout } from "../utils/withTimeout";
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -27,7 +28,7 @@ export function AuthProvider({ children }) {
 
       try {
         // Step 1: Get user's global profile (users/{uid})
-        const userSnap = await getDoc(doc(db, "users", uid));
+        const userSnap = await withTimeout(getDoc(doc(db, "users", uid)), 15000, "load profile");
         
         // Step 2: Get user's active memberships
         const membershipsQuery = query(
@@ -35,7 +36,7 @@ export function AuthProvider({ children }) {
           where("uid", "==", uid),
           where("active", "==", true)
         );
-        const membershipsSnap = await getDocs(membershipsQuery);
+        const membershipsSnap = await withTimeout(getDocs(membershipsQuery), 15000, "load memberships");
 
         if (membershipsSnap.empty) {
           // No organization membership - allow access to Setup page
@@ -83,7 +84,11 @@ export function AuthProvider({ children }) {
 
         // Step 5: Get active org details
         const activeMembership = memberships.find(m => m.orgId === activeOrgId) || memberships[0];
-        const orgSnap = await getDoc(doc(db, "organizations", activeMembership.orgId));
+        const orgSnap = await withTimeout(
+          getDoc(doc(db, "organizations", activeMembership.orgId)),
+          15000,
+          "load organization"
+        );
 
         // Step 6: Build user object with org context
         const userData = {
@@ -108,7 +113,10 @@ export function AuthProvider({ children }) {
         setUser(userData);
 
       } catch (e) {
-        console.error("User profile fetch error:", e);
+        console.error("User profile fetch error:", e?.code, e?.message);
+        if (e?.code === "deadline-exceeded") {
+          console.error("Firestore is unreachable — check that Firestore Database is created & rules are published.");
+        }
         await signOut(auth);
         setUser(null);
       } finally {
