@@ -91,7 +91,11 @@ service cloud.firestore {
     // Employee INVITES (pending until the invitee logs in and claims them).
     // Keyed by {phoneE164}_{orgId}.
     match /invites/{inviteId} {
+      // `resource == null` → the invite doesn't exist yet. Allowing that read
+      // is safe (no data to leak) and is REQUIRED so the addUser transaction
+      // can check for an existing invite before creating one.
       allow read: if isAuthenticated() && (
+        resource == null ||
         request.auth.token.phone_number == resource.data.phone ||
         isAdmin(resource.data.orgId) ||
         isPlatformAdmin()
