@@ -646,6 +646,34 @@ export function DataProvider({ children }) {
     }
   };
 
+  // Schedule a DOWNGRADE to take effect at the end of the current paid period
+  // (they keep current benefits until then). Cron applies it. No refund/charge.
+  const scheduleDowngrade = async (toPlanId, cycle = "monthly", effectiveAtMs = null) => {
+    if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
+    try {
+      await updateDoc(doc(db, "organizations", user.activeOrgId), {
+        pendingPlanChange: { toPlanId, cycle, effectiveAtMs: effectiveAtMs || null },
+      });
+      logActivity(`Downgrade scheduled to ${toPlanId} at period end`);
+      return { ok: true };
+    } catch (e) {
+      console.error("Schedule downgrade error:", e?.code, e?.message);
+      return { ok: false, error: "Downgrade schedule nahi hua." };
+    }
+  };
+
+  const cancelDowngrade = async () => {
+    if (!user?.activeOrgId) return { ok: false };
+    try {
+      await updateDoc(doc(db, "organizations", user.activeOrgId), { pendingPlanChange: null });
+      logActivity("Scheduled downgrade cancelled — staying on current plan");
+      return { ok: true };
+    } catch (e) {
+      console.error("Cancel downgrade error:", e?.code, e?.message);
+      return { ok: false, error: "Cancel nahi hua." };
+    }
+  };
+
   // ============================================================
   // NOTIFICATIONS - org-scoped
   // ============================================================
@@ -717,7 +745,7 @@ export function DataProvider({ children }) {
       updateLeadStatus, updatePriority, updateFollowUpDate, updateLeadRevenue,
       reassignLead, reassignAllLeads, blacklistLead,
       addBulkLeads, addUser, updateUser, deactivateUser, activateUser, pushNotif, markRead, logActivity, setMyGoal,
-      triggerWhatsAppSync, changePlan,
+      triggerWhatsAppSync, changePlan, scheduleDowngrade, cancelDowngrade,
     }}>
       {children}
     </DataContext.Provider>

@@ -54,14 +54,25 @@ export function BillingProvider({ children }) {
     ? Math.max(0, Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / dayMs))
     : 0;
 
+  // Paid-period + subscription lifecycle
+  const currentPeriodEndMs = org?.currentPeriodEndMs || 0;
+  const billingCycle = org?.billingCycle || "monthly";
+  const autopay = org?.autopay === true;
+  const pendingPlanChange = org?.pendingPlanChange || null;
+  const daysToRenewal = currentPeriodEndMs
+    ? Math.ceil((currentPeriodEndMs - Date.now()) / dayMs)
+    : null;
+  const renewalDue = currentPeriodEndMs && daysToRenewal !== null && daysToRenewal <= 5;
+
   const isTrialing = status === "trialing";
   const isActive = status === "active";
+  const isPastDue = status === "past_due";
   // Trial has run out (client-side view; rules enforce the hard block).
   const trialExpired = isTrialing && trialEndsAt && new Date(trialEndsAt).getTime() < Date.now();
   const isExpired = status === "expired" || trialExpired;
 
   // Can the org still perform billable actions (add leads / members)?
-  const subscriptionActive = isActive || (isTrialing && !trialExpired);
+  const subscriptionActive = isActive || isPastDue || (isTrialing && !trialExpired);
 
   return (
     <BillingContext.Provider
@@ -81,8 +92,15 @@ export function BillingProvider({ children }) {
         leadLimitReached,
         trialEndsAt,
         trialDaysLeft,
+        currentPeriodEndMs,
+        billingCycle,
+        autopay,
+        pendingPlanChange,
+        daysToRenewal,
+        renewalDue,
         isTrialing,
         isActive,
+        isPastDue,
         isExpired,
         trialExpired,
         subscriptionActive,

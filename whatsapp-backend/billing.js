@@ -53,29 +53,44 @@ export default function createBillingRouter(db) {
   }
 
   // Apply a paid plan to an org (Admin SDK — the only place limits get raised).
-  async function applyPlan(orgId, plan, cycle, meta) {
+  // If the org already has a period in the future (renewing early), the new
+  // period EXTENDS from that end date instead of resetting from today.
+  // extra = { autopay?, razorpaySubscriptionId? } merged onto the org.
+  async function applyPlan(orgId, plan, cycle, meta, extra = {}) {
     const periodDays = cycle === "yearly" ? 365 : 30;
     const amount = amountForPlan(plan, cycle);
+    const now = Date.now();
+
+    const orgSnap = await db.collection("organizations").doc(orgId).get();
+    const cur = orgSnap.exists ? (orgSnap.data().currentPeriodEndMs || 0) : 0;
+    const base = cur > now ? cur : now; // extend if still active
+    const newPeriodEndMs = base + periodDays * 86400000;
+
     await db.collection("organizations").doc(orgId).update({
       planId: plan.id,
       planName: plan.name,
       seatsLimit: plan.includedSeats,
       leadsLimit: plan.leadsLimit,
       subscriptionStatus: "active",
+      billingCycle: cycle,
       trialEndsAt: null,
       trialEndsAtMs: 0,
-      currentPeriodEndMs: Date.now() + periodDays * 86400000,
+      currentPeriodEndMs: newPeriodEndMs,
+      // a fresh payment clears any scheduled downgrade / cancel / reminder flag
+      pendingPlanChange: null,
+      cancelAtPeriodEnd: false,
+      renewalRemindedFor: null,
       lastPayment: { ...meta, amount, cycle, at: new Date().toISOString() },
+      ...extra,
     });
     await db.collection("organizations").doc(orgId).collection("activity").add({
-      text: `💳 Payment received — ${plan.name} plan (${cycle}) activated via ${meta.gateway}`,
+      text: `💳 Payment received — ${plan.name} plan (${cycle}) via ${meta.gateway}. Valid till ${new Date(newPeriodEndMs).toLocaleDateString("en-IN")}`,
       at: new Date().toISOString(),
       orgId,
     });
-    // Record invoice
     await db.collection("organizations").doc(orgId).collection("invoices").add({
       amount, currency: "INR", plan: plan.name, cycle,
-      gateway: meta.gateway, reference: meta.paymentId || meta.mihpayid || null,
+      gateway: meta.gateway, reference: meta.paymentId || meta.mihpayid || meta.subscriptionId || null,
       status: "paid", at: new Date().toISOString(), orgId,
     });
   }
@@ -369,6 +384,113 @@ export default function createBillingRouter(db) {
     } catch (e) {
       console.error("signup/payu/hash error:", e?.message);
       res.status(500).json({ error: "Could not create PayU signup request" });
+    }
+  });
+
+  // ============================================================
+  // OPTION A — Razorpay Subscriptions (auto-recurring / autopay)
+  // ============================================================
+  async function ensureRazorpayPlan(plan, cycle) {
+    const cacheId = `${plan.id}_${cycle}`;
+    const ref = db.collection("razorpayPlans").doc(cacheId);
+    const snap = await ref.get();
+    if (snap.exists && snap.data().razorpayPlanId) return snap.data().razorpayPlanId;
+    const rp = await razorpay.plans.create({
+      period: cycle === "yearly" ? "yearly" : "monthly",
+      interval: 1,
+      item: { name: `${plan.name} (${cycle})`, amount: amountForPlan(plan, cycle) * 100, currency: "INR" },
+    });
+    await ref.set({ razorpayPlanId: rp.id, planId: plan.id, cycle, createdAt: new Date().toISOString() });
+    return rp.id;
+  }
+
+  // Create a subscription (customer will authorise autopay in checkout).
+  router.post("/subscription/create", requireAuth, async (req, res) => {
+    try {
+      const { orgId, planId, cycle = "monthly" } = req.body;
+      if (!razorpay) return res.status(500).json({ error: "Razorpay not configured on server" });
+      if (!(await isOrgAdmin(req.uid, orgId))) return res.status(403).json({ error: "Not an admin of this org" });
+      const plans = await getMergedPlans(db);
+      const plan = plans[planId] || plans.growth;
+      const rpPlanId = await ensureRazorpayPlan(plan, cycle);
+      const sub = await razorpay.subscriptions.create({
+        plan_id: rpPlanId,
+        total_count: cycle === "yearly" ? 5 : 60,
+        customer_notify: 1,
+        notes: { orgId, planId: plan.id, cycle },
+      });
+      res.json({ subscriptionId: sub.id, keyId: process.env.RAZORPAY_KEY_ID, planName: plan.name });
+    } catch (e) {
+      console.error("subscription/create error:", e?.message);
+      res.status(500).json({ error: "Could not create subscription" });
+    }
+  });
+
+  // Verify the first subscription payment + enable autopay on the org.
+  router.post("/subscription/verify", requireAuth, async (req, res) => {
+    try {
+      const { orgId, planId, cycle = "monthly", razorpay_payment_id, razorpay_subscription_id, razorpay_signature } = req.body;
+      if (!(await isOrgAdmin(req.uid, orgId))) return res.status(403).json({ error: "Not an admin of this org" });
+      const expected = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+        .update(`${razorpay_payment_id}|${razorpay_subscription_id}`).digest("hex");
+      if (expected !== razorpay_signature) return res.status(400).json({ error: "Signature verification failed" });
+      const plans = await getMergedPlans(db);
+      const plan = plans[planId] || plans.growth;
+      await applyPlan(orgId, plan, cycle,
+        { gateway: "razorpay-autopay", paymentId: razorpay_payment_id, subscriptionId: razorpay_subscription_id },
+        { autopay: true, razorpaySubscriptionId: razorpay_subscription_id });
+      res.json({ ok: true, planName: plan.name });
+    } catch (e) {
+      console.error("subscription/verify error:", e?.message);
+      res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
+  // Recurring webhook — Razorpay calls this every cycle (and on failures).
+  router.post("/webhook/razorpay", async (req, res) => {
+    try {
+      const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+      const signature = req.headers["x-razorpay-signature"];
+      const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
+      if (secret && signature) {
+        const expected = crypto.createHmac("sha256", secret).update(raw).digest("hex");
+        if (expected !== signature) { console.warn("razorpay webhook: bad signature"); return res.status(400).json({ error: "bad signature" }); }
+      }
+      const event = JSON.parse(raw.toString() || "{}");
+      const sub = event.payload?.subscription?.entity;
+      const orgId = sub?.notes?.orgId;
+      if (orgId) {
+        const plans = await getMergedPlans(db);
+        const plan = plans[sub.notes.planId] || plans.growth;
+        const cycle = sub.notes.cycle || "monthly";
+        if (event.event === "subscription.charged") {
+          await applyPlan(orgId, plan, cycle, { gateway: "razorpay-autopay", subscriptionId: sub.id }, { autopay: true, razorpaySubscriptionId: sub.id });
+        } else if (event.event === "subscription.halted" || event.event === "subscription.pending") {
+          await db.collection("organizations").doc(orgId).update({ subscriptionStatus: "past_due" });
+        } else if (event.event === "subscription.cancelled" || event.event === "subscription.completed") {
+          await db.collection("organizations").doc(orgId).update({ autopay: false });
+        }
+      }
+      res.json({ ok: true });
+    } catch (e) {
+      console.error("razorpay webhook error:", e?.message);
+      res.status(200).json({ ok: false });
+    }
+  });
+
+  // Cancel autopay (stop future auto-charges; current period stays active).
+  router.post("/subscription/cancel", requireAuth, async (req, res) => {
+    try {
+      const { orgId } = req.body;
+      if (!(await isOrgAdmin(req.uid, orgId))) return res.status(403).json({ error: "Not an admin of this org" });
+      const orgSnap = await db.collection("organizations").doc(orgId).get();
+      const subId = orgSnap.data()?.razorpaySubscriptionId;
+      if (subId && razorpay) { try { await razorpay.subscriptions.cancel(subId, { cancel_at_cycle_end: 1 }); } catch (e) { console.warn("rzp cancel:", e?.message); } }
+      await db.collection("organizations").doc(orgId).update({ autopay: false });
+      res.json({ ok: true });
+    } catch (e) {
+      console.error("subscription/cancel error:", e?.message);
+      res.status(500).json({ error: "Could not cancel autopay" });
     }
   });
 

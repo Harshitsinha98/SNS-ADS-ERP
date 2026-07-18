@@ -5,31 +5,34 @@ import { useBilling } from "../../context/BillingContext";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
-import { mergePlansWithConfig, limitsForPlan } from "../../data/plans";
+import { mergePlansWithConfig, limitsForPlan, PLAN_ORDER, isUpgrade, getPlanById } from "../../data/plans";
 import {
-  getBillingConfig, createRazorpayOrder, verifyRazorpayPayment,
-  getPayuHash, loadRazorpayScript, submitPayuForm,
+  getBillingConfig, createRazorpayOrder, verifyRazorpayPayment, getPayuHash,
+  createSubscription, verifySubscription, cancelAutopay,
+  loadRazorpayScript, submitPayuForm,
 } from "../../utils/billingApi";
 import {
   Check, Sparkles, Users, Inbox, Clock, ArrowRight, Loader2, ShieldCheck,
-  CreditCard,
+  CreditCard, RefreshCw, Zap, Lock, TrendingUp, X, AlertTriangle, Repeat, ChevronDown,
 } from "lucide-react";
 
+const fmtDate = (ms) => ms ? new Date(ms).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
 export default function Billing() {
-  const {
-    planId, planName, status, seatsUsed, seatsLimit, leadsUsed, leadsLimit,
-    trialDaysLeft, isTrialing, isActive, isExpired, org,
-  } = useBilling();
-  const { changePlan } = useData();
+  const b = useBilling();
+  const { changePlan, scheduleDowngrade, cancelDowngrade } = useData();
   const { user } = useAuth();
   const location = useLocation();
 
   const [config, setConfig] = useState(null);
   const [gateways, setGateways] = useState({ razorpay: false, payu: false });
-  const [cycle, setCycle] = useState("monthly");
+  const [cycle, setCycle] = useState(b.billingCycle || "monthly");
   const [method, setMethod] = useState("razorpay");
-  const [busyPlan, setBusyPlan] = useState(null);
+  const [autopayWanted, setAutopayWanted] = useState(false);
+  const [busy, setBusy] = useState(null);
   const [msg, setMsg] = useState("");
+  const [downgradeModal, setDowngradeModal] = useState(null); // target plan
+  const [showManage, setShowManage] = useState(false);
 
   useEffect(() => {
     fetchPlatformConfig().then(setConfig);
@@ -37,114 +40,165 @@ export default function Billing() {
       setGateways(g);
       setMethod(g.razorpay ? "razorpay" : g.payu ? "payu" : "razorpay");
     });
-    // PayU redirect result
     const params = new URLSearchParams(location.search);
     const payu = params.get("payu");
-    if (payu === "success") setMsg("✅ Payment successful — aapka plan activate ho gaya!");
-    else if (payu === "failed") setMsg("❌ PayU payment fail hua. Dobara try karo.");
-    else if (payu === "error") setMsg("⚠️ PayU payment me error aaya.");
+    if (payu === "success") setMsg("✅ Payment successful — plan activate ho gaya!");
+    else if (payu === "failed") setMsg("❌ PayU payment fail hua.");
+    else if (payu === "error") setMsg("⚠️ PayU me error aaya.");
   }, [location.search]);
 
   const { plans } = mergePlansWithConfig(config);
   const anyGateway = gateways.razorpay || gateways.payu;
+  const currentPlan = plans.find((p) => p.id === b.planId) || plans[0];
 
-  const seatPct = seatsLimit > 0 ? Math.min(100, Math.round((seatsUsed / seatsLimit) * 100)) : 0;
-  const leadPct = leadsLimit > 0 ? Math.min(100, Math.round((leadsUsed / leadsLimit) * 100)) : 0;
+  // Post-purchase = active or past_due → upgrade-only view.
+  const hasPaid = b.isActive || b.isPastDue;
+  const higherPlans = plans.filter((p) => isUpgrade(b.planId, p.id));
+  const lowerPlans = plans.filter((p) => p.id !== b.planId && !isUpgrade(b.planId, p.id));
 
-  const statusBadge = () => {
-    if (isActive) return <span className="badge badge-success">Active</span>;
-    if (isExpired) return <span className="badge badge-danger">Expired</span>;
-    if (isTrialing) return <span className="badge badge-warning">Trial · {trialDaysLeft}d left</span>;
-    return <span className="badge badge-primary">{status}</span>;
-  };
+  const seatPct = b.seatsLimit > 0 ? Math.min(100, Math.round((b.seatsUsed / b.seatsLimit) * 100)) : 0;
+  const leadPct = b.leadsLimit > 0 ? Math.min(100, Math.round((b.leadsUsed / b.leadsLimit) * 100)) : 0;
 
-  const payWithRazorpay = async (plan) => {
-    const ok = await loadRazorpayScript();
-    if (!ok) throw new Error("Razorpay checkout load nahi hua.");
-    const order = await createRazorpayOrder({ orgId: org.id, planId: plan.id, cycle });
-
-    await new Promise((resolve, reject) => {
-      const rzp = new window.Razorpay({
-        key: order.keyId,
-        amount: order.amount,
-        currency: order.currency,
-        name: "CodeSkate",
-        description: `${plan.name} plan (${cycle})`,
-        order_id: order.orderId,
-        prefill: { name: user?.displayName || "", contact: (user?.phone || "").replace("+91", "") },
-        theme: { color: "#F04E00" },
-        handler: async (resp) => {
-          try {
-            await verifyRazorpayPayment({
-              orgId: org.id, planId: plan.id, cycle,
-              razorpay_order_id: resp.razorpay_order_id,
-              razorpay_payment_id: resp.razorpay_payment_id,
-              razorpay_signature: resp.razorpay_signature,
-            });
-            resolve();
-          } catch (e) { reject(e); }
-        },
-        modal: { ondismiss: () => reject(new Error("Payment cancel kiya gaya.")) },
-      });
-      rzp.open();
-    });
-  };
-
-  const payWithPayu = async (plan) => {
-    const { action, params } = await getPayuHash({
-      orgId: org.id, planId: plan.id, cycle,
-      firstname: user?.displayName || "Customer",
-      email: "customer@codeskate.app",
-      phone: (user?.phone || "").replace("+91", ""),
-    });
-    submitPayuForm(action, params); // redirects away
-  };
-
-  const handleUpgrade = async (plan) => {
-    setMsg("");
-    setBusyPlan(plan.id);
-    try {
-      if (!anyGateway) {
-        // No gateway configured (backend not deployed) — dev activate fallback.
-        const res = await changePlan(limitsForPlan(plan.id, config));
-        setMsg(res?.ok
-          ? `✅ (Dev) ${plan.name} activate ho gaya — payment gateway configure nahi hai.`
-          : (res?.error || "Activate nahi hua."));
-      } else if (method === "razorpay" && gateways.razorpay) {
-        await payWithRazorpay(plan);
-        setMsg(`✅ Payment successful — ${plan.name} plan activate ho gaya!`);
-      } else if (method === "payu" && gateways.payu) {
-        await payWithPayu(plan);
-        return; // page redirects to PayU
-      } else {
-        setMsg("Ye payment method configure nahi hai.");
-      }
-    } catch (e) {
-      setMsg(e.message || "Payment fail hua.");
-    } finally {
-      setBusyPlan(null);
+  // ---- payment ----
+  const doPayment = async (plan, { autopay = false } = {}) => {
+    if (!anyGateway) {
+      const res = await changePlan(limitsForPlan(plan.id, config));
+      setMsg(res?.ok ? `✅ (Dev) ${plan.name} activate ho gaya — payment gateway configure nahi hai.` : (res?.error || "Activate nahi hua."));
+      return;
     }
+    if (method === "razorpay" && gateways.razorpay) {
+      const ok = await loadRazorpayScript();
+      if (!ok) throw new Error("Razorpay load nahi hua.");
+      if (autopay) {
+        const sub = await createSubscription({ orgId: b.org.id, planId: plan.id, cycle });
+        await new Promise((resolve, reject) => {
+          const rzp = new window.Razorpay({
+            key: sub.keyId, subscription_id: sub.subscriptionId, name: "CodeSkate",
+            description: `${plan.name} (${cycle}) · Autopay`,
+            prefill: { name: user?.displayName || "", contact: (user?.phone || "").replace("+91", "") },
+            theme: { color: "#F04E00" },
+            handler: async (r) => {
+              try {
+                await verifySubscription({ orgId: b.org.id, planId: plan.id, cycle,
+                  razorpay_payment_id: r.razorpay_payment_id, razorpay_subscription_id: r.razorpay_subscription_id, razorpay_signature: r.razorpay_signature });
+                resolve();
+              } catch (e) { reject(e); }
+            },
+            modal: { ondismiss: () => reject(new Error("Autopay setup cancel kiya gaya.")) },
+          });
+          rzp.open();
+        });
+      } else {
+        const order = await createRazorpayOrder({ orgId: b.org.id, planId: plan.id, cycle });
+        await new Promise((resolve, reject) => {
+          const rzp = new window.Razorpay({
+            key: order.keyId, amount: order.amount, currency: order.currency, order_id: order.orderId,
+            name: "CodeSkate", description: `${plan.name} (${cycle})`,
+            prefill: { name: user?.displayName || "", contact: (user?.phone || "").replace("+91", "") },
+            theme: { color: "#F04E00" },
+            handler: async (r) => {
+              try {
+                await verifyRazorpayPayment({ orgId: b.org.id, planId: plan.id, cycle,
+                  razorpay_order_id: r.razorpay_order_id, razorpay_payment_id: r.razorpay_payment_id, razorpay_signature: r.razorpay_signature });
+                resolve();
+              } catch (e) { reject(e); }
+            },
+            modal: { ondismiss: () => reject(new Error("Payment cancel kiya gaya.")) },
+          });
+          rzp.open();
+        });
+      }
+    } else if (method === "payu" && gateways.payu) {
+      const { action, params } = await getPayuHash({ orgId: b.org.id, planId: plan.id, cycle,
+        firstname: user?.displayName || "Customer", email: "customer@codeskate.app", phone: (user?.phone || "").replace("+91", "") });
+      submitPayuForm(action, params);
+      return "redirect";
+    }
+  };
+
+  const handlePay = async (plan, opts) => {
+    setMsg(""); setBusy(plan.id + (opts?.autopay ? "-auto" : ""));
+    try {
+      const r = await doPayment(plan, opts);
+      if (r !== "redirect") setMsg(`✅ Ho gaya — ${plan.name} plan active hai!`);
+    } catch (e) { setMsg(e.message || "Payment fail hua."); }
+    finally { setBusy(null); }
+  };
+
+  const handleRenew = () => handlePay(currentPlan, { autopay: false });
+
+  const confirmDowngrade = async () => {
+    const target = downgradeModal;
+    setDowngradeModal(null); setBusy("downgrade"); setMsg("");
+    const res = await scheduleDowngrade(target.id, cycle, b.currentPeriodEndMs);
+    setBusy(null);
+    setMsg(res?.ok
+      ? `Downgrade ${fmtDate(b.currentPeriodEndMs)} ko ${target.name} me apply hoga. Tab tak aap ${currentPlan.name} enjoy karo!`
+      : (res?.error || "Downgrade schedule nahi hua."));
+  };
+
+  const undoDowngrade = async () => {
+    setBusy("undo"); const res = await cancelDowngrade(); setBusy(null);
+    setMsg(res?.ok ? `Great choice! Aap ${currentPlan.name} par bane rahenge. 🎉` : "");
+  };
+
+  const stopAutopay = async () => {
+    setBusy("cancelauto"); setMsg("");
+    try { await cancelAutopay({ orgId: b.org.id }); setMsg("Autopay band kar diya. Current period tak plan active rahega."); }
+    catch (e) { setMsg(e.message || "Cancel nahi hua."); }
+    finally { setBusy(null); }
   };
 
   return (
     <Layout title="Billing & Subscription">
-      {/* Current plan */}
+      {/* ===== Scheduled downgrade banner (retention) ===== */}
+      {b.pendingPlanChange && (
+        <div className="bg-warning-50 border border-warning-200 rounded-xl p-4 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
+          <TrendingUp className="text-warning-600 shrink-0" size={20} />
+          <div className="flex-1 text-sm text-ink-soft">
+            <span className="font-semibold text-ink">{fmtDate(b.currentPeriodEndMs)}</span> ko aap{" "}
+            <span className="font-semibold">{getPlanById(b.pendingPlanChange.toPlanId)?.name}</span> par chale jaoge —
+            aur <span className="font-semibold text-ember-600">{currentPlan.name}</span> ke ye faayde kho doge.
+            Mann badla?
+          </div>
+          <button onClick={undoDowngrade} disabled={busy === "undo"} className="btn btn-primary text-sm whitespace-nowrap">
+            {busy === "undo" ? <Loader2 size={15} className="animate-spin" /> : <>Keep {currentPlan.name}</>}
+          </button>
+        </div>
+      )}
+
+      {/* ===== Past due / renewal banner ===== */}
+      {b.isPastDue && (
+        <div className="bg-danger-50 border border-danger-200 rounded-xl p-4 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
+          <AlertTriangle className="text-danger-600 shrink-0" size={20} />
+          <p className="flex-1 text-sm text-danger-700">Aapka plan expire ho gaya — grace period chal raha hai. Turant renew karo warna features lock ho jayenge.</p>
+          <button onClick={handleRenew} disabled={busy} className="btn btn-primary text-sm whitespace-nowrap">
+            {busy ? <Loader2 size={15} className="animate-spin" /> : <><RefreshCw size={15} /> Renew now</>}
+          </button>
+        </div>
+      )}
+
+      {/* ===== Current plan card ===== */}
       <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 mb-6">
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
             <p className="eyebrow mb-1">Current plan</p>
-            <div className="flex items-center gap-3">
-              <h2 className="font-display font-bold text-2xl text-ink">{planName}</h2>
-              {statusBadge()}
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="font-display font-bold text-2xl text-ink">{b.planName}</h2>
+              {b.isActive && <span className="badge badge-success">Active</span>}
+              {b.isPastDue && <span className="badge badge-danger">Past due</span>}
+              {b.isTrialing && <span className="badge badge-warning">Trial · {b.trialDaysLeft}d left</span>}
+              {b.isExpired && <span className="badge badge-danger">Expired</span>}
+              {b.autopay && <span className="badge badge-primary flex items-center gap-1"><Repeat size={11} /> Autopay ON</span>}
             </div>
-            {isTrialing && (
-              <p className="text-sm text-ink-soft mt-1 flex items-center gap-1.5">
-                <Clock size={14} className="text-orange-500" /> {trialDaysLeft} din ka trial bacha hai
+            {hasPaid && b.currentPeriodEndMs > 0 && (
+              <p className="text-sm text-ink-soft mt-1.5 flex items-center gap-1.5">
+                <Clock size={14} className="text-orange-500" />
+                {b.autopay ? "Next auto-charge" : "Renews / expires"} on <span className="font-medium text-ink">{fmtDate(b.currentPeriodEndMs)}</span>
+                {b.daysToRenewal != null && b.daysToRenewal >= 0 && <span className="text-ink-muted">({b.daysToRenewal}d)</span>}
               </p>
             )}
-            {isExpired && (
-              <p className="text-sm text-danger-600 mt-1">Trial/subscription khatam — neeche plan choose karke pay karo.</p>
-            )}
+            {b.isTrialing && <p className="text-sm text-ink-soft mt-1">Free trial — kabhi bhi neeche se paid plan activate karo.</p>}
           </div>
           <div className="w-14 h-14 rounded-2xl bg-gradient-orange flex items-center justify-center shadow-glow">
             <Sparkles className="text-white" size={26} />
@@ -152,103 +206,198 @@ export default function Billing() {
         </div>
 
         <div className="grid sm:grid-cols-2 gap-5">
-          <UsageMeter icon={Users} label="Team seats" used={seatsUsed} limit={seatsLimit} pct={seatPct} />
-          <UsageMeter icon={Inbox} label="Leads this cycle" used={leadsUsed}
-            limit={leadsLimit >= 1000000 ? "∞" : leadsLimit} pct={leadsLimit >= 1000000 ? 4 : leadPct} />
+          <UsageMeter icon={Users} label="Team seats" used={b.seatsUsed} limit={b.seatsLimit} pct={seatPct} />
+          <UsageMeter icon={Inbox} label="Leads this cycle" used={b.leadsUsed}
+            limit={b.leadsLimit >= 1000000 ? "∞" : b.leadsLimit} pct={b.leadsLimit >= 1000000 ? 4 : leadPct} />
         </div>
+
+        {/* Renew + manage row (only when paid) */}
+        {hasPaid && (
+          <div className="flex flex-wrap items-center gap-3 mt-5 pt-5 border-t border-cream-200">
+            {(b.renewalDue || b.isPastDue) && !b.autopay && (
+              <button onClick={handleRenew} disabled={busy} className="btn btn-primary text-sm">
+                {busy ? <Loader2 size={15} className="animate-spin" /> : <><RefreshCw size={15} /> Renew {currentPlan.name}</>}
+              </button>
+            )}
+            {!b.autopay && gateways.razorpay && (
+              <button onClick={() => handlePay(currentPlan, { autopay: true })} disabled={busy} className="btn btn-secondary text-sm">
+                <Repeat size={15} /> Enable autopay
+              </button>
+            )}
+            <button onClick={() => setShowManage((v) => !v)} className="text-sm text-ink-muted hover:text-ink flex items-center gap-1 ml-auto">
+              Manage subscription <ChevronDown size={14} className={showManage ? "rotate-180" : ""} />
+            </button>
+          </div>
+        )}
+
+        {/* Manage panel: downgrade + cancel autopay */}
+        {hasPaid && showManage && (
+          <div className="mt-4 pt-4 border-t border-cream-200 space-y-3">
+            {b.autopay && (
+              <button onClick={stopAutopay} disabled={busy === "cancelauto"} className="text-sm text-ink-soft hover:text-danger-600">
+                {busy === "cancelauto" ? "Cancelling…" : "Turn off autopay (current period tak active rahega)"}
+              </button>
+            )}
+            {lowerPlans.length > 0 && !b.pendingPlanChange && (
+              <div>
+                <p className="text-xs text-ink-muted mb-2">Downgrade to a smaller plan (period end pe apply hoga):</p>
+                <div className="flex flex-wrap gap-2">
+                  {lowerPlans.map((p) => (
+                    <button key={p.id} onClick={() => setDowngradeModal(p)}
+                      className="text-xs px-3 py-1.5 rounded-lg border border-cream-300 text-ink-muted hover:border-danger-300 hover:text-danger-600">
+                      Downgrade to {p.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {msg && (
-        <div className="bg-orange-50 border border-orange-200 text-ember-700 rounded-xl px-4 py-3 mb-6 text-sm">{msg}</div>
-      )}
+      {msg && <div className="bg-orange-50 border border-orange-200 text-ember-700 rounded-xl px-4 py-3 mb-6 text-sm">{msg}</div>}
 
-      {/* Controls */}
+      {/* ===== Cycle + method controls ===== */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <p className="eyebrow">Choose your plan</p>
+        <p className="eyebrow">{hasPaid ? "Upgrade your plan" : "Choose a plan"}</p>
         <div className="flex items-center gap-3">
-          {/* payment method */}
           {anyGateway && (
             <div className="inline-flex bg-cream-200 rounded-full p-1 text-sm">
-              {gateways.razorpay && (
-                <button onClick={() => setMethod("razorpay")}
-                  className={`px-3 py-1.5 rounded-full font-medium ${method === "razorpay" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>
-                  Razorpay
-                </button>
-              )}
-              {gateways.payu && (
-                <button onClick={() => setMethod("payu")}
-                  className={`px-3 py-1.5 rounded-full font-medium ${method === "payu" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>
-                  PayU
-                </button>
-              )}
+              {gateways.razorpay && <button onClick={() => setMethod("razorpay")} className={`px-3 py-1.5 rounded-full font-medium ${method === "razorpay" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>Razorpay</button>}
+              {gateways.payu && <button onClick={() => setMethod("payu")} className={`px-3 py-1.5 rounded-full font-medium ${method === "payu" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>PayU</button>}
             </div>
           )}
-          {/* billing cycle */}
           <div className="inline-flex bg-cream-200 rounded-full p-1 text-sm">
-            <button onClick={() => setCycle("monthly")}
-              className={`px-4 py-1.5 rounded-full font-medium ${cycle === "monthly" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>
-              Monthly
-            </button>
-            <button onClick={() => setCycle("yearly")}
-              className={`px-4 py-1.5 rounded-full font-medium ${cycle === "yearly" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>
-              Yearly
-            </button>
+            <button onClick={() => setCycle("monthly")} className={`px-4 py-1.5 rounded-full font-medium ${cycle === "monthly" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>Monthly</button>
+            <button onClick={() => setCycle("yearly")} className={`px-4 py-1.5 rounded-full font-medium ${cycle === "yearly" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>Yearly</button>
           </div>
         </div>
       </div>
 
       {!anyGateway && (
         <p className="text-xs text-warning-700 bg-warning-50 border border-warning-200 rounded-lg px-3 py-2 mb-4">
-          Payment gateway abhi reachable nahi hai (backend deploy + VITE_BACKEND_URL set karo). Tab tak "Activate (dev)" se test kar sakte ho.
+          Payment gateway reach nahi ho raha (VITE_BACKEND_URL set karo). Tab tak "Activate (dev)" se test kar sakte ho.
         </p>
       )}
 
-      <div className="grid md:grid-cols-3 gap-5">
-        {plans.map((plan) => {
-          const isCurrent = plan.id === planId && (isActive || isTrialing);
-          const price = cycle === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
-          return (
-            <div key={plan.id}
-              className={`rounded-2xl border p-6 flex flex-col ${plan.popular ? "border-orange-300 ring-2 ring-orange-100" : "border-cream-300/60"} bg-white shadow-card`}>
-              <div className="flex items-center justify-between mb-1">
-                <h3 className="font-display font-bold text-lg text-ink">{plan.name}</h3>
-                {plan.popular && <span className="badge badge-primary">Popular</span>}
-              </div>
-              <p className="text-sm text-ink-muted mb-4">{plan.tagline}</p>
-              <div className="mb-4">
-                <span className="font-display font-bold text-3xl text-ink">₹{price.toLocaleString("en-IN")}</span>
-                <span className="text-sm text-ink-muted">/{cycle === "monthly" ? "mo" : "yr"}</span>
-              </div>
-              <ul className="space-y-2 mb-6 text-sm">
-                <li className="flex items-center gap-2 text-ink-soft"><Users size={15} className="text-orange-500" /> {plan.includedSeats} seats</li>
-                <li className="flex items-center gap-2 text-ink-soft"><Inbox size={15} className="text-orange-500" />
-                  {plan.leadsLimit >= 1000000 ? "Unlimited" : plan.leadsLimit.toLocaleString("en-IN")} leads/mo</li>
-                {plan.features.filter((f) => f.included).slice(0, 3).map((f, i) => (
-                  <li key={i} className="flex items-center gap-2 text-ink-soft"><Check size={15} className="text-success-500" /> {f.text}</li>
-                ))}
-              </ul>
-              <button disabled={isCurrent || busyPlan === plan.id} onClick={() => handleUpgrade(plan)}
-                className={`mt-auto btn w-full ${isCurrent ? "bg-cream-200 text-ink-muted cursor-default" : "btn-primary"}`}>
-                {busyPlan === plan.id ? (
-                  <><Loader2 size={16} className="animate-spin" /> Processing…</>
-                ) : isCurrent ? (
-                  "Current plan"
-                ) : !anyGateway ? (
-                  <>Activate (dev) <ArrowRight size={15} /></>
-                ) : (
-                  <><CreditCard size={15} /> Pay & upgrade</>
-                )}
-              </button>
-            </div>
-          );
-        })}
-      </div>
+      {/* ===== Plans ===== */}
+      {hasPaid ? (
+        // Post-purchase: only higher plans as upgrades; cheaper greyed out.
+        <>
+          <div className="grid md:grid-cols-3 gap-5">
+            {plans.map((plan) => {
+              const price = cycle === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
+              const isCurrent = plan.id === b.planId;
+              const canUpgrade = isUpgrade(b.planId, plan.id);
+              const locked = !isCurrent && !canUpgrade; // lower plan → greyed
+              return (
+                <PlanCard key={plan.id} plan={plan} price={price} cycle={cycle}
+                  state={isCurrent ? "current" : canUpgrade ? "upgrade" : "locked"}
+                  busy={busy === plan.id} anyGateway={anyGateway}
+                  onPay={() => handlePay(plan)}
+                  onDowngrade={() => setDowngradeModal(plan)} />
+              );
+            })}
+          </div>
+          {higherPlans.length === 0 && (
+            <p className="text-center text-sm text-ink-muted mt-6">🎉 Aap top plan par ho — isse upar kuch nahi!</p>
+          )}
+        </>
+      ) : (
+        // Trial / expired: full plan selection.
+        <div className="grid md:grid-cols-3 gap-5">
+          {plans.map((plan) => {
+            const price = cycle === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
+            return (
+              <PlanCard key={plan.id} plan={plan} price={price} cycle={cycle}
+                state="choose" busy={busy === plan.id} anyGateway={anyGateway}
+                onPay={() => handlePay(plan)} />
+            );
+          })}
+        </div>
+      )}
 
       <p className="text-xs text-ink-muted mt-6 flex items-center gap-1.5">
         <ShieldCheck size={13} />
-        Payment verify hone ke baad backend aapke seat & lead limits turant badha deta hai. Secrets sirf server par hain.
+        Payment verify hone ke baad hi limits badhte hain. Autopay se har cycle apne aap renew hoga; warna expiry se pehle reminder aayega.
       </p>
+
+      {/* ===== Downgrade retention modal ===== */}
+      {downgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-soft border border-cream-300/60 max-w-md w-full p-6 animate-slide-up">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-warning-100 flex items-center justify-center"><TrendingUp className="text-warning-600" size={22} /></div>
+              <button onClick={() => setDowngradeModal(null)} className="text-ink-muted hover:text-ink"><X size={20} /></button>
+            </div>
+            <h3 className="font-display font-bold text-xl text-ink mb-2">Pakka {downgradeModal.name} par jaana hai?</h3>
+            <p className="text-sm text-ink-soft mb-4">
+              {currentPlan.name} chhodne par aap ye kho denge:
+            </p>
+            <ul className="space-y-2 mb-5 text-sm">
+              <li className="flex items-center gap-2 text-ink-soft"><X size={15} className="text-danger-500" /> {currentPlan.includedSeats - downgradeModal.includedSeats > 0 ? `${currentPlan.includedSeats - downgradeModal.includedSeats} team seats` : "Extra seats"}</li>
+              <li className="flex items-center gap-2 text-ink-soft"><X size={15} className="text-danger-500" /> {(currentPlan.leadsLimit >= 1000000 ? "Unlimited" : currentPlan.leadsLimit.toLocaleString("en-IN"))} → {downgradeModal.leadsLimit.toLocaleString("en-IN")} leads/mo</li>
+              {currentPlan.features?.filter((f) => f.included).slice(0, 3).map((f, i) => (
+                <li key={i} className="flex items-center gap-2 text-ink-soft"><X size={15} className="text-danger-500" /> {f.text}</li>
+              ))}
+            </ul>
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-5 text-sm text-ember-700">
+              💡 {currentPlan.name} ke saath aapki team tezi se aur zyada deals close karti hai. Ruk jao?
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setDowngradeModal(null)} className="btn btn-primary flex-1">
+                {currentPlan.name} par ruko
+              </button>
+              <button onClick={confirmDowngrade} className="btn btn-secondary flex-1 text-ink-muted">
+                Phir bhi downgrade
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
+  );
+}
+
+function PlanCard({ plan, price, cycle, state, busy, anyGateway, onPay, onDowngrade }) {
+  const locked = state === "locked";
+  return (
+    <div className={`rounded-2xl border p-6 flex flex-col transition-all ${
+      locked ? "border-cream-200 bg-cream-50 opacity-60"
+        : plan.popular ? "border-orange-300 ring-2 ring-orange-100 bg-white shadow-card"
+        : "border-cream-300/60 bg-white shadow-card"}`}>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-display font-bold text-lg text-ink">{plan.name}</h3>
+        {state === "current" ? <span className="badge badge-success">Current</span>
+          : plan.popular ? <span className="badge badge-primary">Popular</span> : null}
+      </div>
+      <p className="text-sm text-ink-muted mb-4">{plan.tagline}</p>
+      <div className="mb-4">
+        <span className="font-display font-bold text-3xl text-ink">₹{price.toLocaleString("en-IN")}</span>
+        <span className="text-sm text-ink-muted">/{cycle === "monthly" ? "mo" : "yr"}</span>
+      </div>
+      <ul className="space-y-2 mb-6 text-sm">
+        <li className="flex items-center gap-2 text-ink-soft"><Users size={15} className="text-orange-500" /> {plan.includedSeats} seats</li>
+        <li className="flex items-center gap-2 text-ink-soft"><Inbox size={15} className="text-orange-500" /> {plan.leadsLimit >= 1000000 ? "Unlimited" : plan.leadsLimit.toLocaleString("en-IN")} leads/mo</li>
+        {plan.features?.filter((f) => f.included).slice(0, 3).map((f, i) => (
+          <li key={i} className="flex items-center gap-2 text-ink-soft"><Check size={15} className="text-success-500" /> {f.text}</li>
+        ))}
+      </ul>
+      {state === "current" ? (
+        <button disabled className="mt-auto btn w-full bg-cream-200 text-ink-muted cursor-default">Current plan</button>
+      ) : locked ? (
+        <button disabled className="mt-auto btn w-full bg-cream-100 text-ink-muted/60 cursor-not-allowed flex items-center justify-center gap-1.5">
+          <Lock size={14} /> Lower plan
+        </button>
+      ) : (
+        <button disabled={busy} onClick={onPay} className="mt-auto btn btn-primary w-full">
+          {busy ? <><Loader2 size={16} className="animate-spin" /> Processing…</>
+            : !anyGateway ? <>Activate (dev) <ArrowRight size={15} /></>
+            : state === "upgrade" ? <><TrendingUp size={15} /> Upgrade</>
+            : <><CreditCard size={15} /> Choose & pay</>}
+        </button>
+      )}
+    </div>
   );
 }
 

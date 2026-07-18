@@ -7,6 +7,7 @@ import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getNextEmployeeRoundRobin, getNextEmployeeByWorkload } from "./utils/assignLead.js";
 import createBillingRouter from "./billing.js";
+import { getMergedPlans } from "./plans.js";
 
 // 1. Firebase Initialization
 // Deploy-friendly: prefer the FIREBASE_SERVICE_ACCOUNT env var (raw JSON or
@@ -36,10 +37,14 @@ if (!DEFAULT_ORG_ID) {
 
 const app = express();
 app.use(cors());
+
+// Razorpay recurring webhook needs the RAW body for signature verification —
+// register it BEFORE express.json() so the body isn't parsed first.
+app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
+
 app.use(express.json());
 
-// Billing / payments (Razorpay + PayU). Mounted before the JSON-only routes
-// so the PayU callback can use its own urlencoded parser.
+// Billing / payments (Razorpay + PayU).
 app.use("/api/billing", createBillingRouter(db));
 
 // ============================================================
@@ -306,6 +311,95 @@ cron.schedule("*/5 * * * *", async () => {
   } catch (e) {
     console.error("5-min cron error:", e);
   }
+});
+
+// ============================================================
+// SUBSCRIPTION LIFECYCLE (Option B renewal engine)
+// Daily: renewal reminders, past_due/expired transitions, apply downgrades.
+// ============================================================
+const DAY_MS = 86400000;
+const GRACE_DAYS = 3;
+
+async function notifyOrgAdmins(orgId, text) {
+  try {
+    const admins = await db.collection("memberships")
+      .where("orgId", "==", orgId).where("active", "==", true).get();
+    const batch = db.batch();
+    let any = false;
+    admins.docs.forEach((m) => {
+      const d = m.data();
+      if (d.role === "owner" || d.role === "admin") {
+        const nref = db.collection("organizations").doc(orgId).collection("notifications").doc();
+        batch.set(nref, { userId: d.uid, text, type: "billing", read: false, at: new Date().toISOString(), orgId });
+        any = true;
+      }
+    });
+    if (any) await batch.commit();
+  } catch (e) { console.warn("notifyOrgAdmins:", e?.message); }
+}
+
+async function runSubscriptionLifecycle() {
+  const now = Date.now();
+  const plans = await getMergedPlans(db);
+  const snap = await db.collection("organizations").get();
+  let reminded = 0, pastDue = 0, expired = 0, downgraded = 0;
+
+  for (const docSnap of snap.docs) {
+    const org = docSnap.data();
+    const ref = docSnap.ref;
+    const status = org.subscriptionStatus;
+    const periodEnd = org.currentPeriodEndMs || 0;
+
+    // 1) Apply a scheduled downgrade once the paid period ends.
+    if (org.pendingPlanChange && periodEnd && now >= periodEnd) {
+      const target = plans[org.pendingPlanChange.toPlanId] || plans.starter;
+      const cycle = org.pendingPlanChange.cycle || "monthly";
+      const periodDays = cycle === "yearly" ? 365 : 30;
+      await ref.update({
+        planId: target.id, planName: target.name,
+        seatsLimit: target.includedSeats, leadsLimit: target.leadsLimit,
+        billingCycle: cycle,
+        currentPeriodEndMs: now + periodDays * DAY_MS,
+        subscriptionStatus: "active",
+        pendingPlanChange: null,
+        renewalRemindedFor: null,
+      });
+      await ref.collection("activity").add({ text: `⬇️ Plan changed to ${target.name} (scheduled downgrade applied)`, at: new Date().toISOString(), orgId: docSnap.id });
+      await notifyOrgAdmins(docSnap.id, `Aapka plan ab ${target.name} hai. Wapas upgrade karke zyada seats & leads paayein!`);
+      downgraded++;
+      continue;
+    }
+
+    if (status === "active" && periodEnd) {
+      const daysLeft = Math.ceil((periodEnd - now) / DAY_MS);
+      // Renewal reminder for MANUAL payers (autopay auto-charges).
+      if (!org.autopay && daysLeft <= 5 && daysLeft >= 0 && org.renewalRemindedFor !== String(periodEnd)) {
+        await notifyOrgAdmins(docSnap.id, `⏰ Aapka ${org.planName} plan ${daysLeft} din me expire hoga. Billing page se renew karo.`);
+        await ref.update({ renewalRemindedFor: String(periodEnd) });
+        reminded++;
+      }
+      if (now >= periodEnd) {
+        await ref.update({ subscriptionStatus: "past_due" });
+        await notifyOrgAdmins(docSnap.id, `⚠️ Aapka plan expire ho gaya. ${GRACE_DAYS} din me renew karo warna features lock ho jayenge.`);
+        pastDue++;
+      }
+    } else if (status === "past_due" && periodEnd && now >= periodEnd + GRACE_DAYS * DAY_MS) {
+      await ref.update({ subscriptionStatus: "expired" });
+      await notifyOrgAdmins(docSnap.id, `🔒 Grace period khatam — features locked. Renew karke wapas activate karo.`);
+      expired++;
+    }
+  }
+  console.log(`⏱ subscription lifecycle: reminders=${reminded} pastDue=${pastDue} expired=${expired} downgraded=${downgraded}`);
+  return { reminded, pastDue, expired, downgraded };
+}
+
+// Run daily at 06:00 IST.
+cron.schedule("0 6 * * *", () => { runSubscriptionLifecycle().catch((e) => console.error("lifecycle cron:", e)); }, { timezone: "Asia/Kolkata" });
+
+// Manual trigger (for testing the lifecycle without waiting a day).
+app.post("/api/subscription/run-lifecycle", async (req, res) => {
+  try { res.json({ ok: true, ...(await runSubscriptionLifecycle()) }); }
+  catch (e) { res.status(500).json({ ok: false, error: e?.message }); }
 });
 
 // ============================================================
