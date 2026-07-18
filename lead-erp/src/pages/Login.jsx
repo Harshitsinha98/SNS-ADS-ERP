@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Sparkles, Phone, Shield, ArrowRight, Loader2 } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
+import { Phone, ShieldCheck, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import Logo from "../components/marketing/Logo";
 
 export default function Login() {
   const { user, requestOtp, verifyOtp } = useAuth();
@@ -18,7 +19,8 @@ export default function Login() {
       if (user.needsSetup) {
         navigate("/setup", { replace: true });
       } else {
-        navigate(user.role === "admin" ? "/admin" : "/app", { replace: true });
+        const isAdminish = user.role === "admin" || user.role === "owner";
+        navigate(isAdminish ? "/admin" : "/app", { replace: true });
       }
     }
   }, [user, navigate]);
@@ -47,42 +49,37 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Decorative elements */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-primary-400/20 to-accent-400/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-accent-400/20 to-primary-400/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+    <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4 relative overflow-hidden texture-grain">
+      {/* decorative blobs */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-orange-300/25 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 animate-blob pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-ember-300/20 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 animate-blob pointer-events-none" style={{ animationDelay: "4s" }} />
+      <div className="absolute inset-0 pattern-dots opacity-40 pointer-events-none" />
 
-      {/* Recaptcha container */}
-      <div id="recaptcha-container"></div>
+      <div id="recaptcha-container" />
 
       <div className="w-full max-w-md relative z-10">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-12 h-12 bg-gradient-to-br from-primary-600 to-accent-600 rounded-xl flex items-center justify-center shadow-glow">
-            <Sparkles className="w-6 h-6 text-white" />
-          </div>
-          <span className="font-display font-bold text-3xl bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">
-            CodeSkate
-          </span>
+        <div className="flex justify-center mb-8">
+          <Link to="/"><Logo size="lg" /></Link>
         </div>
 
-        {/* Main Card */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-primary-600 to-accent-600 px-6 py-5 text-white">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-1">
-              {step === "phone" ? "Welcome back" : "Verify your number"}
-            </p>
-            <h1 className="font-display font-semibold text-xl">
-              {step === "phone" ? "Sign in to continue" : "Enter verification code"}
-            </h1>
-          </div>
+        <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 overflow-hidden">
+          {/* accent bar */}
+          <div className="h-1.5 bg-gradient-orange" />
 
-          {/* Content */}
-          <div className="p-6">
+          <div className="p-7 sm:p-9">
+            <p className="eyebrow mb-2">{step === "phone" ? "Welcome back" : "Verify"}</p>
+            <h1 className="font-display font-bold text-2xl text-ink mb-1">
+              {step === "phone" ? "Sign in to CodeSkate" : "Enter your code"}
+            </h1>
+            <p className="text-sm text-ink-soft mb-6">
+              {step === "phone"
+                ? "We'll text you a one-time code to sign in."
+                : `Code sent to +91${phone}`}
+            </p>
+
             {err && (
-              <div className="bg-danger-50 text-danger-600 text-sm px-4 py-3 rounded-lg mb-4 border border-danger-100 flex items-start gap-2">
-                <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <div className="bg-danger-50 text-danger-600 text-sm px-4 py-3 rounded-xl mb-4 border border-danger-100 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" />
                 {err}
               </div>
             )}
@@ -90,19 +87,13 @@ export default function Login() {
             {step === "phone" ? (
               <form onSubmit={sendOtp} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone Number
-                  </label>
+                  <label className="block text-sm font-medium text-ink mb-1.5">Mobile number</label>
                   <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <Phone className="w-5 h-5" />
-                    </div>
-                    <div className="absolute left-12 top-1/2 -translate-y-1/2 text-gray-600 font-medium text-sm">
-                      +91
-                    </div>
+                    <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" size={18} />
+                    <span className="absolute left-11 top-1/2 -translate-y-1/2 text-ink-soft font-medium text-sm">+91</span>
                     <input
                       type="tel"
-                      className="input pl-20"
+                      className="input pl-[4.5rem]"
                       placeholder="98XXXXXXXX"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
@@ -111,89 +102,51 @@ export default function Login() {
                       disabled={loading}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    We'll send a 6-digit verification code
-                  </p>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={loading || phone.length !== 10}
-                  className="btn btn-primary w-full py-3.5 text-base"
-                >
+                <button disabled={loading || phone.length !== 10} className="btn btn-primary w-full py-3.5 text-base">
                   {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Sending code...
-                    </>
+                    <><Loader2 size={18} className="animate-spin" /> Sending…</>
                   ) : (
-                    <>
-                      Continue
-                      <ArrowRight className="w-5 h-5" />
-                    </>
+                    <>Send code <ArrowRight size={18} /></>
                   )}
                 </button>
               </form>
             ) : (
               <form onSubmit={confirmOtp} className="space-y-5">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Verification Code
-                  </label>
-                  <input
-                    type="text"
-                    className="input text-center text-2xl tracking-[0.5em] font-mono"
-                    placeholder="000000"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                    maxLength={6}
-                    required
-                    disabled={loading}
-                    autoFocus
-                  />
-                  <p className="text-xs text-gray-500 mt-2 text-center">
-                    Code sent to +91{phone}
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading || otp.length !== 6}
-                  className="btn btn-primary w-full py-3.5 text-base"
-                >
+                <input
+                  className="input text-center text-2xl tracking-[0.5em] font-mono"
+                  placeholder="000000"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  maxLength={6}
+                  required
+                  autoFocus
+                  disabled={loading}
+                />
+                <button disabled={loading || otp.length !== 6} className="btn btn-primary w-full py-3.5 text-base">
                   {loading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Verifying...
-                    </>
+                    <><Loader2 size={18} className="animate-spin" /> Verifying…</>
                   ) : (
-                    <>
-                      Verify & Sign In
-                      <ArrowRight className="w-5 h-5" />
-                    </>
+                    <>Verify & sign in <ArrowRight size={18} /></>
                   )}
                 </button>
-
                 <button
                   type="button"
-                  onClick={() => {
-                    setStep("phone");
-                    setOtp("");
-                    setErr("");
-                    setConfirmation(null);
-                  }}
-                  className="w-full text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                  onClick={() => { setStep("phone"); setOtp(""); setErr(""); setConfirmation(null); }}
+                  className="w-full flex items-center justify-center gap-1.5 text-sm text-ink-muted hover:text-orange-600 transition-colors"
                 >
-                  Use a different number
+                  <ArrowLeft size={15} /> Use a different number
                 </button>
               </form>
             )}
           </div>
         </div>
 
-        {/* Footer */}
-        <p className="text-center text-xs text-gray-400 mt-6">
-          By signing in, you agree to our Terms of Service and Privacy Policy
+        <p className="text-center text-sm text-ink-muted mt-6">
+          New to CodeSkate?{" "}
+          <Link to="/signup" className="text-orange-600 font-semibold hover:underline">
+            Start your free trial
+          </Link>
         </p>
       </div>
     </div>

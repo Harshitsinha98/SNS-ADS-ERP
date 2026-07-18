@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,150 +6,123 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-800 font-body antialiased;
+    @apply bg-cream-100 text-ink font-body antialiased;
     font-feature-settings: 'cv11', 'ss01', 'ss03';
   }
 
-  /* Custom scrollbar */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
-
   ::-webkit-scrollbar-track {
-    @apply bg-gray-100;
+    @apply bg-cream-200;
   }
-
   ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded-full hover:bg-gray-400;
+    @apply bg-orange-300 rounded-full hover:bg-orange-400;
   }
 
-  /* Focus states */
   *:focus-visible {
-    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
-  }
-
-  /* Smooth transitions */
-  * {
-    @apply transition-colors duration-150;
+    @apply outline-none ring-2 ring-orange-500 ring-offset-2 ring-offset-cream-100;
   }
 }
 
 @layer components {
-  /* Typography helpers */
   .eyebrow {
-    @apply text-xs font-semibold uppercase tracking-wider text-gray-500;
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-orange-600;
   }
 
   .num {
     @apply font-mono;
   }
 
-  /* Card styles */
   .card {
-    @apply bg-white rounded-xl shadow-card border border-gray-100 overflow-hidden;
+    @apply bg-white rounded-2xl shadow-card border border-cream-300/60 overflow-hidden;
   }
 
-  .card-hover {
-    @apply hover:shadow-card-hover hover:border-gray-200 transition-all duration-200;
-  }
-
-  /* Button base */
   .btn {
-    @apply px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 inline-flex items-center justify-center gap-2;
+    @apply px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 inline-flex items-center justify-center gap-2;
   }
 
   .btn-primary {
-    @apply bg-gradient-to-r from-primary-600 to-accent-600 text-white hover:from-primary-700 hover:to-accent-700 shadow-button hover:shadow-button-hover;
+    @apply bg-gradient-orange text-white shadow-button hover:shadow-button-hover hover:-translate-y-0.5;
   }
 
   .btn-secondary {
-    @apply bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300;
+    @apply bg-white text-ink border border-cream-400/70 hover:border-orange-300 hover:bg-cream-50;
   }
 
   .btn-ghost {
-    @apply text-gray-600 hover:text-gray-800 hover:bg-gray-100;
+    @apply text-ink-soft hover:text-orange-600 hover:bg-orange-50;
   }
 
-  .btn-danger {
-    @apply bg-danger-500 text-white hover:bg-danger-600;
-  }
-
-  /* Input styles */
   .input {
-    @apply w-full px-4 py-3 rounded-lg border border-gray-200 bg-white text-gray-800 placeholder:text-gray-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-all outline-none;
+    @apply w-full px-4 py-3 rounded-xl border border-cream-400/70 bg-white text-ink placeholder:text-ink-muted/60 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all outline-none;
   }
 
-  .input-error {
-    @apply border-danger-300 focus:border-danger-500 focus:ring-danger-100;
-  }
-
-  /* Badge styles */
   .badge {
-    @apply px-2.5 py-1 rounded-full text-xs font-medium;
+    @apply px-3 py-1 rounded-full text-xs font-semibold;
   }
+  .badge-primary { @apply bg-orange-100 text-orange-700; }
+  .badge-success { @apply bg-success-100 text-success-700; }
+  .badge-warning { @apply bg-warning-100 text-warning-700; }
+  .badge-danger  { @apply bg-danger-100 text-danger-700; }
 
-  .badge-primary {
-    @apply bg-primary-100 text-primary-700;
-  }
-
-  .badge-success {
-    @apply bg-success-100 text-success-700;
-  }
-
-  .badge-warning {
-    @apply bg-warning-100 text-warning-700;
-  }
-
-  .badge-danger {
-    @apply bg-danger-100 text-danger-700;
-  }
-
-  /* Glassmorphism */
-  .glass {
-    @apply bg-white/80 backdrop-blur-lg;
-  }
-
-  /* Gradient text */
   .text-gradient {
-    @apply bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-orange-500 via-orange-600 to-ember-500 bg-clip-text text-transparent;
+  }
+
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/40;
   }
 }
 
 @layer utilities {
-  /* Reduced motion */
-  @media (prefers-reduced-motion: reduce) {
-    * {
-      transition: none !important;
-      animation: none !important;
-    }
+  /* Grain / paper texture overlay */
+  .texture-grain {
+    position: relative;
+  }
+  .texture-grain::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E");
   }
 
-  /* Hide scrollbar but keep functionality */
+  /* Warm dotted pattern */
+  .pattern-dots {
+    background-image: radial-gradient(circle, rgba(240, 78, 0, 0.12) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* Subtle grid */
+  .pattern-grid {
+    background-image:
+      linear-gradient(to right, rgba(180, 146, 92, 0.10) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(180, 146, 92, 0.10) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .shimmer-text {
+    background: linear-gradient(90deg, #C73C05 25%, #FF8A3D 50%, #C73C05 75%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
 
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Custom gradient backgrounds */
-  .bg-gradient-shine {
-    background: linear-gradient(
-      135deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.4) 50%,
-      transparent 100%
-    );
-    background-size: 200% 200%;
-    animation: shine 2s infinite;
-  }
-
-  @keyframes shine {
-    to {
-      background-position: -200% -200%;
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
     }
   }
 }

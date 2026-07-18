@@ -1,5 +1,8 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Landing from "./pages/marketing/Landing";
+import Pricing from "./pages/marketing/Pricing";
+import Signup from "./pages/marketing/Signup";
 import Login from "./pages/Login";
 import Setup from "./pages/Setup";
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -28,6 +31,11 @@ export default function App() {
       <CallTrackerEngine />
 
       <Routes>
+        {/* --- PUBLIC MARKETING --- */}
+        <Route path="/" element={<Landing />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/signup" element={<Signup />} />
+
         <Route path="/login" element={<Login />} />
         <Route path="/setup" element={<ProtectedRoute><Setup /></ProtectedRoute>} />
 
@@ -44,7 +52,7 @@ export default function App() {
         <Route path="/app/lead/:id" element={<ProtectedRoute role="employee"><LeadAction /></ProtectedRoute>} />
         <Route path="/app/tasks" element={<ProtectedRoute role="employee"><Tasks /></ProtectedRoute>} />
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );

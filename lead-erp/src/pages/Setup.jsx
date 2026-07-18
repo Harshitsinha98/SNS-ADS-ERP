@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { doc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Sparkles, Building2, User, Phone, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Building2, User, Phone, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
+import Logo from '../components/marketing/Logo';
+import { TRIAL_DAYS } from '../data/plans';
+
+const DEFAULT_STATUSES = [
+  'New', 'Ringing', 'Meeting Fixed', 'Negotiation', 'Follow-up', 'Closed-Won', 'Lost',
+];
 
 export default function Setup() {
   const { user } = useAuth();
@@ -26,16 +32,20 @@ export default function Setup() {
     try {
       const orgId = `org_${Date.now()}`;
       const uid = user.uid;
+      const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
-      // 1. Create organization
       await setDoc(doc(db, 'organizations', orgId), {
         name: orgName.trim(),
-        slug: orgName.trim().toLowerCase().replace(/\s+/g, '-'),
+        slug: orgName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
         createdAt: serverTimestamp(),
         createdBy: uid,
+        planName: 'Growth',
+        subscriptionStatus: 'trialing',
+        seatsUsed: 1,
+        seatsLimit: 10,
+        trialEndsAt,
       });
 
-      // 2. Create/update user identity
       await setDoc(doc(db, 'users', uid), {
         phone: user.phone,
         displayName: user.displayName || 'Admin',
@@ -44,9 +54,7 @@ export default function Setup() {
         defaultOrgId: orgId,
       }, { merge: true });
 
-      // 3. Create membership (owner role)
-      const membershipId = `${uid}_${orgId}`;
-      await setDoc(doc(db, 'memberships', membershipId), {
+      await setDoc(doc(db, 'memberships', `${uid}_${orgId}`), {
         uid: uid,
         orgId: orgId,
         role: 'owner',
@@ -57,21 +65,19 @@ export default function Setup() {
         lastActiveAt: serverTimestamp(),
       });
 
-      // 4. Create organization settings
       await setDoc(doc(db, 'organizations', orgId, 'settings', 'config'), {
-        statuses: ['New', 'Contacted', 'Qualified', 'Proposal', 'Negotiation', 'Closed-Won', 'Closed-Lost'],
+        statuses: DEFAULT_STATUSES,
         autoAssign: 'round-robin',
       });
 
-      // 5. Create meta for lead assignment
       await setDoc(doc(db, 'organizations', orgId, 'meta', 'leadAssignment'), {
         lastIndex: 0,
       });
 
       setSuccess(true);
       setTimeout(() => {
-        navigate('/admin');
-      }, 2000);
+        window.location.assign('/admin');
+      }, 1800);
     } catch (err) {
       console.error('Setup error:', err);
       setError(err.message || 'Failed to create organization');
@@ -80,106 +86,93 @@ export default function Setup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-white" />
-          </div>
-          <span className="font-display font-bold text-2xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            CodeSkate
-          </span>
+    <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4 relative overflow-hidden texture-grain">
+      <div className="absolute top-0 right-0 w-96 h-96 bg-orange-300/25 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 animate-blob pointer-events-none" />
+      <div className="absolute inset-0 pattern-dots opacity-40 pointer-events-none" />
+
+      <div className="w-full max-w-md relative z-10">
+        <div className="flex justify-center mb-8">
+          <Logo size="lg" />
         </div>
 
-        {/* Setup Card */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-5 text-white">
-            <h1 className="font-display font-semibold text-xl flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
-              Create Your Organization
-            </h1>
-            <p className="text-sm text-white/80 mt-1">
-              Set up your workspace to get started
-            </p>
-          </div>
+        <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 overflow-hidden">
+          <div className="h-1.5 bg-gradient-orange" />
 
-          {/* Form */}
-          <div className="p-6">
+          <div className="p-7 sm:p-9">
             {success ? (
-              <div className="text-center py-8">
-                <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-                <h2 className="font-display font-semibold text-lg text-gray-800 mb-2">
-                  Organization Created!
+              <div className="text-center py-6 animate-fade-in">
+                <div className="w-20 h-20 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-5">
+                  <CheckCircle2 className="w-11 h-11 text-success-600" />
+                </div>
+                <h2 className="font-display font-bold text-2xl text-ink mb-2">
+                  Workspace ready! 🎉
                 </h2>
-                <p className="text-sm text-gray-500">
-                  Redirecting to dashboard...
-                </p>
+                <p className="text-ink-soft mb-5">Taking you to your dashboard…</p>
+                <Loader2 className="w-6 h-6 animate-spin text-orange-500 mx-auto" />
               </div>
             ) : (
-              <form onSubmit={handleSetup} className="space-y-5">
-                {/* User Info */}
-                <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User className="w-5 h-5 text-blue-600" />
+              <>
+                <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4">
+                  <Building2 className="text-orange-600" size={24} />
+                </div>
+                <h1 className="font-display font-bold text-2xl text-ink mb-1">
+                  Create your organization
+                </h1>
+                <p className="text-sm text-ink-soft mb-6">
+                  Set up your workspace to get started with your {TRIAL_DAYS}-day free trial.
+                </p>
+
+                <form onSubmit={handleSetup} className="space-y-5">
+                  <div className="bg-cream-100 rounded-xl p-4 flex items-center gap-3 border border-cream-300/60">
+                    <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
+                      <User className="w-5 h-5 text-orange-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-ink-muted">Signed in as</p>
+                      <p className="text-sm font-medium text-ink flex items-center gap-1.5 font-mono">
+                        <Phone className="w-3 h-3" />
+                        {user?.phone}
+                      </p>
+                    </div>
                   </div>
+
                   <div>
-                    <p className="text-xs text-gray-500">Logged in as</p>
-                    <p className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                      <Phone className="w-3 h-3" />
-                      {user?.phone}
-                    </p>
+                    <label className="block text-sm font-medium text-ink mb-1.5">
+                      Organization name
+                    </label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" size={18} />
+                      <input
+                        type="text"
+                        value={orgName}
+                        onChange={(e) => setOrgName(e.target.value)}
+                        placeholder="e.g., CodeSkate Technologies"
+                        className="input pl-11"
+                        disabled={loading}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Org Name */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Organization Name
-                  </label>
-                  <input
-                    type="text"
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    placeholder="e.g., CodeSkate Technologies"
-                    className="w-full px-4 py-3 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all outline-none text-gray-800"
-                    disabled={loading}
-                  />
-                </div>
-
-                {/* Error */}
-                {error && (
-                  <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg border border-red-100">
-                    {error}
-                  </div>
-                )}
-
-                {/* Submit */}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      Create & Continue
-                      <ArrowRight className="w-4 h-4" />
-                    </>
+                  {error && (
+                    <div className="bg-danger-50 text-danger-600 text-sm px-4 py-3 rounded-xl border border-danger-100">
+                      {error}
+                    </div>
                   )}
-                </button>
-              </form>
+
+                  <button type="submit" disabled={loading} className="btn btn-primary w-full py-3.5 text-base">
+                    {loading ? (
+                      <><Loader2 size={18} className="animate-spin" /> Creating…</>
+                    ) : (
+                      <>Create & continue <ArrowRight size={18} /></>
+                    )}
+                  </button>
+                </form>
+              </>
             )}
           </div>
         </div>
 
-        {/* Help text */}
-        <p className="text-center text-xs text-gray-400 mt-4">
+        <p className="text-center text-xs text-ink-muted mt-5">
           You'll be the owner of this organization
         </p>
       </div>
