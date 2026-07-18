@@ -1,0 +1,251 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================================
+    // HELPER FUNCTIONS
+    // ============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getMembership(orgId) {
+      return get(/databases/$(database)/documents/memberships/$(request.auth.uid)_$(orgId));
+    }
+    
+    function hasActiveMembership(orgId) {
+      let membership = getMembership(orgId);
+      return membership.exists && membership.data.active == true;
+    }
+    
+    function hasRole(orgId, role) {
+      let membership = getMembership(orgId);
+      return membership.exists && 
+             membership.data.active == true && 
+             membership.data.role == role;
+    }
+    
+    function isAdmin(orgId) {
+      return hasRole(orgId, 'admin') || hasRole(orgId, 'owner');
+    }
+    
+    function isOwner(orgId) {
+      return hasRole(orgId, 'owner');
+    }
+    
+    function isEmployeeOrAbove(orgId) {
+      let membership = getMembership(orgId);
+      return membership.exists && membership.data.active == true;
+    }
+    
+    // ============================================================
+    // GLOBAL USER IDENTITY
+    // ============================================================
+    
+    match /users/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow create: if isAuthenticated() && request.auth.uid == uid;
+      allow update: if isAuthenticated() && request.auth.uid == uid 
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                      .hasAny(['phone']);
+    }
+    
+    // ============================================================
+    // MEMBERSHIPS (User ↔ Organization mapping)
+    // ============================================================
+    
+    match /memberships/{membershipId} {
+      // User can read their own memberships
+      allow read: if isAuthenticated() && 
+                     request.auth.uid == resource.data.uid;
+      
+      // User can create their own membership (for first org creation)
+      // OR admin can create memberships for their org
+      allow create: if isAuthenticated() && (
+        (request.resource.data.uid == request.auth.uid && 
+         request.resource.data.role == 'owner') ||
+        (isAdmin(request.resource.data.orgId) && 
+         request.auth.uid != request.resource.data.uid)
+      );
+      
+      // Admin can update memberships in their org
+      // User can update their own lastActiveAt
+      allow update: if isAuthenticated() && 
+                      isAdmin(resource.data.orgId) &&
+                      request.auth.uid != resource.data.uid
+                   || isAuthenticated() && 
+                      request.auth.uid == resource.data.uid &&
+                      request.resource.data.diff(resource.data)
+                        .affectedKeys().hasOnly(['lastActiveAt']);
+      
+      // Only owner can delete memberships (remove users)
+      allow delete: if isAuthenticated() && isOwner(resource.data.orgId);
+    }
+    
+    // ============================================================
+    // ORGANIZATIONS
+    // ============================================================
+    
+    match /organizations/{orgId} {
+      // Read: must be a member
+      allow read: if isAuthenticated() && hasActiveMembership(orgId);
+      
+      // Create: anyone authenticated (self-serve signup — future phase)
+      // For Phase 1, creation happens via migration script only
+      allow create: if isAuthenticated();
+      
+      // Update: admin only
+      allow update: if isAuthenticated() && isAdmin(orgId);
+      
+      // Delete: owner only (future — soft delete preferred)
+      allow delete: if false; // Disabled in Phase 1
+      
+      // ============================================================
+      // LEADS (per-organization)
+      // ============================================================
+      
+      match /leads/{leadId} {
+        // Read: any active member
+        allow read: if isAuthenticated() && isEmployeeOrAbove(orgId);
+        
+        // Create: admin or employee
+        allow create: if isAuthenticated() && isEmployeeOrAbove(orgId)
+                      && request.resource.data.orgId == orgId;
+        
+        // Update: admin (any field) or employee (assigned leads only)
+        allow update: if isAuthenticated() && (
+          (isAdmin(orgId)) ||
+          (isEmployeeOrAbove(orgId) && 
+           resource.data.assignedTo == request.auth.uid)
+        );
+        
+        // Delete: admin only
+        allow delete: if isAuthenticated() && isAdmin(orgId);
+        
+        // --------------------------------------------------------
+        // NOTES subcollection
+        // --------------------------------------------------------
+        match /notes/{noteId} {
+          allow read: if isAuthenticated() && isEmployeeOrAbove(orgId)
+                      && (resource.data.visibility == 'team' 
+                          || isAdmin(orgId));
+          
+          allow create: if isAuthenticated() && isEmployeeOrAbove(orgId);
+          
+          allow update: if isAuthenticated() && isEmployeeOrAbove(orgId)
+                        && (isAdmin(orgId) 
+                            || resource.data.authorId == request.auth.uid);
+          
+          allow delete: if isAuthenticated() && isAdmin(orgId);
+        }
+        
+        // --------------------------------------------------------
+        // PRIVATE subcollection (financials — admin only)
+        // --------------------------------------------------------
+        match /private/{docId} {
+          allow read: if isAuthenticated() && isAdmin(orgId);
+          allow write: if isAuthenticated() && isAdmin(orgId);
+        }
+      }
+      
+      // ============================================================
+      // SETTINGS (per-organization)
+      // ============================================================
+      
+      match /settings/{settingsId} {
+        allow read: if isAuthenticated() && isEmployeeOrAbove(orgId);
+        allow write: if isAuthenticated() && isAdmin(orgId);
+      }
+      
+      // ============================================================
+      // META (lead assignment counter)
+      // ============================================================
+      
+      match /meta/{metaId} {
+        allow read: if isAuthenticated() && isEmployeeOrAbove(orgId);
+        allow write: if isAuthenticated() && isAdmin(orgId);
+      }
+      
+      // ============================================================
+      // ACTIVITY (per-organization audit log)
+      // ============================================================
+      
+      match /activity/{activityId} {
+        allow read: if isAuthenticated() && isEmployeeOrAbove(orgId);
+        allow create: if isAuthenticated() && isEmployeeOrAbove(orgId)
+                      && request.resource.data.orgId == orgId;
+        allow update, delete: if false; // immutable audit log
+      }
+      
+      // ============================================================
+      // NOTIFICATIONS (per-organization)
+      // ============================================================
+      
+      match /notifications/{notifId} {
+        allow read: if isAuthenticated() && isEmployeeOrAbove(orgId)
+                    && resource.data.userId == request.auth.uid;
+        allow create: if isAuthenticated() && isEmployeeOrAbove(orgId);
+        allow update: if isAuthenticated() && 
+                        resource.data.userId == request.auth.uid;
+        allow delete: if isAuthenticated() && 
+                        resource.data.userId == request.auth.uid;
+      }
+      
+      // ============================================================
+      // GOALS (per-organization)
+      // ============================================================
+      
+      match /goals/{goalsId} {
+        allow read: if isAuthenticated() && isEmployeeOrAbove(orgId);
+        allow write: if isAuthenticated() && isAdmin(orgId);
+      }
+      
+      // ============================================================
+      // PENDING LEADS (WhatsApp queue, per-org)
+      // ============================================================
+      
+      match /pending_leads/{pendingId} {
+        allow read: if isAuthenticated() && isAdmin(orgId);
+        allow write: if isAuthenticated() && isAdmin(orgId);
+      }
+    }
+    
+    // ============================================================
+    // LEGACY COLLECTIONS (read-only during migration, then deleted)
+    // ============================================================
+    
+    match /leads/{leadId} {
+      allow read, write: if false; // Disabled after migration
+    }
+    
+    match /users/{phoneId} {
+      allow read: if isAuthenticated(); // Read-only for migration lookup
+      allow write: if false;
+    }
+    
+    match /settings/{doc} {
+      allow read, write: if false;
+    }
+    
+    match /activity/{doc} {
+      allow read, write: if false;
+    }
+    
+    match /notifications/{doc} {
+      allow read, write: if false;
+    }
+    
+    match /goals/{doc} {
+      allow read, write: if false;
+    }
+    
+    match /meta/{doc} {
+      allow read, write: if false;
+    }
+    
+    match /pending_whatsapp/{doc} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -14,6 +14,40 @@ const DEFAULT_SETTINGS = {
   autoAssign: "round-robin",
 };
 
+// ============================================================
+// HELPER FUNCTIONS for org-scoped paths
+// ============================================================
+
+/**
+ * Get a collection reference scoped to the active organization
+ * @param {string} orgId - Organization ID
+ * @param {string} collectionName - Collection name (e.g., "leads", "activity")
+ * @returns Firestore collection reference
+ */
+const orgCollection = (orgId, collectionName) => 
+  collection(db, "organizations", orgId, collectionName);
+
+/**
+ * Get a document reference scoped to the active organization
+ * @param {string} orgId - Organization ID
+ * @param {string} collectionName - Collection name
+ * @param {string} docId - Document ID
+ * @returns Firestore document reference
+ */
+const orgDoc = (orgId, collectionName, docId) => 
+  doc(db, "organizations", orgId, collectionName, docId);
+
+/**
+ * Get a subcollection reference under an org-scoped document
+ * @param {string} orgId - Organization ID
+ * @param {string} parentCollection - Parent collection name
+ * @param {string} parentId - Parent document ID
+ * @param {string} subcollectionName - Subcollection name
+ * @returns Firestore collection reference
+ */
+const orgSubcollection = (orgId, parentCollection, parentId, subcollectionName) =>
+  collection(db, "organizations", orgId, parentCollection, parentId, subcollectionName);
+
 export function DataProvider({ children }) {
   const { user } = useAuth();
 
@@ -26,14 +60,20 @@ export function DataProvider({ children }) {
   const [financials, setFinancials] = useState({});
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !user.activeOrgId) {
       setLeads([]); setUsers([]); setNotifications([]); setActivity([]); setGoals({}); setFinancials({});
       return;
     }
 
-    const leadsQuery = user.role === "admin"
-      ? collection(db, "leads")
-      : query(collection(db, "leads"), where("assignedTo", "==", user.id));
+    const orgId = user.activeOrgId;
+    const isAdmin = user.activeOrgRole === "admin" || user.activeOrgRole === "owner";
+
+    // ============================================================
+    // LEADS - org-scoped
+    // ============================================================
+    const leadsQuery = isAdmin
+      ? orgCollection(orgId, "leads")
+      : query(orgCollection(orgId, "leads"), where("assignedTo", "==", user.uid));
 
     const unsubLeads = onSnapshot(
       leadsQuery,
@@ -41,26 +81,52 @@ export function DataProvider({ children }) {
       (err) => console.error("Leads listener error:", err)
     );
 
+    // ============================================================
+    // USERS - now query memberships for this org
+    // ============================================================
+    const usersQuery = query(
+      collection(db, "memberships"),
+      where("orgId", "==", orgId),
+      where("active", "==", true)
+    );
+
     const unsubUsers = onSnapshot(
-      collection(db, "users"),
-      (snap) => setUsers(snap.docs.map((d) => ({ id: d.id, phone: d.id.replace("+91", ""), ...d.data() }))),
+      usersQuery,
+      (snap) => setUsers(snap.docs.map((d) => ({ 
+        id: d.data().uid, // Use uid as id for compatibility
+        uid: d.data().uid,
+        phone: d.data().phone, // Will be null for now, need to join with users collection
+        name: d.data().displayName,
+        role: d.data().role,
+        active: d.data().active,
+        ...d.data() 
+      }))),
       (err) => console.error("Users listener error:", err)
     );
 
-    const unsubSettings = onSnapshot(doc(db, "settings", "config"), (d) => {
+    // ============================================================
+    // SETTINGS - org-scoped
+    // ============================================================
+    const unsubSettings = onSnapshot(orgDoc(orgId, "settings", "config"), (d) => {
       if (d.exists()) setSettings(d.data());
     }, (err) => console.error("Settings listener error:", err));
 
+    // ============================================================
+    // NOTIFICATIONS - org-scoped
+    // ============================================================
     const unsubNotifs = onSnapshot(
-      query(collection(db, "notifications"), where("userId", "==", user.id)),
+      query(orgCollection(orgId, "notifications"), where("userId", "==", user.uid)),
       (snap) => setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
       (err) => console.error("Notifications listener error:", err)
     );
 
+    // ============================================================
+    // ACTIVITY - org-scoped, admin only
+    // ============================================================
     let unsubActivity = () => {};
-    if (user.role === "admin") {
+    if (isAdmin) {
       unsubActivity = onSnapshot(
-        query(collection(db, "activity"), orderBy("at", "desc"), limit(100)),
+        query(orgCollection(orgId, "activity"), orderBy("at", "desc"), limit(100)),
         (snap) => setActivity(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
         (err) => console.error("Activity listener error:", err)
       );
@@ -68,22 +134,34 @@ export function DataProvider({ children }) {
       setActivity([]);
     }
 
+    // ============================================================
+    // GOALS - org-scoped, admin only
+    // ============================================================
     let unsubGoals = () => {};
-    if (user.role === "admin") {
-      unsubGoals = onSnapshot(doc(db, "goals", "config"), (d) => {
+    if (isAdmin) {
+      unsubGoals = onSnapshot(orgDoc(orgId, "goals", "config"), (d) => {
         if (d.exists()) setGoals(d.data());
       }, (err) => console.error("Goals listener error:", err));
     } else {
       setGoals({});
     }
 
+    // ============================================================
+    // FINANCIALS - admin only, use collectionGroup but filter by orgId client-side
+    // ============================================================
     let unsubFinancials = () => {};
-    if (user.role === "admin") {
+    if (isAdmin) {
       unsubFinancials = onSnapshot(collectionGroup(db, "private"), (snap) => {
         const map = {};
         snap.docs.forEach((d) => {
-          const leadId = d.ref.parent.parent.id;
-          map[leadId] = d.data();
+          // Check if this private doc belongs to our org
+          // Path: organizations/{orgId}/leads/{leadId}/private/{docId}
+          const pathSegments = d.ref.path.split('/');
+          const docOrgId = pathSegments[1];
+          if (docOrgId === orgId) {
+            const leadId = d.ref.parent.parent.id;
+            map[leadId] = d.data();
+          }
         });
         setFinancials(map);
       }, (err) => console.error("Financials listener error:", err));
@@ -91,20 +169,40 @@ export function DataProvider({ children }) {
       setFinancials({});
     }
 
-    return () => { unsubLeads(); unsubUsers(); unsubSettings(); unsubNotifs(); unsubActivity(); unsubGoals(); unsubFinancials(); };
+    return () => { 
+      unsubLeads(); 
+      unsubUsers(); 
+      unsubSettings(); 
+      unsubNotifs(); 
+      unsubActivity(); 
+      unsubGoals(); 
+      unsubFinancials(); 
+    };
   }, [user]);
 
+  // ============================================================
+  // ACTIVITY LOGGING - org-scoped
+  // ============================================================
 
   const logActivity = async (text) => {
+    if (!user?.activeOrgId) return;
     try {
-      await addDoc(collection(db, "activity"), { text, at: new Date().toISOString() });
+      await addDoc(orgCollection(user.activeOrgId, "activity"), { 
+        text, 
+        at: new Date().toISOString(),
+        orgId: user.activeOrgId,
+      });
     } catch (e) { console.error("Error logging activity:", e); }
   };
 
+  // ============================================================
+  // NOTES - org-scoped subcollection
+  // ============================================================
 
   const writeNote = async (leadId, noteData) => {
+    if (!user?.activeOrgId) return;
     try {
-      await addDoc(collection(db, "leads", leadId, "notes"), {
+      await addDoc(orgSubcollection(user.activeOrgId, "leads", leadId, "notes"), {
         ...noteData,
         at: new Date().toISOString(),
       });
@@ -124,88 +222,106 @@ export function DataProvider({ children }) {
     if (type === "call" || type === "worknote") {
       patch.lastContactedAt = new Date().toISOString();
     }
-    try { await updateDoc(doc(db, "leads", id), patch); } catch (e) { console.error(e); }
+    try { 
+      await updateDoc(orgDoc(user.activeOrgId, "leads", id), patch); 
+    } catch (e) { console.error(e); }
   };
 
-  const addWorknote = (id, text, user, extra = {}) => {
-    const visibility = user?.role === "admin" ? (extra.visibility || "admin_only") : "team";
+  const addWorknote = (id, text, currentUser, extra = {}) => {
+    const isAdmin = currentUser?.activeOrgRole === "admin" || currentUser?.activeOrgRole === "owner";
+    const visibility = isAdmin ? (extra.visibility || "admin_only") : "team";
     addNote(id, text, "worknote", {
-      authorId: user?.id || user?.uid || null,
-      authorName: user?.name || "Unknown",
-      authorRole: user?.role || "employee",
+      authorId: currentUser?.uid || currentUser?.id || null,
+      authorName: currentUser?.displayName || currentUser?.name || "Unknown",
+      authorRole: currentUser?.activeOrgRole || currentUser?.role || "employee",
       visibility,
     });
-    logActivity(`Worknote added on lead ${id} by ${user?.name || "Unknown"}`);
+    logActivity(`Worknote added on lead ${id} by ${currentUser?.displayName || currentUser?.name || "Unknown"}`);
   };
 
-  const updateLead = async (id, patch, user) => {
+  // ============================================================
+  // LEAD OPERATIONS - org-scoped
+  // ============================================================
+
+  const updateLead = async (id, patch, currentUser) => {
+    if (!user?.activeOrgId) return;
     try {
-      await updateDoc(doc(db, "leads", id), { ...patch, lastUpdated: new Date().toISOString() });
+      await updateDoc(orgDoc(user.activeOrgId, "leads", id), { 
+        ...patch, 
+        lastUpdated: new Date().toISOString() 
+      });
       if (patch.status) {
         await writeNote(id, {
           type: "status",
-          text: `Status changed to "${patch.status}"${user?.name ? ` by ${user.name}` : ""}`,
+          text: `Status changed to "${patch.status}"${currentUser?.displayName || currentUser?.name ? ` by ${currentUser?.displayName || currentUser?.name}` : ""}`,
           visibility: "team",
-          authorName: user?.name || "System",
+          authorName: currentUser?.displayName || currentUser?.name || "System",
         });
         logActivity(`Lead ${id} status changed to "${patch.status}"`);
       }
     } catch (e) { console.error("Error updating lead:", e); }
   };
 
-  const updateLeadStatus = (id, status, user) => updateLead(id, { status }, user);
+  const updateLeadStatus = (id, status, currentUser) => updateLead(id, { status }, currentUser);
 
-  const updatePriority = async (id, priority, user) => {
+  const updatePriority = async (id, priority, currentUser) => {
+    if (!user?.activeOrgId) return;
     try {
-      await updateDoc(doc(db, "leads", id), { priority, lastUpdated: new Date().toISOString() });
+      await updateDoc(orgDoc(user.activeOrgId, "leads", id), { 
+        priority, 
+        lastUpdated: new Date().toISOString() 
+      });
       await writeNote(id, {
         type: "system",
-        text: `Priority changed to "${priority}"${user?.name ? ` by ${user.name}` : ""}`,
+        text: `Priority changed to "${priority}"${currentUser?.displayName || currentUser?.name ? ` by ${currentUser?.displayName || currentUser?.name}` : ""}`,
         visibility: "team",
-        authorName: user?.name || "System",
+        authorName: currentUser?.displayName || currentUser?.name || "System",
       });
     } catch (e) { console.error("Error updating priority:", e); }
   };
 
-  const updateFollowUpDate = async (id, date, user) => {
+  const updateFollowUpDate = async (id, date, currentUser) => {
+    if (!user?.activeOrgId) return;
     try {
-      await updateDoc(doc(db, "leads", id), { followUp: date, lastUpdated: new Date().toISOString() });
+      await updateDoc(orgDoc(user.activeOrgId, "leads", id), { 
+        followUp: date, 
+        lastUpdated: new Date().toISOString() 
+      });
       await writeNote(id, {
         type: "system",
-        text: `Follow-up date updated${user?.name ? ` by ${user.name}` : ""}`,
+        text: `Follow-up date updated${currentUser?.displayName || currentUser?.name ? ` by ${currentUser?.displayName || currentUser?.name}` : ""}`,
         visibility: "team",
-        authorName: user?.name || "System",
+        authorName: currentUser?.displayName || currentUser?.name || "System",
       });
     } catch (e) { console.error("Error updating follow-up date:", e); }
   };
 
-  const updateLeadRevenue = async (id, revenue, user) => {
+  const updateLeadRevenue = async (id, revenue, currentUser) => {
+    if (!user?.activeOrgId) return;
     try {
-      await setDoc(doc(db, "leads", id, "private", "data"), {
+      await setDoc(doc(db, "organizations", user.activeOrgId, "leads", id, "private", "data"), {
         revenue: Number(revenue) || 0,
-        revenueUpdatedBy: user?.name || "Unknown",
+        revenueUpdatedBy: currentUser?.displayName || currentUser?.name || "Unknown",
         revenueUpdatedAt: new Date().toISOString(),
       }, { merge: true });
-      logActivity(`Revenue updated on lead ${id} → ₹${revenue} by ${user?.name || "Unknown"}`);
+      logActivity(`Revenue updated on lead ${id} → ₹${revenue} by ${currentUser?.displayName || currentUser?.name || "Unknown"}`);
     } catch (e) { console.error("Error updating revenue:", e); }
   };
 
-  const reassignLead = async (id, employeeId, employeeName, user) => {
+  const reassignLead = async (id, employeeId, employeeName, currentUser) => {
     await updateLead(id, { assignedTo: employeeId, assignedToName: employeeName || null });
     await writeNote(id, {
       type: "assignment",
-      text: `Reassigned to ${employeeName || employeeId}${user?.name ? ` by ${user.name}` : ""}`,
+      text: `Reassigned to ${employeeName || employeeId}${currentUser?.displayName || currentUser?.name ? ` by ${currentUser?.displayName || currentUser?.name}` : ""}`,
       visibility: "team",
-      authorName: user?.name || "System",
+      authorName: currentUser?.displayName || currentUser?.name || "System",
     });
     pushNotif(employeeId, `New lead assigned to you (${id})`);
     logActivity(`Lead ${id} reassigned to ${employeeName || employeeId}`);
   };
 
-  // NEW: deactivate/delete hone wale employee ki saari OPEN leads (Closed-Won/Lost
-  // ke alawa) ek saath kisi aur employee ko move karne ke liye — taaki koi lead
-  // orphan na ho jaaye (jisko koi bhi employee apni "My Leads" mein na dekh paaye).
-  const reassignAllLeads = async (fromEmployeeId, toEmployeeId, toEmployeeName, user) => {
+  const reassignAllLeads = async (fromEmployeeId, toEmployeeId, toEmployeeName, currentUser) => {
+    if (!user?.activeOrgId) return 0;
     try {
       const openLeads = leads.filter(
         (l) => l.assignedTo === fromEmployeeId && !["Closed-Won", "Lost"].includes(l.status)
@@ -214,7 +330,7 @@ export function DataProvider({ children }) {
 
       const batch = writeBatch(db);
       openLeads.forEach((l) => {
-        batch.update(doc(db, "leads", l.id), {
+        batch.update(orgDoc(user.activeOrgId, "leads", l.id), {
           assignedTo: toEmployeeId,
           assignedToName: toEmployeeName || null,
           lastUpdated: new Date().toISOString(),
@@ -225,9 +341,9 @@ export function DataProvider({ children }) {
       await Promise.all(openLeads.map((l) =>
         writeNote(l.id, {
           type: "assignment",
-          text: `Bulk-reassigned to ${toEmployeeName || toEmployeeId}${user?.name ? ` by ${user.name}` : ""} (previous employee deactivated)`,
+          text: `Bulk-reassigned to ${toEmployeeName || toEmployeeId}${currentUser?.displayName || currentUser?.name ? ` by ${currentUser?.displayName || currentUser?.name}` : ""} (previous employee deactivated)`,
           visibility: "team",
-          authorName: user?.name || "System",
+          authorName: currentUser?.displayName || currentUser?.name || "System",
         })
       ));
 
@@ -245,8 +361,12 @@ export function DataProvider({ children }) {
     logActivity(`Lead ${id} blacklisted`);
   };
 
+  // ============================================================
+  // BULK LEADS - org-scoped
+  // ============================================================
 
   const addBulkLeads = async (rows, assigner) => {
+    if (!user?.activeOrgId) return 0;
     try {
       const emps = users.filter((u) => u.role === "employee");
       if (emps.length === 0) {
@@ -274,7 +394,7 @@ export function DataProvider({ children }) {
           assignedTo = emps[(rr++) % emps.length]?.id;
         }
 
-        const newLeadRef = doc(collection(db, "leads"));
+        const newLeadRef = doc(orgCollection(user.activeOrgId, "leads"));
         batch.set(newLeadRef, {
           name: r.name || r.Name || "Unknown",
           phone: r.phone || r.Phone || "",
@@ -289,6 +409,7 @@ export function DataProvider({ children }) {
           lastUpdated: new Date().toISOString(),
           followUp: null,
           lastContactedAt: null,
+          orgId: user.activeOrgId,
         });
         count++;
 
@@ -303,47 +424,95 @@ export function DataProvider({ children }) {
     }
   };
 
+  // ============================================================
+  // USER MANAGEMENT - memberships-based
+  // ============================================================
 
   const addUser = async (u) => {
+    if (!user?.activeOrgId) return;
     try {
-      await setDoc(doc(db, "users", "+91" + u.phone), { name: u.name, role: u.role, active: true });
+      // Create membership for the new user
+      // Note: In a full implementation, you'd also create the users/{uid} document
+      // and potentially invite them via Firebase Auth
+      const phoneId = "+91" + u.phone;
+      
+      // For now, we create a membership assuming the user will sign up
+      // In production, you'd use Firebase Admin SDK to create the auth user
+      await setDoc(doc(db, "memberships", `${phoneId}_${user.activeOrgId}`), { 
+        uid: phoneId, // Temporary - will be replaced with actual UID after user signs up
+        orgId: user.activeOrgId,
+        displayName: u.name, 
+        role: u.role, 
+        active: true,
+        invitedBy: user.uid,
+        joinedAt: new Date().toISOString(),
+      });
     } catch (e) { console.error("Add user error:", e); }
   };
 
-  const updateUser = async (id, patch) => {
-    try { await updateDoc(doc(db, "users", id), patch); }
-    catch (e) { console.error("Update user error:", e); }
+  const updateUser = async (uid, patch) => {
+    if (!user?.activeOrgId) return;
+    try { 
+      // Update the membership document
+      await updateDoc(doc(db, "memberships", `${uid}_${user.activeOrgId}`), patch); 
+    } catch (e) { console.error("Update user error:", e); }
   };
 
-  const deactivateUser = (id) => updateUser(id, { active: false });
+  const deactivateUser = (uid) => updateUser(uid, { active: false });
 
+  // ============================================================
+  // NOTIFICATIONS - org-scoped
+  // ============================================================
 
   const pushNotif = async (userId, text) => {
+    if (!user?.activeOrgId) return;
     try {
-      await addDoc(collection(db, "notifications"), { userId, text, read: false, at: new Date().toISOString() });
+      await addDoc(orgCollection(user.activeOrgId, "notifications"), { 
+        userId, 
+        text, 
+        read: false, 
+        at: new Date().toISOString(),
+        orgId: user.activeOrgId,
+      });
     } catch (e) { console.error("Push notif error:", e); }
   };
 
   const markRead = async (userId) => {
+    if (!user?.activeOrgId) return;
     try {
       const mine = notifications.filter((n) => n.userId === userId && !n.read);
       if (mine.length === 0) return;
       const batch = writeBatch(db);
-      mine.forEach((n) => batch.update(doc(db, "notifications", n.id), { read: true }));
+      mine.forEach((n) => batch.update(orgDoc(user.activeOrgId, "notifications", n.id), { read: true }));
       await batch.commit();
     } catch (e) { console.error("Mark read error:", e); }
   };
 
+  // ============================================================
+  // GOALS & SETTINGS - org-scoped
+  // ============================================================
 
   const setMyGoal = async (empId, target) => {
-    try { await setDoc(doc(db, "goals", "config"), { ...goals, [empId]: Number(target) || 0 }, { merge: true }); }
-    catch (e) { console.error("Set goal error:", e); }
+    if (!user?.activeOrgId) return;
+    try { 
+      await setDoc(orgDoc(user.activeOrgId, "goals", "config"), { 
+        ...goals, 
+        [empId]: Number(target) || 0,
+        orgId: user.activeOrgId,
+      }, { merge: true }); 
+    } catch (e) { console.error("Set goal error:", e); }
   };
 
   const setSettingsValue = async (s) => {
-    try { await setDoc(doc(db, "settings", "config"), s, { merge: true }); }
-    catch (e) { console.error("Set settings error:", e); }
+    if (!user?.activeOrgId) return;
+    try { 
+      await setDoc(orgDoc(user.activeOrgId, "settings", "config"), s, { merge: true }); 
+    } catch (e) { console.error("Set settings error:", e); }
   };
+
+  // ============================================================
+  // WHATSAPP SYNC
+  // ============================================================
 
   const triggerWhatsAppSync = async () => {
     try {

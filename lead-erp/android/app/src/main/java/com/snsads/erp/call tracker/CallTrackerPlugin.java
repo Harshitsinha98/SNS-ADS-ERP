@@ -1,4 +1,4 @@
-package com.snsads.erp.calltracker;
+package com.codeskate.erp.calltracker;
 
 import android.Manifest;
 import android.content.BroadcastReceiver;

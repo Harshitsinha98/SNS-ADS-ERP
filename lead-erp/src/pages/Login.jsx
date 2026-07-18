@@ -41,7 +41,7 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-2 justify-center mb-8">
           <Radio size={20} className="text-signal" />
-          <span className="font-display font-semibold text-white text-lg tracking-tight">SNS ADS ERP</span>
+          <span className="font-display font-semibold text-white text-lg tracking-tight">CodeSkate</span>
         </div>
         <div className="bg-ink-soft border border-ink-line rounded-xl p-7">
           <p className="eyebrow text-white/40 mb-1">{step === "phone" ? "Sign in" : "Verify"}</p>

@@ -1,0 +1,16 @@
+{
+  "name": "sns-ads-erp-firestore-tests",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore 'npm run test:rules'",
+    "test:rules": "vitest run",
+    "test:watch": "vitest",
+    "emulator": "firebase emulators:start --only firestore"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.0",
+    "firebase-tools": "^13.0.0",
+    "vitest": "^1.0.0"
+  }
+}

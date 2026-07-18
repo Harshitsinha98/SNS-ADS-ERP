@@ -35,7 +35,7 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
           <div className="flex items-center gap-2">
             <Radio size={18} className="text-signal" />
             <div>
-              <p className="font-display font-semibold text-white text-[15px] leading-tight">SNS ADS ERP</p>
+              <p className="font-display font-semibold text-white text-[15px] leading-tight">CodeSkate</p>
               <p className="text-[11px] text-white/40 leading-tight">{user.role === "admin" ? "Control Tower" : "Sales Desk"}</p>
             </div>
           </div>

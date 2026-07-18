@@ -5,91 +5,123 @@ import cron from "node-cron";
 import fs from "fs";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { getNextEmployeeRoundRobin } from "./utils/assignLead.js";
+import { getNextEmployeeRoundRobin, getNextEmployeeByWorkload } from "./utils/assignLead.js";
 
 // 1. Firebase Initialization
 const serviceAccount = JSON.parse(fs.readFileSync("./serviceAccountKey.json", "utf-8"));
 initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
+// Multi-tenant configuration
+// For Phase 1, use a default organization ID from environment variable
+const DEFAULT_ORG_ID = process.env.DEFAULT_ORG_ID;
+
+if (!DEFAULT_ORG_ID) {
+  console.warn("⚠️  WARNING: DEFAULT_ORG_ID not set in environment. WhatsApp leads will not be imported.");
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
 // ============================================================
+// HELPER: Get org-scoped collection reference
+// ============================================================
+const orgCollection = (orgId, collectionName) => 
+  db.collection('organizations').doc(orgId).collection(collectionName);
+
+// ============================================================
 // CORE: WhatsApp lead ko Firestore mein import karna (dedup + auto-assign)
+// Multi-tenant version - writes to org-scoped collections
 // ============================================================
 async function importWhatsAppLead({ phone, name, requirement }) {
+  if (!DEFAULT_ORG_ID) {
+    console.error("❌ Cannot import lead: DEFAULT_ORG_ID not configured");
+    return { status: "error", reason: "org_not_configured" };
+  }
+
+  const orgId = DEFAULT_ORG_ID;
+
   try {
-    // 1. Duplicate Check: ab note subcollection mein jaata hai, admin_only
-    // (employee ke browser mein Firestore Rules ki wajah se fetch hi nahi hoga)
-    const existing = await db.collection("leads").where("phone", "==", phone).limit(1).get();
+    // 1. Duplicate Check - org-scoped leads
+    const existing = await orgCollection(orgId, "leads")
+      .where("phone", "==", phone)
+      .limit(1)
+      .get();
 
     if (!existing.empty) {
       const leadId = existing.docs[0].id;
-      await db.collection("leads").doc(leadId).collection("notes").add({
-        type: "whatsapp",
-        text: `New WhatsApp message: ${requirement}`,
-        authorName: "WhatsApp Sync",
-        visibility: "admin_only",
-        at: new Date().toISOString(),
-      });
-      await db.collection("leads").doc(leadId).update({
-        lastUpdated: new Date().toISOString(),
-      });
+      
+      // Add note to existing lead
+      await orgCollection(orgId, "leads")
+        .doc(leadId)
+        .collection("notes")
+        .add({
+          type: "whatsapp",
+          text: `New WhatsApp message: ${requirement}`,
+          authorName: "WhatsApp Sync",
+          visibility: "admin_only",
+          at: new Date().toISOString(),
+        });
+      
+      // Update lastUpdated timestamp
+      await orgCollection(orgId, "leads")
+        .doc(leadId)
+        .update({
+          lastUpdated: new Date().toISOString(),
+        });
+      
       return { status: "duplicate", leadId };
     }
 
-    // 2. Settings Check: Assignment mode kya hai (round-robin ya workload)
-    const settingsDoc = await db.collection("settings").doc("config").get();
-    const settings = settingsDoc.exists ? settingsDoc.data() : { autoAssign: "round-robin" };
+    // 2. Settings Check - org-scoped settings
+    const settingsDoc = await orgCollection(orgId, "settings")
+      .doc("config")
+      .get();
+    
+    const settings = settingsDoc.exists 
+      ? settingsDoc.data() 
+      : { autoAssign: "round-robin" };
 
     let assignedTo = null;
     let assignedToName = null;
 
-    // 3. Lead Assignment Logic
+    // 3. Lead Assignment Logic - using org-scoped functions
     if (settings.autoAssign === "workload") {
-      const usersSnap = await db
-        .collection("users")
-        .where("role", "==", "employee")
-        .where("active", "==", true)
-        .get();
-      const emps = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-      if (emps.length > 0) {
-        const counts = {};
-        for (const e of emps) {
-          const c = await db.collection("leads").where("assignedTo", "==", e.id).get();
-          counts[e.id] = c.size;
-        }
-        const chosen = emps.sort((a, b) => counts[a.id] - counts[b.id])[0];
-        assignedTo = chosen.id;
-        assignedToName = chosen.name || null;
+      const employee = await getNextEmployeeByWorkload(db, orgId);
+      if (employee) {
+        assignedTo = employee.id;
+        assignedToName = employee.name || null;
       }
     } else {
-      // Transaction-safe Round Robin logic (from utils)
-      const employee = await getNextEmployeeRoundRobin(db);
+      // Round Robin (default)
+      const employee = await getNextEmployeeRoundRobin(db, orgId);
       if (employee) {
         assignedTo = employee.id;
         assignedToName = employee.name || null;
       }
     }
 
-    // 4. Fallback: Agar koi active employee nahi mila, toh Pending Queue mein daalo
+    // 4. Fallback: No active employees - add to pending queue (org-scoped)
     if (!assignedTo) {
-      const existingPending = await db.collection("pending_whatsapp").where("phone", "==", phone).limit(1).get();
+      const existingPending = await orgCollection(orgId, "pending_leads")
+        .where("phone", "==", phone)
+        .limit(1)
+        .get();
+      
       if (existingPending.empty) {
-        await db.collection("pending_whatsapp").add({
+        await orgCollection(orgId, "pending_leads").add({
           phone,
           name,
           requirement,
+          orgId,
           queuedAt: new Date().toISOString()
         });
       }
       return { status: "queued", reason: "no_active_employees" };
     }
 
-    // 5. Nayi Lead Create Karo — 'value' aur 'notes' array array ab yahan nahi
+    // 5. Create new lead - org-scoped
     const leadData = {
       name: name || "WhatsApp Lead",
       phone,
@@ -105,11 +137,13 @@ async function importWhatsAppLead({ phone, name, requirement }) {
       lastUpdated: new Date().toISOString(),
       followUp: null,
       lastContactedAt: null,
+      orgId,
     };
 
-    const ref = await db.collection("leads").add(leadData);
+    const leadsCollection = orgCollection(orgId, "leads");
+    const ref = await leadsCollection.add(leadData);
 
-    // Initial activity-stream entry — Timeline khaali na dikhe lead khulte hi
+    // Initial note - Timeline not empty on lead open
     await ref.collection("notes").add({
       type: "system",
       text: "Lead created via WhatsApp",
@@ -118,17 +152,19 @@ async function importWhatsAppLead({ phone, name, requirement }) {
       at: new Date().toISOString(),
     });
 
-    // 6. Notifications & Activity Log update
-    await db.collection("notifications").add({
+    // 6. Notifications & Activity Log - org-scoped
+    await orgCollection(orgId, "notifications").add({
       userId: assignedTo,
       text: `New WhatsApp lead: ${leadData.name} (${ref.id})`,
       read: false,
       at: new Date().toISOString(),
+      orgId,
     });
 
-    await db.collection("activity").add({
+    await orgCollection(orgId, "activity").add({
       text: `📲 WhatsApp lead auto-imported: ${leadData.name} → ${assignedTo}`,
       at: new Date().toISOString(),
+      orgId,
     });
 
     return { status: "created", leadId: ref.id };
@@ -142,8 +178,13 @@ async function importWhatsAppLead({ phone, name, requirement }) {
 // QUEUE PROCESSOR: Pending leads ko assign karna
 // ============================================================
 async function processPendingQueue() {
+  if (!DEFAULT_ORG_ID) {
+    console.error("❌ Cannot process queue: DEFAULT_ORG_ID not configured");
+    return 0;
+  }
+
   try {
-    const snap = await db.collection("pending_whatsapp").get();
+    const snap = await orgCollection(DEFAULT_ORG_ID, "pending_leads").get();
     let processed = 0;
 
     for (const docSnap of snap.docs) {
@@ -208,7 +249,7 @@ app.post("/webhook", async (req, res) => {
 app.post("/api/whatsapp/sync-now", async (req, res) => {
   try {
     const imported = await processPendingQueue();
-    res.json({ success: true, imported });
+    res.json({ success: true, imported, orgId: DEFAULT_ORG_ID });
   } catch (e) {
     console.error("Manual sync error:", e);
     res.status(500).json({ success: false, error: "Sync failed" });
@@ -222,7 +263,7 @@ cron.schedule("*/5 * * * *", async () => {
   try {
     const imported = await processPendingQueue();
     if (imported > 0) {
-      console.log(`⏱ 5-min sync: ${imported} pending lead(s) successfully processed`);
+      console.log(`⏱ 5-min sync: ${imported} pending lead(s) successfully processed for org ${DEFAULT_ORG_ID}`);
     }
   } catch (e) {
     console.error("5-min cron error:", e);
@@ -232,7 +273,10 @@ cron.schedule("*/5 * * * *", async () => {
 // ============================================================
 // Health Check Route
 // ============================================================
-app.get("/", (req, res) => res.send("SNS ADS ERP backend is running ✅"));
+app.get("/", (req, res) => res.send("CodeSkate backend is running ✅\nMulti-tenant mode enabled.\nOrg ID: " + (DEFAULT_ORG_ID || "NOT CONFIGURED")));
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`🚀 Backend running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 Backend running on port ${PORT}`);
+  console.log(`🏢 Multi-tenant mode: ${DEFAULT_ORG_ID ? `Default org = ${DEFAULT_ORG_ID}` : 'NOT CONFIGURED'}`);
+});
