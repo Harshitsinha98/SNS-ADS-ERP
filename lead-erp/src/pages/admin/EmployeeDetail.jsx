@@ -10,7 +10,7 @@ export default function EmployeeDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { users, leads, financials, updateUser, deactivateUser, activateUser, reassignLead, reassignAllLeads } = useData();
+  const { users, leads, financials, deactivateUser, activateUser, reassignLead, reassignAllLeads } = useData();
   const [bulkTarget, setBulkTarget] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
 
@@ -35,13 +35,7 @@ export default function EmployeeDetail() {
   const openLeadsCount = stats.leads.filter((l) => !["Closed-Won", "Lost"].includes(l.status)).length;
 
   const changeNumber = () => {
-    const newPhone = prompt("Enter the new 10-digit mobile number:", emp.phone);
-    if (newPhone && /^\d{10}$/.test(newPhone)) {
-      updateUser(emp.id, { phone: newPhone });
-      alert("Mobile number updated!");
-    } else if (newPhone) {
-      alert("Please enter a valid 10-digit number.");
-    }
+    alert("For security, a member's verified phone number cannot be changed in place. Deactivate the old member and send a new invitation to the verified number.");
   };
 
   // NEW (Q3 fix): before deactivating (or at any time) move all OPEN leads to

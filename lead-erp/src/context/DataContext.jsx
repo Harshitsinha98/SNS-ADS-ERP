@@ -1,12 +1,14 @@
 import { createContext, useContext, useState, useEffect, useMemo } from "react";
 import {
-  collection, collectionGroup, doc, onSnapshot, addDoc, updateDoc, setDoc, deleteDoc,
-  query, where, orderBy, limit, writeBatch, runTransaction, increment, getDoc
+  collection, collectionGroup, doc, onSnapshot, addDoc, updateDoc, setDoc, getDoc,
+  query, where, orderBy, limit, writeBatch
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
-
-const toE164 = (phone) => "+91" + String(phone).replace(/\D/g, "").slice(-10);
+import {
+  inviteTeamMember, setTeamMemberStatus, setTeamMemberRole, schedulePlanDowngrade, cancelPlanDowngrade,
+  importBulkLeads, reassignBulkLeads, triggerWhatsAppSync as requestWhatsAppSync,
+} from "../utils/billingApi";
 
 const DataContext = createContext();
 export const useData = () => useContext(DataContext);
@@ -223,33 +225,42 @@ export function DataProvider({ children }) {
   // ACTIVITY LOGGING - org-scoped
   // ============================================================
 
-  const logActivity = async (text) => {
-    if (!user?.activeOrgId) return;
-    try {
-      await addDoc(orgCollection(user.activeOrgId, "activity"), { 
-        text, 
-        at: new Date().toISOString(),
-        orgId: user.activeOrgId,
-      });
-    } catch (e) { console.error("Error logging activity:", e); }
-  };
+  // Audit records are server-authored so the browser cannot forge an immutable
+  // event. Privileged backend operations already create audit entries.
+  const logActivity = async () => {};
 
   // ============================================================
   // NOTES - org-scoped subcollection
   // ============================================================
 
   const writeNote = async (leadId, noteData) => {
-    if (!user?.activeOrgId) return;
+    if (!user?.activeOrgId || !user?.uid) return false;
+    const payload = {
+      ...noteData,
+      authorId: noteData.authorId || user.uid,
+      authorName: noteData.authorName || user.displayName || "Team member",
+      at: new Date().toISOString(),
+    };
     try {
-      await addDoc(orgSubcollection(user.activeOrgId, "leads", leadId, "notes"), {
-        ...noteData,
-        at: new Date().toISOString(),
-      });
-    } catch (e) { console.error("Error writing note:", e); }
+      const notesRef = orgSubcollection(user.activeOrgId, "leads", leadId, "notes");
+      if (noteData.callLogId) {
+        // A stable native call-log ID lets a retry recover a failed lead update
+        // without creating another CRM note. Rules keep existing notes immutable.
+        const noteRef = doc(notesRef, `call_${String(noteData.callLogId).replace(/[^A-Za-z0-9_-]/g, "_")}`);
+        const existing = await getDoc(noteRef);
+        if (!existing.exists()) await setDoc(noteRef, payload);
+      } else {
+        await addDoc(notesRef, payload);
+      }
+      return true;
+    } catch (error) {
+      console.error("Error writing note:", error);
+      return false;
+    }
   };
 
   const addNote = async (id, text, type = "note", extra = {}) => {
-    await writeNote(id, {
+    const noteWritten = await writeNote(id, {
       type, text,
       visibility: extra.visibility || "team",
       authorId: extra.authorId || null,
@@ -257,13 +268,18 @@ export function DataProvider({ children }) {
       authorRole: extra.authorRole || null,
       ...extra,
     });
+    if (!noteWritten) return false;
     const patch = { lastUpdated: new Date().toISOString() };
     if (type === "call" || type === "worknote") {
       patch.lastContactedAt = new Date().toISOString();
     }
-    try { 
-      await updateDoc(orgDoc(user.activeOrgId, "leads", id), patch); 
-    } catch (e) { console.error(e); }
+    try {
+      await updateDoc(orgDoc(user.activeOrgId, "leads", id), patch);
+      return true;
+    } catch (error) {
+      console.error("Error updating lead activity:", error);
+      return false;
+    }
   };
 
   const addWorknote = (id, text, currentUser, extra = {}) => {
@@ -359,36 +375,16 @@ export function DataProvider({ children }) {
     logActivity(`Lead ${id} reassigned to ${employeeName || employeeId}`);
   };
 
-  const reassignAllLeads = async (fromEmployeeId, toEmployeeId, toEmployeeName, currentUser) => {
+  const reassignAllLeads = async (fromEmployeeId, toEmployeeId, toEmployeeName) => {
     if (!user?.activeOrgId) return 0;
     try {
-      const openLeads = leads.filter(
-        (l) => l.assignedTo === fromEmployeeId && !["Closed-Won", "Lost"].includes(l.status)
-      );
-      if (openLeads.length === 0) return 0;
-
-      const batch = writeBatch(db);
-      openLeads.forEach((l) => {
-        batch.update(orgDoc(user.activeOrgId, "leads", l.id), {
-          assignedTo: toEmployeeId,
-          assignedToName: toEmployeeName || null,
-          lastUpdated: new Date().toISOString(),
-        });
+      const result = await reassignBulkLeads({
+        orgId: user.activeOrgId,
+        fromEmployeeId,
+        toEmployeeId,
+        toEmployeeName: toEmployeeName || null,
       });
-      await batch.commit();
-
-      await Promise.all(openLeads.map((l) =>
-        writeNote(l.id, {
-          type: "assignment",
-          text: `Bulk-reassigned to ${toEmployeeName || toEmployeeId}${currentUser?.displayName || currentUser?.name ? ` by ${currentUser?.displayName || currentUser?.name}` : ""} (previous employee deactivated)`,
-          visibility: "team",
-          authorName: currentUser?.displayName || currentUser?.name || "System",
-        })
-      ));
-
-      pushNotif(toEmployeeId, `${openLeads.length} lead(s) reassigned to you from a deactivated employee`);
-      logActivity(`${openLeads.length} lead(s) bulk-reassigned from ${fromEmployeeId} to ${toEmployeeName || toEmployeeId}`);
-      return openLeads.length;
+      return result.count || 0;
     } catch (e) {
       console.error("Bulk reassign error:", e);
       return 0;
@@ -404,63 +400,19 @@ export function DataProvider({ children }) {
   // BULK LEADS - org-scoped
   // ============================================================
 
-  const addBulkLeads = async (rows, assigner) => {
+  const addBulkLeads = async (rows, assigner, importId) => {
     if (!user?.activeOrgId) return 0;
     try {
-      // Only claimed members (real UID, logged in at least once) can receive leads.
-      const emps = users.filter((u) => u.role === "employee" && !u.pending && u.uid);
-      if (emps.length === 0) {
-        alert("No active (logged-in) employees available to assign leads. Pending invitees can't receive leads until they log in.");
-        return 0;
-      }
-
-      const batch = writeBatch(db);
-      let rr = 0;
-      let count = 0;
-
-      const currentWorkloads = {};
-      if (assigner === "workload") {
-        emps.forEach(e => {
-          currentWorkloads[e.id] = leads.filter(l => l.assignedTo === e.id).length;
-        });
-      }
-
-      for (const r of rows) {
-        let assignedTo;
-        if (assigner === "workload") {
-          assignedTo = Object.keys(currentWorkloads).reduce((a, b) => currentWorkloads[a] < currentWorkloads[b] ? a : b);
-          currentWorkloads[assignedTo]++;
-        } else {
-          assignedTo = emps[(rr++) % emps.length]?.id;
-        }
-
-        const newLeadRef = doc(orgCollection(user.activeOrgId, "leads"));
-        batch.set(newLeadRef, {
-          name: r.name || r.Name || "Unknown",
-          phone: r.phone || r.Phone || "",
-          email: r.email || r.Email || "",
-          source: r.source || r.Source || "Import",
-          requirement: r.requirement || r.Requirement || "",
-          status: "New",
-          assignedTo,
-          blacklisted: false,
-          priority: "Warm",
-          createdAt: new Date().toISOString(),
-          lastUpdated: new Date().toISOString(),
-          followUp: null,
-          lastContactedAt: null,
-          orgId: user.activeOrgId,
-        });
-        count++;
-
-        if (count % 450 === 0) await batch.commit();
-      }
-
-      await batch.commit();
-      return count;
+      const result = await importBulkLeads({
+        orgId: user.activeOrgId,
+        rows,
+        importId,
+        assigner: assigner === "workload" ? "workload" : "round-robin",
+      });
+      return result.imported || 0;
     } catch (e) {
-      console.error("Bulk Import Error:", e);
-      return 0;
+      console.error("Bulk import error:", e);
+      throw e;
     }
   };
 
@@ -478,199 +430,74 @@ export function DataProvider({ children }) {
   // u = { name, phone (10-digit), email?, role }
   const addUser = async (u) => {
     if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
-
-    const orgId = user.activeOrgId;
-    const phoneE164 = toE164(u.phone);
-    const orgRef = doc(db, "organizations", orgId);
-    const inviteRef = doc(db, "invites", `${phoneE164}_${orgId}`);
-    const claimedMemRef = doc(db, "memberships", `${phoneE164}_${orgId}`); // legacy placeholder id
-
     try {
-      await runTransaction(db, async (tx) => {
-        const orgSnap = await tx.get(orgRef);
-        if (!orgSnap.exists()) throw Object.assign(new Error("org missing"), { code: "no-org" });
-
-        const org = orgSnap.data();
-        const seatsUsed = org.seatsUsed ?? 1;
-        const seatsLimit = org.seatsLimit ?? 1;
-        if (org.subscriptionStatus === "expired")
-          throw Object.assign(new Error("expired"), { code: "expired" });
-        if (seatsUsed >= seatsLimit)
-          throw Object.assign(new Error("seat limit"), { code: "seat-limit" });
-
-        const invSnap = await tx.get(inviteRef);
-        if (invSnap.exists() && invSnap.data().active)
-          throw Object.assign(new Error("exists"), { code: "exists" });
-
-        tx.set(inviteRef, {
-          phone: phoneE164,
-          orgId,
-          displayName: u.name,
-          email: u.email || "",
-          role: u.role || "employee",
-          active: true,
-          claimed: false,
-          invitedBy: user.uid,
-          invitedByName: user.displayName || user.name || "Admin",
-          createdAt: new Date().toISOString(),
-        });
-        tx.update(orgRef, { seatsUsed: increment(1) });
+      await inviteTeamMember({
+        orgId: user.activeOrgId,
+        name: u.name,
+        phone: u.phone,
+        email: u.email || "",
+        role: u.role || "employee",
       });
-
-      logActivity(`Team member invited: ${u.name} (${u.role}) — ${phoneE164}`);
       return { ok: true };
     } catch (e) {
-      if (e.code === "seat-limit")
-        return { ok: false, error: "Seat limit reached. Upgrade your plan to add more team members." };
-      if (e.code === "expired")
-        return { ok: false, error: "Trial/subscription ended. Activate or upgrade your plan from the Billing page." };
-      if (e.code === "exists")
-        return { ok: false, error: "This number is already invited/added." };
-      if (e.code === "permission-denied")
-        return { ok: false, error: "Permission denied — subscription expired or security rules not published. Check the Billing page." };
-      console.error("Add user error:", e?.code, e?.message);
-      return { ok: false, error: `Could not add member (${e?.code || "error"}). Please try again.` };
+      return { ok: false, error: e.message || "Could not invite team member" };
     }
   };
 
   const updateUser = async (uid, patch) => {
-    if (!user?.activeOrgId) return;
-    try { 
-      await updateDoc(doc(db, "memberships", `${uid}_${user.activeOrgId}`), patch); 
-    } catch (e) { console.error("Update user error:", e); }
+    if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
+    try {
+      if (patch.role) {
+        await setTeamMemberRole({ orgId: user.activeOrgId, uid, role: patch.role });
+        return { ok: true };
+      }
+      return { ok: false, error: "Mobile-number changes require a new verified invitation." };
+    } catch (e) {
+      return { ok: false, error: e.message || "Could not update team member" };
+    }
   };
 
-  // Deactivate a team member (works for both claimed members and pending invites)
-  // and free up their seat. `target` is the user object from the team list.
   const deactivateUser = async (target) => {
-    if (!user?.activeOrgId) return { ok: false };
-    const orgId = user.activeOrgId;
-    const orgRef = doc(db, "organizations", orgId);
-
-    // Pending invite (not yet claimed) → deactivate the invite
-    if (target && target.pending && target.inviteId) {
-      try {
-        await runTransaction(db, async (tx) => {
-          const invRef = doc(db, "invites", target.inviteId);
-          const invSnap = await tx.get(invRef);
-          if (!invSnap.exists() || invSnap.data().active === false) return;
-          const orgSnap = await tx.get(orgRef);
-          tx.update(invRef, { active: false });
-          if (orgSnap.exists()) {
-            const used = orgSnap.data().seatsUsed ?? 1;
-            tx.update(orgRef, { seatsUsed: Math.max(0, used - 1) });
-          }
-        });
-        logActivity(`Pending invite removed (${target.phone})`);
-        return { ok: true };
-      } catch (e) {
-        console.error("Deactivate invite error:", e?.code, e?.message);
-        return { ok: false, error: "Could not remove." };
-      }
-    }
-
-    // Claimed member → deactivate membership by uid
-    const uid = typeof target === "string" ? target : target?.uid || target?.id;
-    const memRef = doc(db, "memberships", `${uid}_${orgId}`);
+    if (!user?.activeOrgId || target?.pending) return { ok: false, error: "Pending invitations can be managed after they are claimed." };
     try {
-      await runTransaction(db, async (tx) => {
-        const memSnap = await tx.get(memRef);
-        if (!memSnap.exists() || memSnap.data().active === false) return;
-        const orgSnap = await tx.get(orgRef);
-        tx.update(memRef, { active: false });
-        if (orgSnap.exists()) {
-          const used = orgSnap.data().seatsUsed ?? 1;
-          tx.update(orgRef, { seatsUsed: Math.max(0, used - 1) });
-        }
-      });
-      logActivity(`Team member deactivated (${uid})`);
+      await setTeamMemberStatus({ orgId: user.activeOrgId, uid: target?.uid || target?.id || target, active: false });
       return { ok: true };
     } catch (e) {
-      console.error("Deactivate user error:", e?.code, e?.message);
-      return { ok: false, error: "Could not deactivate." };
+      return { ok: false, error: e.message || "Could not deactivate team member" };
     }
   };
 
-  // Re-activate a member — consumes a seat, so it's blocked when the plan is
-  // full or the subscription/trial has expired.
   const activateUser = async (uid) => {
     if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
-    const orgRef = doc(db, "organizations", user.activeOrgId);
-    const memRef = doc(db, "memberships", `${uid}_${user.activeOrgId}`);
     try {
-      await runTransaction(db, async (tx) => {
-        const memSnap = await tx.get(memRef);
-        if (!memSnap.exists()) throw Object.assign(new Error("missing"), { code: "missing" });
-        if (memSnap.data().active === true) return; // already active
-        const orgSnap = await tx.get(orgRef);
-        const org = orgSnap.exists() ? orgSnap.data() : {};
-        if (org.subscriptionStatus === "expired")
-          throw Object.assign(new Error("expired"), { code: "expired" });
-        if ((org.seatsUsed ?? 0) >= (org.seatsLimit ?? 0))
-          throw Object.assign(new Error("seat"), { code: "seat-limit" });
-        tx.update(memRef, { active: true });
-        tx.update(orgRef, { seatsUsed: increment(1) });
-      });
-      logActivity(`Team member re-activated (${uid})`);
+      await setTeamMemberStatus({ orgId: user.activeOrgId, uid, active: true });
       return { ok: true };
     } catch (e) {
-      if (e.code === "seat-limit")
-        return { ok: false, error: "Seat limit reached. Upgrade your plan to re-activate this member." };
-      if (e.code === "expired")
-        return { ok: false, error: "Subscription/trial expired. Upgrade to re-activate members." };
-      console.error("Activate user error:", e?.code, e?.message);
-      return { ok: false, error: "Could not activate." };
+      return { ok: false, error: e.message || "Could not activate team member" };
     }
   };
 
-  // In-app plan upgrade/downgrade. Updates the org's plan and RAISES the
-  // seat & lead limits to the new plan immediately (concern #4).
-  // NOTE: with no payment gateway wired yet this is a trusted owner action;
-  // when Razorpay is added, gate this behind a verified payment.
-  const changePlan = async (limits) => {
-    if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
-    try {
-      await updateDoc(doc(db, "organizations", user.activeOrgId), {
-        planId: limits.planId,
-        planName: limits.planName,
-        seatsLimit: limits.seatsLimit,
-        leadsLimit: limits.leadsLimit,
-        subscriptionStatus: "active",
-        trialEndsAt: null,
-      });
-      logActivity(`Plan changed to ${limits.planName} (seats: ${limits.seatsLimit})`);
-      return { ok: true };
-    } catch (e) {
-      console.error("Change plan error:", e?.code, e?.message);
-      return { ok: false, error: "Could not change plan. Please try again." };
-    }
-  };
+  // Entitlements are payment-backend only. Keep this compatibility method so
+  // older callers receive a safe message instead of mutating Firestore.
+  const changePlan = async () => ({ ok: false, error: "Choose a payment method to activate or upgrade a plan." });
 
-  // Schedule a DOWNGRADE to take effect at the end of the current paid period
-  // (they keep current benefits until then). Cron applies it. No refund/charge.
-  const scheduleDowngrade = async (toPlanId, cycle = "monthly", effectiveAtMs = null) => {
+  const scheduleDowngrade = async (toPlanId, cycle = "monthly") => {
     if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
     try {
-      await updateDoc(doc(db, "organizations", user.activeOrgId), {
-        pendingPlanChange: { toPlanId, cycle, effectiveAtMs: effectiveAtMs || null },
-      });
-      logActivity(`Downgrade scheduled to ${toPlanId} at period end`);
+      await schedulePlanDowngrade({ orgId: user.activeOrgId, toPlanId, cycle });
       return { ok: true };
     } catch (e) {
-      console.error("Schedule downgrade error:", e?.code, e?.message);
-      return { ok: false, error: "Could not schedule downgrade." };
+      return { ok: false, error: e.message || "Could not schedule downgrade." };
     }
   };
 
   const cancelDowngrade = async () => {
-    if (!user?.activeOrgId) return { ok: false };
+    if (!user?.activeOrgId) return { ok: false, error: "No active organization" };
     try {
-      await updateDoc(doc(db, "organizations", user.activeOrgId), { pendingPlanChange: null });
-      logActivity("Scheduled downgrade cancelled — staying on current plan");
+      await cancelPlanDowngrade({ orgId: user.activeOrgId });
       return { ok: true };
     } catch (e) {
-      console.error("Cancel downgrade error:", e?.code, e?.message);
-      return { ok: false, error: "Could not cancel." };
+      return { ok: false, error: e.message || "Could not cancel downgrade." };
     }
   };
 
@@ -729,9 +556,9 @@ export function DataProvider({ children }) {
   // ============================================================
 
   const triggerWhatsAppSync = async () => {
+    if (!user?.activeOrgId) return { success: false, error: "No active organization" };
     try {
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/whatsapp/sync-now`, { method: "POST" });
-      return await res.json();
+      return await requestWhatsAppSync({ orgId: user.activeOrgId });
     } catch (e) {
       console.error("WhatsApp sync error:", e);
       return { success: false, error: e.message };

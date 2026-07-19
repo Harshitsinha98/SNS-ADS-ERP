@@ -271,7 +271,7 @@ describe('Role-based access - Admin', () => {
     );
   });
 
-  it('Admin CAN delete leads', async () => {
+  it('Admin CANNOT delete leads directly', async () => {
     const db = getDbAsUser('admin_1', { phone: '+916666666666' });
     const adminDb = getDbAsAdmin();
 
@@ -279,8 +279,8 @@ describe('Role-based access - Admin', () => {
     await createMembership(adminDb, 'admin_1', 'org_a', 'admin');
     await createLead(adminDb, 'org_a', 'lead_1');
 
-    // Test: Admin should be able to delete lead
-    await assertSucceeds(
+    // Lead lifecycle and quota accounting are backend-owned.
+    await assertFails(
       db.collection('organizations').doc('org_a').collection('leads').doc('lead_1').delete()
     );
   });
@@ -514,6 +514,79 @@ describe('Activity log access', () => {
     await assertFails(
       db.collection('organizations').doc('org_a')
         .collection('activity').doc('activity_1').delete()
+    );
+  });
+});
+
+
+// ============================================================
+// PRIVILEGE ESCALATION AND ENTITLEMENT REGRESSIONS
+// ============================================================
+
+describe('Server-owned privileges and billing', () => {
+  it('Authenticated user CANNOT create an owner membership in another org', async () => {
+    const db = getDbAsUser('attacker', { phone: '+919111111111' });
+    const adminDb = getDbAsAdmin();
+    await createOrganization(adminDb, 'target_org', { name: 'Target' });
+
+    await assertFails(
+      db.collection('memberships').doc('attacker_target_org').set({
+        uid: 'attacker', orgId: 'target_org', role: 'owner', active: true,
+      })
+    );
+  });
+
+  it('Employee CANNOT promote their own membership', async () => {
+    const db = getDbAsUser('employee_1', { phone: '+915555555555' });
+    const adminDb = getDbAsAdmin();
+    await createOrganization(adminDb, 'org_a', { name: 'Org A' });
+    await createMembership(adminDb, 'employee_1', 'org_a', 'employee');
+
+    await assertFails(
+      db.collection('memberships').doc('employee_1_org_a').update({ role: 'owner' })
+    );
+  });
+
+  it('Organization admin CANNOT self-activate a paid plan or raise limits', async () => {
+    const db = getDbAsUser('admin_1', { phone: '+916666666666' });
+    const adminDb = getDbAsAdmin();
+    await createOrganization(adminDb, 'org_a', {
+      name: 'Org A', subscriptionStatus: 'expired', seatsLimit: 1, leadsLimit: 10,
+    });
+    await createMembership(adminDb, 'admin_1', 'org_a', 'admin');
+
+    await assertFails(
+      db.collection('organizations').doc('org_a').update({
+        subscriptionStatus: 'active', seatsLimit: 999, leadsLimit: 999999,
+      })
+    );
+  });
+
+  it('Employee CANNOT create a lead directly and bypass quota accounting', async () => {
+    const db = getDbAsUser('employee_1', { phone: '+915555555555' });
+    const adminDb = getDbAsAdmin();
+    await createOrganization(adminDb, 'org_a', { name: 'Org A' });
+    await createMembership(adminDb, 'employee_1', 'org_a', 'employee');
+
+    await assertFails(
+      db.collection('organizations').doc('org_a').collection('leads').doc('forged').set({
+        orgId: 'org_a', assignedTo: 'employee_1', name: 'Bypass attempt',
+      })
+    );
+  });
+
+  it('Employee CANNOT write a note to another employee’s lead', async () => {
+    const db = getDbAsUser('employee_1', { phone: '+915555555555' });
+    const adminDb = getDbAsAdmin();
+    await createOrganization(adminDb, 'org_a', { name: 'Org A' });
+    await createMembership(adminDb, 'employee_1', 'org_a', 'employee');
+    await createMembership(adminDb, 'employee_2', 'org_a', 'employee');
+    await createLead(adminDb, 'org_a', 'lead_2', { assignedTo: 'employee_2' });
+
+    await assertFails(
+      db.collection('organizations').doc('org_a').collection('leads').doc('lead_2').collection('notes').doc('forged').set({
+        authorId: 'employee_1', visibility: 'team', text: 'Unauthorized note', at: new Date().toISOString(),
+      })
     );
   });
 });

@@ -5,14 +5,14 @@ import { useBilling } from "../../context/BillingContext";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
-import { mergePlansWithConfig, limitsForPlan, PLAN_ORDER, isUpgrade, getPlanById } from "../../data/plans";
+import { mergePlansWithConfig, isUpgrade, getPlanById } from "../../data/plans";
 import {
   getBillingConfig, createRazorpayOrder, verifyRazorpayPayment, getPayuHash,
   createSubscription, verifySubscription, cancelAutopay,
   loadRazorpayScript, submitPayuForm,
 } from "../../utils/billingApi";
 import {
-  Check, Sparkles, Users, Inbox, Clock, ArrowRight, Loader2, ShieldCheck,
+  Check, Sparkles, Users, Inbox, Clock, Loader2, ShieldCheck,
   CreditCard, RefreshCw, Zap, Lock, TrendingUp, X, AlertTriangle, Repeat, ChevronDown,
 } from "lucide-react";
 
@@ -20,7 +20,7 @@ const fmtDate = (ms) => ms ? new Date(ms).toLocaleDateString("en-IN", { day: "2-
 
 export default function Billing() {
   const b = useBilling();
-  const { changePlan, scheduleDowngrade, cancelDowngrade } = useData();
+  const { scheduleDowngrade, cancelDowngrade } = useData();
   const { user } = useAuth();
   const location = useLocation();
 
@@ -62,9 +62,7 @@ export default function Billing() {
   // ---- payment ----
   const doPayment = async (plan, { autopay = false } = {}) => {
     if (!anyGateway) {
-      const res = await changePlan(limitsForPlan(plan.id, config));
-      setMsg(res?.ok ? `✅ (Dev) ${plan.name} activated — no payment gateway configured.` : (res?.error || "Could not activate."));
-      return;
+      throw new Error("Payments are temporarily unavailable. Contact support to activate your plan.");
     }
     if (method === "razorpay" && gateways.razorpay) {
       const ok = await loadRazorpayScript();
@@ -276,7 +274,7 @@ export default function Billing() {
 
       {!anyGateway && (
         <p className="text-xs text-warning-700 bg-warning-50 border border-warning-200 rounded-lg px-3 py-2 mb-4">
-          Payment gateway is unreachable (set VITE_BACKEND_URL). Until then, you can test with "Activate (dev)".
+          Payment gateway is temporarily unavailable. Plan activation and upgrades are disabled until a verified payment method is available.
         </p>
       )}
 
@@ -390,9 +388,9 @@ function PlanCard({ plan, price, cycle, state, busy, anyGateway, onPay, onDowngr
           <Lock size={14} /> Lower plan
         </button>
       ) : (
-        <button disabled={busy} onClick={onPay} className="mt-auto btn btn-primary w-full">
+        <button disabled={busy || !anyGateway} onClick={onPay} className="mt-auto btn btn-primary w-full">
           {busy ? <><Loader2 size={16} className="animate-spin" /> Processing…</>
-            : !anyGateway ? <>Activate (dev) <ArrowRight size={15} /></>
+            : !anyGateway ? <>Payment unavailable</>
             : state === "upgrade" ? <><TrendingUp size={15} /> Upgrade</>
             : <><CreditCard size={15} /> Choose & pay</>}
         </button>

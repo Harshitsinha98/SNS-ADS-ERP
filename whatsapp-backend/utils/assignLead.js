@@ -82,7 +82,7 @@ export async function getNextEmployeeByWorkload(db, orgId) {
         .collection('leads')
         .where('assignedTo', '==', e.id)
         .get();
-      counts[e.id] = leadsSnap.size;
+      counts[e.id] = leadsSnap.docs.filter((lead) => !['Closed-Won', 'Lost'].includes(lead.data().status)).length;
     }
 
     // Sort by count and return employee with lowest workload

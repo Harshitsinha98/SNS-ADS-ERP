@@ -17,7 +17,11 @@ async function authedPost(path, body) {
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    const error = new Error(data.error || `Request failed (${res.status})`);
+    Object.assign(error, data, { status: res.status });
+    throw error;
+  }
   return data;
 }
 
@@ -73,3 +77,17 @@ export function submitPayuForm(action, params) {
   document.body.appendChild(form);
   form.submit();
 }
+
+
+// ---- secured workspace, team, lead, and platform operations ----
+export const provisionTrialWorkspace = (body) => authedPost("/api/billing/trial/provision", body);
+export const claimTeamInvites = () => authedPost("/api/billing/team/claim-invites", {});
+export const inviteTeamMember = (body) => authedPost("/api/billing/team/invite", body);
+export const setTeamMemberStatus = (body) => authedPost("/api/billing/team/member-status", body);
+export const setTeamMemberRole = (body) => authedPost("/api/billing/team/member-role", body);
+export const schedulePlanDowngrade = (body) => authedPost("/api/billing/subscription/schedule-downgrade", body);
+export const cancelPlanDowngrade = (body) => authedPost("/api/billing/subscription/cancel-downgrade", body);
+export const importBulkLeads = (body) => authedPost("/api/billing/leads/bulk-import", body);
+export const reassignBulkLeads = (body) => authedPost("/api/billing/leads/reassign-bulk", body);
+export const platformOrgAction = (body) => authedPost("/api/billing/platform/org-action", body);
+export const triggerWhatsAppSync = (body) => authedPost("/api/whatsapp/sync-now", body);

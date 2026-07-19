@@ -1,56 +1,10 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, collection, query, where, getDocs, setDoc, updateDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { withTimeout } from "../utils/withTimeout";
+import { claimTeamInvites } from "../utils/billingApi";
 import { PLATFORM_OWNER_PHONE } from "../data/constants";
-
-// When an invited employee logs in, turn their pending invite(s) into real
-// UID-keyed membership(s) so their login resolves to the employee dashboard
-// instead of the "create organization" prompt.
-async function claimPendingInvites(uid, phone) {
-  if (!phone) return 0;
-  let claimed = 0;
-  try {
-    const invSnap = await getDocs(
-      query(collection(db, "invites"), where("phone", "==", phone), where("active", "==", true))
-    );
-    for (const inv of invSnap.docs) {
-      const d = inv.data();
-      try {
-        await setDoc(doc(db, "memberships", `${uid}_${d.orgId}`), {
-          uid,
-          orgId: d.orgId,
-          role: d.role || "employee",
-          displayName: d.displayName || "Member",
-          email: d.email || "",
-          phone: phone, // E164 — for team display & dedup
-          active: true,
-          invitedBy: d.invitedBy || null,
-          joinedAt: new Date().toISOString(),
-          lastActiveAt: new Date().toISOString(),
-        });
-        await updateDoc(inv.ref, {
-          active: false,
-          claimed: true,
-          claimedByUid: uid,
-          claimedAt: new Date().toISOString(),
-        });
-        await setDoc(
-          doc(db, "users", uid),
-          { phone, displayName: d.displayName || "Member", defaultOrgId: d.orgId, lastLoginAt: new Date().toISOString() },
-          { merge: true }
-        );
-        claimed++;
-      } catch (e) {
-        console.error("Invite claim failed for org", d.orgId, e?.code, e?.message);
-      }
-    }
-  } catch (e) {
-    console.warn("Invite lookup skipped:", e?.code || e?.message);
-  }
-  return claimed;
-}
 
 const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
@@ -80,6 +34,13 @@ export function AuthProvider({ children }) {
         
         const isPlatformOwner = phone === PLATFORM_OWNER_PHONE;
 
+        // Pending invites are claimed by a backend transaction on every sign-in.
+        // This supports users who belong to multiple organizations without ever
+        // allowing a browser to create or elevate a membership.
+        await claimTeamInvites().catch((error) => {
+          console.warn("Invite claim skipped:", error?.message || error);
+        });
+
         // Step 2: Get user's active memberships
         const membershipsQuery = query(
           collection(db, "memberships"),
@@ -87,15 +48,6 @@ export function AuthProvider({ children }) {
           where("active", "==", true)
         );
         let membershipsSnap = await withTimeout(getDocs(membershipsQuery), 15000, "load memberships");
-
-        // Step 2b: If none, this might be an invited employee logging in for the
-        // first time — claim their pending invite(s) into real memberships.
-        if (membershipsSnap.empty) {
-          const claimed = await claimPendingInvites(uid, phone);
-          if (claimed > 0) {
-            membershipsSnap = await withTimeout(getDocs(membershipsQuery), 15000, "reload memberships");
-          }
-        }
 
         if (membershipsSnap.empty) {
           // Platform owner has no org membership but still needs the /platform
