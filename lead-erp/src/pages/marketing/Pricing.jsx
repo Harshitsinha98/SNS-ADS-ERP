@@ -6,6 +6,9 @@ import MarketingFooter from "../../components/marketing/MarketingFooter";
 import { TRIAL_DAYS, mergePlansWithConfig } from "../../data/plans";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
 
+const SALES_WHATSAPP_NUMBER = (import.meta.env.VITE_SALES_WHATSAPP_NUMBER || "919653043939").replace(/\D/g, "");
+const salesWhatsAppUrl = `https://wa.me/${SALES_WHATSAPP_NUMBER}?text=${encodeURIComponent("Hi CodeSkate team, I need help with a custom CRM plan.")}`;
+
 const buildFaqs = (trialDays) => [
   {
     q: `What happens after my ${trialDays}-day trial ends?`,
@@ -214,7 +217,7 @@ export default function Pricing() {
 
         <p className="text-center text-sm text-ink-muted mt-10 px-4">
           All prices in INR and exclusive of applicable taxes. Need a custom plan?{" "}
-          <span className="text-orange-600 font-semibold cursor-pointer hover:underline">Talk to sales →</span>
+          <a href={salesWhatsAppUrl} target="_blank" rel="noreferrer" className="text-orange-600 font-semibold hover:underline">Talk to sales →</a>
         </p>
       </section>
 

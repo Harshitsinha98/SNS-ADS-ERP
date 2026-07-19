@@ -101,6 +101,77 @@ export default function createBillingRouter(db) {
     return { plan, cycle: normalizeCycle(cycle) };
   }
 
+  async function assertNoExistingWorkspace(uid) {
+    const [membershipSnap, userSnap, authRecord] = await Promise.all([
+      db.collection("memberships").where("uid", "==", uid).limit(10).get(),
+      db.collection("users").doc(uid).get(),
+      getAuth().getUser(uid),
+    ]);
+    const hasActiveMembership = membershipSnap.docs.some((membership) => membership.data().active === true);
+    const hasWorkspaceProfile = Boolean(userSnap.exists && userSnap.data().defaultOrgId);
+    if (hasActiveMembership || hasWorkspaceProfile || authRecord.phoneNumber === PLATFORM_OWNER_PHONE) {
+      throw httpError(409, "This number is already registered. Please sign in instead.");
+    }
+  }
+
+  // Exactly one pending signup checkout may exist for a user. A dismissed
+  // checkout is resumable using the same provider intent, so it never creates
+  // a second chargeable session that could race workspace provisioning.
+  async function claimSignupSession(uid) {
+    const ref = db.collection("signupSessions").doc(uid);
+    const claimId = crypto.randomUUID();
+    return db.runTransaction(async (tx) => {
+      const existing = await tx.get(ref);
+      const now = Date.now();
+      if (existing.exists && existing.data().status === "pending") return { created: false, ...existing.data() };
+      if (existing.exists && existing.data().status === "creating") {
+        // A provider order may have been created before a crashed request could
+        // attach it. Do not reclaim this lock automatically: doing so could
+        // allow a late order to be paid after a newer checkout is issued.
+        throw httpError(409, "Your checkout is still being prepared. Please try again shortly or contact support.");
+      }
+      // The claim ID makes a cleanup/recovery action unable to attach a
+      // provider checkout that belongs to a different in-flight request.
+      tx.set(ref, { uid, status: "creating", claimId, createdAt: nowIso(), createdAtMs: now });
+      return { created: true, claimId };
+    });
+  }
+
+  async function attachSignupSession(uid, claimId, provider, intentId) {
+    const ref = db.collection("signupSessions").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const session = await tx.get(ref);
+      if (!session.exists || session.data().status !== "creating" || session.data().claimId !== claimId) {
+        throw httpError(409, "Your checkout session was replaced. Please try again.");
+      }
+      tx.update(ref, { status: "pending", provider, intentId, updatedAt: nowIso() });
+    });
+  }
+
+  async function abandonCreatingSignupSession(uid, claimId) {
+    const ref = db.collection("signupSessions").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const session = await tx.get(ref);
+      if (session.exists && session.data().status === "creating" && session.data().claimId === claimId) tx.delete(ref);
+    });
+  }
+
+  async function assertSignupSessionOwner(uid, intentId) {
+    const session = await db.collection("signupSessions").doc(uid).get();
+    // Existing sessions created before this protection are still accepted.
+    if (!session.exists) return;
+    const data = session.data();
+    if (data.status !== "pending" || data.intentId !== intentId) {
+      throw httpError(409, "This checkout session is no longer active. Please contact support if payment was completed.");
+    }
+  }
+
+  async function completeSignupSession(uid, intentId) {
+    await db.collection("signupSessions").doc(uid).set({
+      status: "completed", intentId, completedAt: nowIso(),
+    }, { merge: true });
+  }
+
   function subscriptionAllowsLeadCreation(org) {
     if (org.subscriptionStatus === "active") return true;
     return org.subscriptionStatus === "trialing"
@@ -227,19 +298,22 @@ export default function createBillingRouter(db) {
   }
 
   async function failIntent(intentId, message) {
-    await db.collection("paymentIntents").doc(intentId).set({
-      status: "failed",
-      failedAt: nowIso(),
-      failure: message,
-    }, { merge: true });
+    const ref = db.collection("paymentIntents").doc(intentId);
+    await db.runTransaction(async (tx) => {
+      const intent = await tx.get(ref);
+      // A late/duplicate gateway callback must never turn a completed payment
+      // into a failed session.
+      if (!intent.exists || intent.data().status === "completed") return;
+      tx.set(ref, {
+        status: "failed",
+        failedAt: nowIso(),
+        failure: message,
+      }, { merge: true });
+    });
   }
 
-  async function verifyRazorpayPayment({ orderId, paymentId, signature, intent }) {
+  async function verifyRazorpayCapturedPayment({ orderId, paymentId, intent }) {
     if (!razorpay) throw httpError(503, "Razorpay is not configured");
-    const expectedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(`${orderId}|${paymentId}`).digest("hex");
-    if (!same(expectedSignature, signature)) throw httpError(400, "Payment signature verification failed");
-
     const [order, payment] = await Promise.all([
       razorpay.orders.fetch(orderId),
       razorpay.payments.fetch(paymentId),
@@ -252,6 +326,14 @@ export default function createBillingRouter(db) {
     return { order, payment };
   }
 
+  async function verifyRazorpayPayment({ orderId, paymentId, signature, intent }) {
+    if (!razorpay) throw httpError(503, "Razorpay is not configured");
+    const expectedSignature = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${orderId}|${paymentId}`).digest("hex");
+    if (!same(expectedSignature, signature)) throw httpError(400, "Payment signature verification failed");
+    return verifyRazorpayCapturedPayment({ orderId, paymentId, intent });
+  }
+
   async function provisionWorkspace({ uid, phone, orgName, fullName, plan, cycle, paymentMeta, eventId }) {
     const orgRef = db.collection("organizations").doc();
     const userRef = db.collection("users").doc(uid);
@@ -262,8 +344,11 @@ export default function createBillingRouter(db) {
     const createdAt = nowIso();
 
     const result = await db.runTransaction(async (tx) => {
-      const existingEvent = await tx.get(eventRef);
+      const [existingEvent, existingUser] = await Promise.all([tx.get(eventRef), tx.get(userRef)]);
       if (existingEvent.exists) return { alreadyApplied: true, orgId: existingEvent.data().result?.orgId };
+      if (existingUser.exists && existingUser.data().defaultOrgId) {
+        throw httpError(409, "This number is already registered. Please sign in instead.");
+      }
 
       const periodEnd = Date.now() + periodDays * DAY_MS;
       tx.create(orgRef, {
@@ -334,6 +419,90 @@ export default function createBillingRouter(db) {
     return result.orgId;
   }
 
+  // A signed Razorpay payment.captured webhook can arrive when the browser
+  // never reaches /signup/verify. Reconcile the server-owned intent here so a
+  // captured payment always provisions (or safely replays) its workspace.
+  async function finalizeRazorpaySignupFromWebhook(orderId, paymentId) {
+    const intentRef = db.collection("paymentIntents").doc(orderId);
+    const intentSnap = await intentRef.get();
+    if (!intentSnap.exists || intentSnap.data().kind !== "signup") return null;
+    const intent = intentSnap.data();
+    if (intent.status === "completed") {
+      await completeSignupSession(intent.uid, orderId);
+      return intent.outcome || {};
+    }
+    const { payment } = await verifyRazorpayCapturedPayment({ orderId, paymentId, intent });
+    const userRecord = await getAuth().getUser(intent.uid);
+    const { plan, cycle } = await getPlan(db, intent.planId, intent.cycle);
+    const orgId = await provisionWorkspace({
+      uid: intent.uid,
+      phone: userRecord.phoneNumber || null,
+      orgName: intent.orgName,
+      fullName: intent.fullName,
+      plan,
+      cycle,
+      paymentMeta: { gateway: "razorpay", paymentId: payment.id },
+      eventId: `razorpay_payment_${payment.id}`,
+    });
+    const result = { orgId, planName: plan.name };
+    await finishIntent(orderId, result);
+    await completeSignupSession(intent.uid, orderId);
+    return result;
+  }
+
+  // Public, deliberately minimal account-existence check used before signup
+  // OTP is sent. It returns no account, organization, or role data; the
+  // result only prevents an existing active customer from starting checkout.
+  const accountStatusAttempts = new Map();
+  const accountStatusWindowMs = 10 * 60 * 1000;
+  const accountStatusLimit = 20;
+
+  function allowAccountStatusLookup(req) {
+    const now = Date.now();
+    const clientKey = crypto.createHash("sha256").update(req.ip || "unknown").digest("hex");
+    const current = accountStatusAttempts.get(clientKey);
+    if (!current || current.expiresAtMs <= now) {
+      if (accountStatusAttempts.size >= 10000) {
+        for (const [key, entry] of accountStatusAttempts) {
+          if (entry.expiresAtMs <= now) accountStatusAttempts.delete(key);
+        }
+      }
+      if (accountStatusAttempts.size >= 10000) return false;
+      accountStatusAttempts.set(clientKey, { count: 1, expiresAtMs: now + accountStatusWindowMs });
+      return true;
+    }
+    if (current.count >= accountStatusLimit) return false;
+    current.count += 1;
+    return true;
+  }
+
+  router.post("/account-status", async (req, res) => {
+    try {
+      const digits = phoneKey(req.body?.phone);
+      if (!/^(91)?[6-9]\d{9}$/.test(digits)) {
+        return res.status(400).json({ error: "Enter a valid Indian mobile number" });
+      }
+      const phone = `+91${digits.slice(-10)}`;
+      if (!allowAccountStatusLookup(req)) {
+        return res.status(429).json({ error: "Too many account checks. Please try again shortly." });
+      }
+      const [membershipSnap, userSnap] = await Promise.all([
+        db.collection("memberships").where("phone", "==", phone).limit(10).get(),
+        db.collection("users").where("phone", "==", phone).limit(1).get(),
+      ]);
+      // A membership is the authoritative sign that this number already has
+      // workspace access. The user profile fallback preserves compatibility
+      // with pre-membership migration accounts.
+      const registered = membershipSnap.docs.some((membership) => membership.data().active === true)
+        || !userSnap.empty
+        || phone === PLATFORM_OWNER_PHONE;
+      return res.json({ registered });
+    } catch (error) {
+      console.error("account-status:", error.message);
+      return res.status(503).json({ error: "Could not check this number right now. Please try again." });
+    }
+  });
+
   // Public gateway configuration only; private gateway secrets never leave the backend.
   router.get("/config", (req, res) => {
     res.json({
@@ -345,6 +514,8 @@ export default function createBillingRouter(db) {
 
   // ----- secure trial workspace provisioning -----
   router.post("/trial/provision", requireAuth, async (req, res) => {
+    let signupSessionCreated = false;
+    let signupSessionClaimId = null;
     try {
       const orgName = String(req.body?.orgName || "").trim();
       const fullName = String(req.body?.fullName || "").trim();
@@ -352,7 +523,13 @@ export default function createBillingRouter(db) {
       const authRecord = await getAuth().getUser(req.authUser.uid);
       const phone = authRecord.phoneNumber;
       if (!phone) throw httpError(400, "A verified phone number is required");
+      await assertNoExistingWorkspace(req.authUser.uid);
+      const signupSession = await claimSignupSession(req.authUser.uid);
+      if (!signupSession.created) throw httpError(409, "A paid checkout is already pending for this number. Please complete it or contact support.");
+      signupSessionCreated = true;
+      signupSessionClaimId = signupSession.claimId;
       const trialRef = db.collection("trialsUsed").doc(phoneKey(phone));
+      const userRef = db.collection("users").doc(req.authUser.uid);
       const orgRef = db.collection("organizations").doc();
       const trialDays = await getTrialDays();
       const { plan } = await getPlan(db, "starter", "monthly");
@@ -361,8 +538,11 @@ export default function createBillingRouter(db) {
       const endMs = Date.now() + trialDays * DAY_MS;
 
       await db.runTransaction(async (tx) => {
-        const used = await tx.get(trialRef);
+        const [used, existingUser] = await Promise.all([tx.get(trialRef), tx.get(userRef)]);
         if (used.exists) throw httpError(409, "This number has already used its free trial");
+        if (existingUser.exists && existingUser.data().defaultOrgId) {
+          throw httpError(409, "This number is already registered. Please sign in instead.");
+        }
         tx.create(trialRef, { phone, uid: req.authUser.uid, orgId: orgRef.id, usedAt: createdAt });
         tx.create(orgRef, {
           name: orgName,
@@ -380,7 +560,7 @@ export default function createBillingRouter(db) {
           trialEndsAt: new Date(endMs).toISOString(),
           trialEndsAtMs: endMs,
         });
-        tx.set(db.collection("users").doc(req.authUser.uid), {
+        tx.set(userRef, {
           phone,
           displayName: fullName,
           defaultOrgId: orgRef.id,
@@ -406,8 +586,10 @@ export default function createBillingRouter(db) {
           orgId: orgRef.id,
         });
       });
+      await completeSignupSession(req.authUser.uid, "trial");
       res.json({ ok: true, orgId: orgRef.id, trialDays });
     } catch (error) {
+      if (signupSessionCreated) await abandonCreatingSignupSession(req.authUser.uid, signupSessionClaimId).catch(() => {});
       res.status(error.status || 500).json({ error: error.message || "Could not create trial workspace" });
     }
   });
@@ -459,11 +641,36 @@ export default function createBillingRouter(db) {
 
   // ----- Razorpay paid workspace signup -----
   router.post("/signup/order", requireAuth, async (req, res) => {
+    let sessionCreated = false;
+    let sessionClaimId = null;
     try {
       if (!razorpay) throw httpError(503, "Razorpay is not configured on the server");
       const orgName = String(req.body?.orgName || "").trim();
       const fullName = String(req.body?.fullName || "").trim();
       if (!orgName || !fullName) throw httpError(400, "Organization and owner name are required");
+      await assertNoExistingWorkspace(req.authUser.uid);
+      const session = await claimSignupSession(req.authUser.uid);
+      if (!session.created) {
+        if (session.provider !== "razorpay" || !session.intentId) {
+          throw httpError(409, "A PayU checkout is already pending for this number. Please resume that checkout.");
+        }
+        const existingIntent = await db.collection("paymentIntents").doc(session.intentId).get();
+        if (!existingIntent.exists || existingIntent.data().kind !== "signup") {
+          throw httpError(409, "Your checkout is still being prepared. Please try again shortly.");
+        }
+        const intent = existingIntent.data();
+        const { plan } = await getPlan(db, intent.planId, intent.cycle);
+        return res.json({
+          orderId: session.intentId,
+          amount: intent.amountPaise,
+          currency: "INR",
+          keyId: process.env.RAZORPAY_KEY_ID,
+          planName: plan.name,
+          resumed: true,
+        });
+      }
+      sessionCreated = true;
+      sessionClaimId = session.claimId;
       const { plan, cycle } = await getPlan(db, req.body.planId, req.body.cycle);
       const amountPaise = amountForPlan(plan, cycle) * 100;
       const order = await razorpay.orders.create({
@@ -480,10 +687,11 @@ export default function createBillingRouter(db) {
         amountPaise,
         orgName,
         fullName,
-        expiresAtMs: Date.now() + 30 * 60 * 1000,
       });
+      await attachSignupSession(req.authUser.uid, sessionClaimId, "razorpay", order.id);
       res.json({ orderId: order.id, amount: amountPaise, currency: "INR", keyId: process.env.RAZORPAY_KEY_ID, planName: plan.name });
     } catch (error) {
+      if (sessionCreated) await abandonCreatingSignupSession(req.authUser.uid, sessionClaimId).catch(() => {});
       res.status(error.status || 500).json({ error: error.message || "Could not create payment order" });
     }
   });
@@ -492,7 +700,11 @@ export default function createBillingRouter(db) {
     const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body || {};
     try {
       const intent = await beginIntent(orderId, req.authUser.uid, "signup");
-      if (intent.completed) return res.json({ ok: true, replay: true, ...(intent.outcome || {}) });
+      if (intent.completed) {
+        await completeSignupSession(req.authUser.uid, orderId);
+        return res.json({ ok: true, replay: true, ...(intent.outcome || {}) });
+      }
+      await assertSignupSessionOwner(req.authUser.uid, orderId);
       const { payment } = await verifyRazorpayPayment({ orderId, paymentId, signature, intent });
       const userRecord = await getAuth().getUser(req.authUser.uid);
       const { plan, cycle } = await getPlan(db, intent.planId, intent.cycle);
@@ -507,7 +719,10 @@ export default function createBillingRouter(db) {
         eventId: `razorpay_payment_${payment.id}`,
       });
       const result = { orgId, planName: plan.name };
+      // Record the durable payment outcome before closing the signup session.
+      // A retry can then replay success even if this process exits mid-finalize.
       await finishIntent(orderId, result);
+      await completeSignupSession(req.authUser.uid, orderId);
       res.json({ ok: true, ...result });
     } catch (error) {
       if (orderId) await failIntent(orderId, error.message).catch(() => {});
@@ -544,7 +759,7 @@ export default function createBillingRouter(db) {
       productinfo,
       email,
       phone,
-      expiresAtMs: Date.now() + 30 * 60 * 1000,
+      expiresAtMs: kind === "signup" ? null : Date.now() + 30 * 60 * 1000,
     });
     return {
       action: process.env.PAYU_MODE === "live" ? "https://secure.payu.in/_payment" : "https://test.payu.in/_payment",
@@ -560,6 +775,32 @@ export default function createBillingRouter(db) {
         udf2,
         udf3,
         hash,
+        surl: `${PUBLIC_BACKEND_URL}/api/billing/payu/callback`,
+        furl: `${PUBLIC_BACKEND_URL}/api/billing/payu/callback`,
+      },
+    };
+  }
+
+  function payuFormFromIntent(intent, txnid) {
+    const key = process.env.PAYU_KEY;
+    const salt = process.env.PAYU_SALT;
+    if (!key || !salt) throw httpError(503, "PayU is not configured on the server");
+    const udf1 = intent.kind === "signup" ? "signup" : intent.orgId;
+    const hashString = `${key}|${txnid}|${intent.amount}|${intent.productinfo}|${intent.fullName}|${intent.email}|${udf1}|${intent.planId}|${intent.cycle}||||||${salt}`;
+    return {
+      action: process.env.PAYU_MODE === "live" ? "https://secure.payu.in/_payment" : "https://test.payu.in/_payment",
+      params: {
+        key,
+        txnid,
+        amount: intent.amount,
+        productinfo: intent.productinfo,
+        firstname: intent.fullName,
+        email: intent.email,
+        phone: String(intent.phone || "").replace("+91", ""),
+        udf1,
+        udf2: intent.planId,
+        udf3: intent.cycle,
+        hash: crypto.createHash("sha512").update(hashString).digest("hex"),
         surl: `${PUBLIC_BACKEND_URL}/api/billing/payu/callback`,
         furl: `${PUBLIC_BACKEND_URL}/api/billing/payu/callback`,
       },
@@ -585,10 +826,26 @@ export default function createBillingRouter(db) {
   });
 
   router.post("/signup/payu/hash", requireAuth, async (req, res) => {
+    let sessionCreated = false;
+    let sessionClaimId = null;
     try {
       const orgName = String(req.body?.orgName || "").trim();
       const fullName = String(req.body?.fullName || "").trim();
       if (!orgName || !fullName) throw httpError(400, "Organization and owner name are required");
+      await assertNoExistingWorkspace(req.authUser.uid);
+      const session = await claimSignupSession(req.authUser.uid);
+      if (!session.created) {
+        if (session.provider !== "payu" || !session.intentId) {
+          throw httpError(409, "A Razorpay checkout is already pending for this number. Please resume that checkout.");
+        }
+        const existingIntent = await db.collection("paymentIntents").doc(session.intentId).get();
+        if (!existingIntent.exists || existingIntent.data().kind !== "signup") {
+          throw httpError(409, "Your checkout is still being prepared. Please try again shortly.");
+        }
+        return res.json(payuFormFromIntent(existingIntent.data(), session.intentId));
+      }
+      sessionCreated = true;
+      sessionClaimId = session.claimId;
       const userRecord = await getAuth().getUser(req.authUser.uid);
       const form = await createPayuIntent({
         kind: "signup",
@@ -600,8 +857,10 @@ export default function createBillingRouter(db) {
         email: String(req.body.email || "customer@codeskate.app").slice(0, 120),
         phone: userRecord.phoneNumber || "",
       });
+      await attachSignupSession(req.authUser.uid, sessionClaimId, "payu", form.params.txnid);
       res.json(form);
     } catch (error) {
+      if (sessionCreated) await abandonCreatingSignupSession(req.authUser.uid, sessionClaimId).catch(() => {});
       res.status(error.status || 500).json({ error: error.message || "Could not create PayU request" });
     }
   });
@@ -622,10 +881,22 @@ export default function createBillingRouter(db) {
       if (String(body.amount) !== intent.amount || String(body.productinfo) !== intent.productinfo || String(body.udf2) !== intent.planId || String(body.udf3) !== intent.cycle) {
         throw httpError(400, "PayU payment details do not match the server payment session");
       }
+      // PayU may resend a valid success callback. Preserve the original
+      // successful destination instead of reopening provisioning or marking
+      // the completed intent as failed.
+      if (intent.status === "completed") {
+        const prior = intent.outcome || {};
+        if (intent.kind === "signup") await completeSignupSession(intent.uid, txnid);
+        const redirect = intent.kind === "signup"
+          ? `${FRONTEND_URL}/login?paid=1&org=${encodeURIComponent(prior.orgId || "")}`
+          : `${FRONTEND_URL}/admin/billing?payu=success`;
+        return res.redirect(303, redirect);
+      }
       const eventId = `payu_payment_${body.mihpayid || txnid}`;
       const { plan, cycle } = await getPlan(db, intent.planId, intent.cycle);
       let redirect;
       if (intent.kind === "signup") {
+        await assertSignupSessionOwner(intent.uid, txnid);
         const userRecord = await getAuth().getUser(intent.uid);
         const orgId = await provisionWorkspace({
           uid: intent.uid,
@@ -637,7 +908,10 @@ export default function createBillingRouter(db) {
           paymentMeta: { gateway: "payu", mihpayid: body.mihpayid || txnid },
           eventId,
         });
+        // Persist the payment result first so a duplicate callback can replay
+        // success if the process exits before the session is marked complete.
         await finishIntent(txnid, { orgId, planName: plan.name });
+        await completeSignupSession(intent.uid, txnid);
         redirect = `${FRONTEND_URL}/login?paid=1&org=${encodeURIComponent(orgId)}`;
       } else if (intent.kind === "upgrade") {
         const result = await applyPlan(intent.orgId, plan, cycle, { gateway: "payu", mihpayid: body.mihpayid || txnid }, eventId);
@@ -742,7 +1016,8 @@ export default function createBillingRouter(db) {
           const prior = existing.data();
           const stillProcessing = prior.status === "processing"
             && Number(prior.processingStartedAtMs || 0) > now - 5 * 60 * 1000;
-          if (prior.status === "completed" || stillProcessing) return false;
+          if (prior.status === "completed") return "completed";
+          if (stillProcessing) return "in_progress";
           tx.set(eventRef, {
             status: "processing",
             processingStartedAtMs: now,
@@ -750,7 +1025,7 @@ export default function createBillingRouter(db) {
             retryCount: Number(prior.retryCount || 0) + 1,
             failure: null,
           }, { merge: true });
-          return true;
+          return "claimed";
         }
         tx.create(eventRef, {
           event: event.event || "unknown",
@@ -759,9 +1034,19 @@ export default function createBillingRouter(db) {
           retryCount: 0,
           status: "processing",
         });
-        return true;
+        return "claimed";
       });
-      if (!claimed) return res.json({ ok: true, duplicate: true });
+      // Do not acknowledge an in-flight fulfillment as a successful duplicate:
+      // if its process died, Razorpay must retry after this short lease.
+      if (claimed === "completed") return res.json({ ok: true, duplicate: true });
+      if (claimed === "in_progress") return res.status(409).json({ error: "Webhook processing is still in progress" });
+
+      const paymentEntity = event.payload?.payment?.entity;
+      if (event.event === "payment.captured" && paymentEntity?.order_id && paymentEntity?.id) {
+        const result = await finalizeRazorpaySignupFromWebhook(paymentEntity.order_id, paymentEntity.id);
+        await eventRef.update({ status: "completed", completedAt: nowIso(), failure: null });
+        return res.json({ ok: true, signupReconciled: Boolean(result) });
+      }
 
       const subscription = event.payload?.subscription?.entity;
       const subscriptionId = subscription?.id;
@@ -1177,6 +1462,43 @@ export default function createBillingRouter(db) {
       throw httpError(400, "Unsupported platform action");
     } catch (error) {
       res.status(error.status || 500).json({ error: error.message || "Platform action failed" });
+    }
+  });
+
+  // A checkout creation can be interrupted after its server-side lock is
+  // written but before its provider intent is attached. Automatic deletion is
+  // unsafe because a late provider order could still be paid. Platform support
+  // must first reconcile the provider dashboard, then explicitly release this
+  // stale, self-owned session so the customer can start again.
+  router.post("/platform/signup-session/recover", requireAuth, requirePlatformAdmin, async (req, res) => {
+    try {
+      const uid = String(req.body?.uid || "").trim();
+      if (!uid) throw httpError(400, "A user ID is required");
+      if (req.body?.confirmedNoProviderPayment !== true) {
+        throw httpError(400, "Confirm that no provider payment or usable checkout exists before releasing this session");
+      }
+      const sessionRef = db.collection("signupSessions").doc(uid);
+      const recoveryRef = db.collection("signupSessionRecoveries").doc(crypto.randomUUID());
+      await db.runTransaction(async (tx) => {
+        const session = await tx.get(sessionRef);
+        if (!session.exists || session.data().status !== "creating") {
+          throw httpError(404, "No interrupted signup checkout was found");
+        }
+        if (Number(session.data().createdAtMs || 0) > Date.now() - 5 * 60 * 1000) {
+          throw httpError(409, "Wait five minutes before recovering a checkout that may still be running");
+        }
+        tx.create(recoveryRef, {
+          uid,
+          recoveredBy: req.authUser.uid,
+          recoveredAt: nowIso(),
+          reason: "provider_reconciled_no_payment",
+          previousSession: session.data(),
+        });
+        tx.delete(sessionRef);
+      });
+      res.json({ ok: true, message: "Interrupted checkout released after provider reconciliation" });
+    } catch (error) {
+      res.status(error.status || 500).json({ error: error.message || "Could not recover the signup checkout" });
     }
   });
 
