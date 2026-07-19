@@ -31,6 +31,13 @@ service cloud.firestore {
         'status', 'priority', 'followUp', 'lastUpdated', 'lastContactedAt'
       ]);
     }
+    // Provider timestamps and entitlement/accounting fields stay server-owned.
+    function adminLeadFieldsOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status', 'priority', 'followUp', 'lastUpdated', 'lastContactedAt',
+        'assignedTo', 'assignedToName', 'blacklisted'
+      ]);
+    }
 
     match /platformAdmins/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isPlatformAdmin());
@@ -56,15 +63,12 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // A tenant admin may manage only mappings already owned by their tenant.
-    // These documents are otherwise unavailable to other tenants.
+    // WhatsApp routing is verified with Meta and maintained by the backend;
+    // browser clients cannot claim a shared provider phone-number ID.
     match /whatsappConfigs/{phoneNumberId} {
-      allow read: if isPlatformAdmin() || (resource != null && isAdmin(resource.data.orgId));
-      allow create: if isAdmin(request.resource.data.orgId);
-      allow update: if isAdmin(resource.data.orgId)
-                    && request.resource.data.orgId == resource.data.orgId;
-      allow delete: if isAdmin(resource.data.orgId);
+      allow read, write: if false;
     }
+    match /whatsappCredentials/{orgId} { allow read, write: if false; }
 
     match /users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isPlatformAdmin());
@@ -88,7 +92,7 @@ service cloud.firestore {
         allow read: if isAdmin(orgId) || isLeadAssignee(orgId, leadId);
         // Backend creates and counts every lead so quotas cannot be bypassed.
         allow create, delete: if false;
-        allow update: if isAdmin(orgId)
+        allow update: if (isAdmin(orgId) && adminLeadFieldsOnly())
           || (isLeadAssignee(orgId, leadId) && employeeLeadFieldsOnly());
 
         match /notes/{noteId} {
@@ -108,11 +112,25 @@ service cloud.firestore {
         match /private/{docId} {
           allow read, write: if isAdmin(orgId);
         }
+
+        // Provider transcripts are backend-authored. An admin can read any
+        // tenant conversation; employees can read only conversations assigned
+        // to them, matching lead visibility.
+        match /messages/{messageId} {
+          allow read: if isAdmin(orgId) || isLeadAssignee(orgId, leadId);
+          allow write: if false;
+        }
       }
 
+      // WhatsApp connection state is backend-authored. Other settings remain
+      // tenant-admin editable through their existing UI.
+      match /settings/whatsapp {
+        allow read: if isActiveMember(orgId);
+        allow write: if false;
+      }
       match /settings/{settingsId} {
         allow read: if isActiveMember(orgId);
-        allow write: if isAdmin(orgId);
+        allow write: if isAdmin(orgId) && settingsId != 'whatsapp';
       }
       match /meta/{metaId} {
         allow read: if isActiveMember(orgId);
@@ -148,6 +166,9 @@ service cloud.firestore {
     match /billingEvents/{id} { allow read, write: if false; }
     match /razorpayWebhookEvents/{id} { allow read, write: if false; }
     match /whatsappMessageEvents/{id} { allow read, write: if false; }
+    match /whatsappPendingMessages/{id} { allow read, write: if false; }
+    match /whatsappOutboundIntents/{id} { allow read, write: if false; }
+    match /whatsappOutboundDispatches/{id} { allow read, write: if false; }
     match /systemLocks/{id} { allow read, write: if false; }
     match /subscriptionIntents/{id} { allow read, write: if false; }
     match /signupSessions/{id} { allow read, write: if false; }

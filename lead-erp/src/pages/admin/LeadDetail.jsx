@@ -5,9 +5,10 @@ import { db } from "../../firebase";
 import Layout from "../../components/Layout";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
-import { CheckCircle, Phone, PhoneOff, MessageCircle } from "lucide-react";
-import { fmtDuration, toWaNumber } from "../../utils/helpers";
+import { CheckCircle, Phone, PhoneOff } from "lucide-react";
+import { fmtDuration } from "../../utils/helpers";
 import Timeline from "../../components/Timeline";
+import WhatsAppConversation from "../../components/WhatsAppConversation";
 
 const PRIORITIES = ["Hot", "Warm", "Cold"];
 
@@ -32,6 +33,7 @@ export default function LeadDetail() {
     reassignLead, updateLeadRevenue, updatePriority, addNote
   } = useData();
 
+  const orgId = user?.activeOrgId;
   const lead = leads.find((l) => l.id === id);
   const [notes, setNotes] = useState([]);
   const [financial, setFinancial] = useState(null);
@@ -46,21 +48,21 @@ export default function LeadDetail() {
   const [pendingDuration, setPendingDuration] = useState(0);
 
   useEffect(() => {
-    if (!id) return;
-    const q = query(collection(db, "leads", id, "notes"), orderBy("at", "desc"));
+    if (!id || !orgId) return undefined;
+    const q = query(collection(db, "organizations", orgId, "leads", id, "notes"), orderBy("at", "desc"));
     const unsub = onSnapshot(q, (snap) => {
       setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, (err) => console.error("Notes listener error:", err));
     return unsub;
-  }, [id]);
+  }, [id, orgId]);
 
   useEffect(() => {
-    if (!id || user?.role !== 'admin') { setFinancial(null); return; }
-    const unsub = onSnapshot(doc(db, "leads", id, "private", "data"), (snap) => {
+    if (!id || !orgId || user?.role !== "admin") { setFinancial(null); return undefined; }
+    const unsub = onSnapshot(doc(db, "organizations", orgId, "leads", id, "private", "data"), (snap) => {
       setFinancial(snap.exists() ? snap.data() : null);
     }, (err) => console.error("Financial listener error:", err));
     return unsub;
-  }, [id, user?.role]);
+  }, [id, orgId, user?.role]);
 
   useEffect(() => {
     if (!callActive) return;
@@ -113,11 +115,6 @@ export default function LeadDetail() {
     setShowWorknoteModal(false);
     setNoteText("");
     setPendingDuration(0);
-  };
-
-  const quickWhatsApp = () => {
-    addNote(lead.id, "Opened WhatsApp chat from lead page", "whatsapp", { authorName: user.name, visibility: "team" });
-    window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
   };
 
   return (
@@ -177,9 +174,6 @@ export default function LeadDetail() {
                   <PhoneOff size={15} /> End call · {fmtDuration(elapsed)}
                 </button>
               )}
-              <button onClick={quickWhatsApp} className="w-full flex items-center justify-center gap-2 bg-teal-50 text-teal-700 border border-teal-200 rounded-md p-2.5 text-sm font-medium hover:bg-teal-100 transition">
-                <MessageCircle size={15} /> WhatsApp
-              </button>
             </div>
 
             {user.role === 'admin' && (
@@ -193,6 +187,8 @@ export default function LeadDetail() {
               </div>
             )}
           </div>
+
+          <WhatsAppConversation lead={lead} />
 
           <div className="bg-white rounded-xl shadow border p-5">
             <h3 className="font-semibold mb-3">Add Worknote</h3>

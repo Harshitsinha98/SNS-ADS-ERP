@@ -106,3 +106,7 @@ export const importBulkLeads = (body) => authedPost("/api/billing/leads/bulk-imp
 export const reassignBulkLeads = (body) => authedPost("/api/billing/leads/reassign-bulk", body);
 export const platformOrgAction = (body) => authedPost("/api/billing/platform/org-action", body);
 export const triggerWhatsAppSync = (body) => authedPost("/api/whatsapp/sync-now", body);
+export const getWhatsAppConnection = (body) => authedPost("/api/whatsapp/status", body);
+export const connectWhatsAppBusiness = (body) => authedPost("/api/whatsapp/connect", body);
+export const disconnectWhatsAppBusiness = (body) => authedPost("/api/whatsapp/disconnect", body);
+export const sendWhatsAppMessage = (body) => authedPost("/api/whatsapp/messages", body);
