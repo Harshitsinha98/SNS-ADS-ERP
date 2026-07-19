@@ -1,105 +1,156 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Layout from "../../components/Layout";
 import { useAuth } from "../../context/AuthContext";
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../../firebase";
 import {
-  MessageCircle, Check, Copy, Loader2, Plug, Unplug, ArrowRight, Info,
-} from "lucide-react";
+  connectWhatsAppBusiness,
+  disconnectWhatsAppBusiness,
+  getWhatsAppConnection,
+} from "../../utils/billingApi";
+import { MessageCircle, Loader2, Plug, Unplug, ArrowRight, Info, ShieldCheck } from "lucide-react";
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "";
+const META_APP_ID = import.meta.env.VITE_META_APP_ID || "";
+const META_EMBEDDED_SIGNUP_CONFIG_ID = import.meta.env.VITE_META_EMBEDDED_SIGNUP_CONFIG_ID || "";
+const META_GRAPH_API_VERSION = import.meta.env.VITE_META_GRAPH_API_VERSION || "v22.0";
+
+function loadMetaSdk() {
+  if (!META_APP_ID) return Promise.reject(new Error("Meta App ID is not configured"));
+  if (window.FB) {
+    window.FB.init({ appId: META_APP_ID, cookie: true, xfbml: false, version: META_GRAPH_API_VERSION });
+    return Promise.resolve(window.FB);
+  }
+  return new Promise((resolve, reject) => {
+    const existing = document.getElementById("meta-jssdk");
+    const initialise = () => {
+      if (!window.FB) return reject(new Error("Meta login could not be loaded"));
+      window.FB.init({ appId: META_APP_ID, cookie: true, xfbml: false, version: META_GRAPH_API_VERSION });
+      resolve(window.FB);
+    };
+    if (existing) {
+      existing.addEventListener("load", initialise, { once: true });
+      existing.addEventListener("error", () => reject(new Error("Meta login could not be loaded")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "meta-jssdk";
+    script.async = true;
+    script.defer = true;
+    script.src = "https://connect.facebook.net/en_US/sdk.js";
+    script.onload = initialise;
+    script.onerror = () => reject(new Error("Meta login could not be loaded"));
+    document.body.appendChild(script);
+  });
+}
 
 export default function WhatsApp() {
   const { user } = useAuth();
   const orgId = user?.activeOrgId;
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [phoneNumberId, setPhoneNumberId] = useState("");
-  const [wabaId, setWabaId] = useState("");
-  const [savedNumberId, setSavedNumberId] = useState("");
-  const [msg, setMsg] = useState("");
-  const [copied, setCopied] = useState("");
+  const [connection, setConnection] = useState({ connected: false });
+  const [message, setMessage] = useState("");
+  const completionRef = useRef({ code: null, signup: null, done: false });
 
-  const webhookUrl = BACKEND_URL ? `${BACKEND_URL}/webhook` : "https://<your-backend>/webhook";
+  const refreshConnection = async () => {
+    if (!orgId) return;
+    const result = await getWhatsAppConnection({ orgId });
+    setConnection(result);
+  };
 
   useEffect(() => {
-    if (!orgId) return;
-    getDoc(doc(db, "organizations", orgId, "settings", "whatsapp"))
-      .then((snap) => {
-        if (snap.exists()) {
-          const d = snap.data();
-          setConnected(!!d.connected);
-          setPhoneNumberId(d.phoneNumberId || "");
-          setWabaId(d.wabaId || "");
-          setSavedNumberId(d.phoneNumberId || "");
-        }
-      })
-      .catch((e) => console.warn("whatsapp settings read:", e?.code))
+    refreshConnection()
+      .catch((error) => setMessage(error.message || "Could not load WhatsApp connection."))
       .finally(() => setLoading(false));
   }, [orgId]);
 
-  const copy = (text, key) => {
-    navigator.clipboard?.writeText(text);
-    setCopied(key);
-    setTimeout(() => setCopied(""), 1500);
-  };
-
-  const connect = async (e) => {
-    e.preventDefault();
-    setMsg("");
-    const pid = phoneNumberId.trim();
-    if (!/^\d{6,}$/.test(pid)) {
-      setMsg("Please enter a valid Phone Number ID (from Meta, numbers only).");
+  const connect = async () => {
+    if (!orgId) return;
+    if (!META_APP_ID || !META_EMBEDDED_SIGNUP_CONFIG_ID) {
+      setMessage("WhatsApp onboarding is not configured yet. Ask the platform administrator to add the Meta App ID and Embedded Signup Configuration ID in Vercel.");
       return;
     }
     setSaving(true);
-    try {
-      // Reverse-lookup mapping used by the backend webhook to route leads.
-      await setDoc(doc(db, "whatsappConfigs", pid), {
-        orgId,
-        phoneNumberId: pid,
-        wabaId: wabaId.trim() || null,
-        connectedAt: serverTimestamp(),
-        connectedBy: user.uid,
-      });
-      // Org-scoped settings for display.
-      await setDoc(doc(db, "organizations", orgId, "settings", "whatsapp"), {
-        phoneNumberId: pid,
-        wabaId: wabaId.trim() || null,
-        connected: true,
-        connectedAt: serverTimestamp(),
-      }, { merge: true });
+    setMessage("");
+    completionRef.current = { code: null, signup: null, done: false };
 
-      // Clean up an old mapping if the number id changed.
-      if (savedNumberId && savedNumberId !== pid) {
-        await deleteDoc(doc(db, "whatsappConfigs", savedNumberId)).catch(() => {});
+    const finishConnection = async () => {
+      const state = completionRef.current;
+      if (state.done || !state.code || !state.signup?.wabaId || !state.signup?.phoneNumberId) return;
+      state.done = true;
+      window.removeEventListener("message", onMetaMessage);
+      try {
+        await connectWhatsAppBusiness({
+          orgId,
+          code: state.code,
+          wabaId: state.signup.wabaId,
+          phoneNumberId: state.signup.phoneNumberId,
+        });
+        await refreshConnection();
+        setMessage("WhatsApp Business connected. New inbound messages will be routed to this workspace and your team can reply from lead records.");
+      } catch (error) {
+        setMessage(error.message || "Could not verify the WhatsApp Business connection.");
+      } finally {
+        setSaving(false);
       }
+    };
 
-      setConnected(true);
-      setSavedNumberId(pid);
-      setMsg("✅ WhatsApp connected! Leads arriving on this number will now come in automatically.");
-    } catch (err) {
-      console.error("WhatsApp connect error:", err?.code, err?.message);
-      setMsg(err?.code === "permission-denied"
-        ? "Permission denied — publish the rules or check your admin access."
-        : "Connection failed: " + (err?.code || err?.message));
-    } finally {
+    const onMetaMessage = (event) => {
+      if (!["https://www.facebook.com", "https://web.facebook.com"].includes(event.origin)) return;
+      let payload;
+      try {
+        payload = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+      } catch {
+        return;
+      }
+      if (payload?.type !== "WA_EMBEDDED_SIGNUP") return;
+      if (payload.event === "FINISH") {
+        const data = payload.data || {};
+        completionRef.current.signup = {
+          wabaId: String(data.waba_id || data.wabaId || ""),
+          phoneNumberId: String(data.phone_number_id || data.phoneNumberId || ""),
+        };
+        finishConnection();
+      } else if (payload.event === "CANCEL") {
+        setMessage("WhatsApp connection was cancelled before completion.");
+        setSaving(false);
+      }
+    };
+
+    window.addEventListener("message", onMetaMessage);
+    try {
+      const FB = await loadMetaSdk();
+      FB.login((response) => {
+        const code = response?.authResponse?.code;
+        if (!code) {
+          window.removeEventListener("message", onMetaMessage);
+          setMessage("Meta did not return an authorization code. Please complete the connection flow and try again.");
+          setSaving(false);
+          return;
+        }
+        completionRef.current.code = code;
+        finishConnection();
+      }, {
+        config_id: META_EMBEDDED_SIGNUP_CONFIG_ID,
+        response_type: "code",
+        override_default_response_type: true,
+        extras: { setup: {}, featureType: "whatsapp_business_app_onboarding" },
+      });
+    } catch (error) {
+      window.removeEventListener("message", onMetaMessage);
+      setMessage(error.message || "Could not start Meta Embedded Signup.");
       setSaving(false);
     }
   };
 
   const disconnect = async () => {
-    setSaving(true); setMsg("");
+    if (!orgId || !window.confirm("Disconnect this WhatsApp Business number? Inbound messages will no longer create leads in this workspace.")) return;
+    setSaving(true);
+    setMessage("");
     try {
-      if (savedNumberId) await deleteDoc(doc(db, "whatsappConfigs", savedNumberId)).catch(() => {});
-      await setDoc(doc(db, "organizations", orgId, "settings", "whatsapp"),
-        { connected: false }, { merge: true });
-      setConnected(false);
-      setMsg("WhatsApp disconnected.");
-    } catch (err) {
-      setMsg("Disconnect failed: " + (err?.code || err?.message));
+      await disconnectWhatsAppBusiness({ orgId });
+      setConnection({ connected: false });
+      setMessage("WhatsApp Business has been disconnected from this workspace.");
+    } catch (error) {
+      setMessage(error.message || "Could not disconnect WhatsApp Business.");
     } finally {
       setSaving(false);
     }
@@ -111,103 +162,61 @@ export default function WhatsApp() {
 
   return (
     <Layout title="WhatsApp Integration">
-      {/* Status card */}
       <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 mb-6">
         <div className="flex items-center gap-4">
-          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${connected ? "bg-success-100" : "bg-cream-200"}`}>
-            <MessageCircle className={connected ? "text-success-600" : "text-ink-muted"} size={26} />
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${connection.connected ? "bg-success-100" : "bg-cream-200"}`}>
+            <MessageCircle className={connection.connected ? "text-success-600" : "text-ink-muted"} size={26} />
           </div>
           <div className="flex-1">
             <h2 className="font-display font-bold text-xl text-ink flex items-center gap-2">
               WhatsApp Business
-              {connected
+              {connection.connected
                 ? <span className="badge badge-success">Connected</span>
-                : <span className="badge bg-cream-200 text-ink-muted">Not connected</span>}
+                : connection.reauthorizationRequired
+                  ? <span className="badge bg-amber-100 text-amber-700">Reconnect required</span>
+                  : <span className="badge bg-cream-200 text-ink-muted">Not connected</span>}
             </h2>
             <p className="text-sm text-ink-soft mt-0.5">
-              {connected
-                ? `Leads are being fetched automatically from Number ID ${savedNumberId}.`
-                : "Connect your WhatsApp Business number — leads will flow into the CRM automatically."}
+              {connection.connected
+                ? "Inbound messages create leads in this workspace. Your team can reply from each lead record."
+                : connection.reauthorizationRequired
+                  ? "The Meta authorization has expired. Reconnect this number before sending CRM replies."
+                  : "Connect this workspace's own WhatsApp Business number through Meta."}
             </p>
           </div>
-          {connected && (
-            <button onClick={disconnect} disabled={saving}
-              className="btn btn-secondary text-sm text-danger-600 border-danger-200 hover:bg-danger-50">
+          {connection.connected && (
+            <button onClick={disconnect} disabled={saving} className="btn btn-secondary text-sm text-danger-600 border-danger-200 hover:bg-danger-50">
               <Unplug size={15} /> Disconnect
             </button>
           )}
         </div>
+        {connection.connected && (
+          <p className="mt-4 text-xs text-ink-muted">Connected Meta phone number ID: <code className="bg-cream-100 px-1.5 py-0.5 rounded">{connection.phoneNumberId}</code></p>
+        )}
       </div>
 
-      {msg && (
-        <div className="bg-orange-50 border border-orange-200 text-ember-700 rounded-xl px-4 py-3 mb-6 text-sm">{msg}</div>
-      )}
+      {message && <div className="bg-orange-50 border border-orange-200 text-ember-700 rounded-xl px-4 py-3 mb-6 text-sm">{message}</div>}
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Step 1: Meta webhook config */}
         <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
-          <h3 className="font-display font-semibold text-lg text-ink mb-1 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-700 text-xs font-bold flex items-center justify-center">1</span>
-            Set up the webhook in Meta
-          </h3>
-          <p className="text-sm text-ink-soft mb-4">
-            In Meta Developer → WhatsApp → Configuration, enter this webhook URL and verify token (one time):
+          <h3 className="font-display font-semibold text-lg text-ink mb-2 flex items-center gap-2"><ShieldCheck size={19} className="text-success-600" /> Secure per-workspace connection</h3>
+          <p className="text-sm text-ink-soft leading-6">
+            Each customer connects their own WhatsApp Business Account through Meta. CodeSkate verifies the number before routing messages, so another workspace cannot claim or receive its leads.
           </p>
-
-          <label className="block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1">Callback URL</label>
-          <div className="flex items-center gap-2 mb-3">
-            <code className="flex-1 bg-cream-100 border border-cream-300 rounded-lg px-3 py-2 text-sm font-mono break-all">{webhookUrl}</code>
-            <button onClick={() => copy(webhookUrl, "url")} className="btn btn-secondary px-3 py-2">
-              {copied === "url" ? <Check size={15} className="text-success-600" /> : <Copy size={15} />}
-            </button>
-          </div>
-
-          <label className="block text-xs font-semibold text-ink-muted uppercase tracking-wider mb-1">Verify Token</label>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 bg-cream-100 border border-cream-300 rounded-lg px-3 py-2 text-sm font-mono">codeskate_verify</code>
-            <button onClick={() => copy("codeskate_verify", "tok")} className="btn btn-secondary px-3 py-2">
-              {copied === "tok" ? <Check size={15} className="text-success-600" /> : <Copy size={15} />}
-            </button>
-          </div>
-          <p className="text-xs text-ink-muted mt-3 flex items-start gap-1.5">
-            <Info size={13} className="mt-0.5 shrink-0" />
-            The backend must have <code className="bg-cream-200 px-1 rounded">WHATSAPP_VERIFY_TOKEN=codeskate_verify</code> set. Subscribe to the "messages" field.
-          </p>
+          <button onClick={connect} disabled={saving || connection.connected} className="btn btn-primary w-full mt-6">
+            {saving ? <><Loader2 size={16} className="animate-spin" /> Connecting…</> : <><Plug size={16} /> Connect with Meta <ArrowRight size={16} /></>}
+          </button>
         </div>
-
-        {/* Step 2: Connect this org's number */}
         <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
-          <h3 className="font-display font-semibold text-lg text-ink mb-1 flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-orange-100 text-orange-700 text-xs font-bold flex items-center justify-center">2</span>
-            Connect your number
-          </h3>
-          <p className="text-sm text-ink-soft mb-4">
-            You'll find the <strong>Phone number ID</strong> in Meta → WhatsApp → API Setup. Enter it here.
-          </p>
-          <form onSubmit={connect} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-ink mb-1.5">Phone Number ID <span className="text-danger-500">*</span></label>
-              <input className="input" placeholder="e.g. 123456789012345" value={phoneNumberId}
-                onChange={(e) => setPhoneNumberId(e.target.value.replace(/\D/g, ""))} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink mb-1.5">WhatsApp Business Account ID <span className="text-ink-muted">(optional)</span></label>
-              <input className="input" placeholder="e.g. 987654321098765" value={wabaId}
-                onChange={(e) => setWabaId(e.target.value.replace(/\D/g, ""))} />
-            </div>
-            <button disabled={saving} className="btn btn-primary w-full">
-              {saving ? <><Loader2 size={16} className="animate-spin" /> Saving…</>
-                : connected ? <><Plug size={16} /> Update connection</>
-                : <>Connect WhatsApp <ArrowRight size={16} /></>}
-            </button>
-          </form>
+          <h3 className="font-display font-semibold text-lg text-ink mb-2">How replies work</h3>
+          <ol className="text-sm text-ink-soft space-y-3 list-decimal pl-5">
+            <li>A customer messages this connected WhatsApp number.</li>
+            <li>CodeSkate creates or updates the lead in this workspace.</li>
+            <li>Open the lead record and use the WhatsApp reply panel.</li>
+          </ol>
+          <p className="text-xs text-ink-muted mt-5 flex items-start gap-1.5"><Info size={13} className="mt-0.5 shrink-0" /> Free-form replies are available for 24 hours after the customer's latest message. Outside that window, Meta requires an approved template.</p>
         </div>
       </div>
-
-      <p className="text-xs text-ink-muted mt-6 flex items-center gap-1.5">
-        <Info size={13} />
-        A WhatsApp number can be connected to only one organization. Leads are routed to your org based on that number's Phone Number ID.
-      </p>
     </Layout>
   );
 }
