@@ -5,8 +5,9 @@ import {
   connectWhatsAppBusiness,
   disconnectWhatsAppBusiness,
   getWhatsAppConnection,
+  repairWhatsAppWebhook,
 } from "../../utils/billingApi";
-import { MessageCircle, Loader2, Plug, Unplug, ArrowRight, Info, ShieldCheck } from "lucide-react";
+import { MessageCircle, Loader2, Plug, Unplug, ArrowRight, Info, ShieldCheck, RefreshCw } from "lucide-react";
 
 const META_APP_ID = import.meta.env.VITE_META_APP_ID || "";
 const META_EMBEDDED_SIGNUP_CONFIG_ID = import.meta.env.VITE_META_EMBEDDED_SIGNUP_CONFIG_ID || "";
@@ -46,6 +47,7 @@ export default function WhatsApp() {
   const orgId = user?.activeOrgId;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [repairingWebhook, setRepairingWebhook] = useState(false);
   const [connection, setConnection] = useState({ connected: false });
   const [registrationPin, setRegistrationPin] = useState("");
   const [message, setMessage] = useState("");
@@ -148,6 +150,20 @@ export default function WhatsApp() {
     }
   };
 
+  const repairWebhook = async () => {
+    if (!orgId) return;
+    setRepairingWebhook(true);
+    setMessage("");
+    try {
+      await repairWhatsAppWebhook({ orgId });
+      setMessage("Meta webhook subscription refreshed for this WhatsApp Business Account. Send a new inbound message now and check Render Logs.");
+    } catch (error) {
+      setMessage(error.message || "Could not refresh Meta webhook delivery.");
+    } finally {
+      setRepairingWebhook(false);
+    }
+  };
+
   const disconnect = async () => {
     if (!orgId || !window.confirm("Disconnect this WhatsApp Business number? Inbound messages will no longer create leads in this workspace.")) return;
     setSaving(true);
@@ -198,7 +214,13 @@ export default function WhatsApp() {
           )}
         </div>
         {connection.connected && (
-          <p className="mt-4 text-xs text-ink-muted">Connected Meta phone number ID: <code className="bg-cream-100 px-1.5 py-0.5 rounded">{connection.phoneNumberId}</code></p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <p className="text-xs text-ink-muted">Connected Meta phone number ID: <code className="bg-cream-100 px-1.5 py-0.5 rounded">{connection.phoneNumberId}</code></p>
+            <button onClick={repairWebhook} disabled={repairingWebhook || saving} className="btn btn-secondary text-xs">
+              <RefreshCw size={14} className={repairingWebhook ? "animate-spin" : ""} />
+              {repairingWebhook ? "Refreshing Meta webhook…" : "Repair Meta webhook delivery"}
+            </button>
+          </div>
         )}
       </div>
 

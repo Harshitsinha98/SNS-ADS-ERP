@@ -712,6 +712,29 @@ app.post("/api/whatsapp/status", requireAuth, async (req, res) => {
   }
 });
 
+app.post("/api/whatsapp/repair-webhook", requireAuth, async (req, res) => {
+  try {
+    const orgId = String(req.body?.orgId || "").trim();
+    if (!(await isOrgAdmin(req.authUser.uid, orgId))) return res.status(403).json({ error: "Organization admin access required" });
+    const credential = await db.collection("whatsappCredentials").doc(orgId).get();
+    if (!credential.exists) return res.status(409).json({ error: "Connect WhatsApp Business before repairing webhook delivery" });
+    const data = credential.data();
+    if (data.connectionState !== "connected" || isWhatsAppCredentialExpired(data)) {
+      return res.status(409).json({ error: "Reconnect WhatsApp Business before repairing webhook delivery" });
+    }
+
+    await metaGraphRequest(`${data.wabaId}/subscribed_apps`, {
+      method: "POST",
+      token: decryptWhatsAppToken(data.tokenCiphertext),
+    });
+    console.info("WhatsApp webhook subscription refreshed", { orgId, phoneNumberId: data.phoneNumberId });
+    return res.json({ ok: true, phoneNumberId: data.phoneNumberId });
+  } catch (error) {
+    console.error("WhatsApp webhook repair failed:", error.message);
+    return res.status(error.status || 500).json({ error: error.message || "Could not refresh WhatsApp webhook delivery" });
+  }
+});
+
 app.post("/api/whatsapp/disconnect", requireAuth, async (req, res) => {
   try {
     const orgId = String(req.body?.orgId || "").trim();
@@ -936,6 +959,9 @@ app.post("/webhook", async (req, res) => {
 
   try {
     const payload = JSON.parse(raw.toString("utf8") || "{}");
+    const entryCount = Array.isArray(payload.entry) ? payload.entry.length : 0;
+    const changeCount = (payload.entry || []).reduce((count, entry) => count + (entry.changes || []).length, 0);
+    console.info("WhatsApp webhook received", { entryCount, changeCount });
     const results = [];
     for (const entry of payload.entry || []) {
       for (const change of entry.changes || []) {

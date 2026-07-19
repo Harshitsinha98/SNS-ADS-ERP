@@ -109,4 +109,5 @@ export const triggerWhatsAppSync = (body) => authedPost("/api/whatsapp/sync-now"
 export const getWhatsAppConnection = (body) => authedPost("/api/whatsapp/status", body);
 export const connectWhatsAppBusiness = (body) => authedPost("/api/whatsapp/connect", body);
 export const disconnectWhatsAppBusiness = (body) => authedPost("/api/whatsapp/disconnect", body);
+export const repairWhatsAppWebhook = (body) => authedPost("/api/whatsapp/repair-webhook", body);
 export const sendWhatsAppMessage = (body) => authedPost("/api/whatsapp/messages", body);
