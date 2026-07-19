@@ -23,6 +23,9 @@ function loadServiceAccount() {
 initializeApp({ credential: cert(loadServiceAccount()) });
 const db = getFirestore();
 const app = express();
+// Render/Vercel-style deployments terminate TLS at one trusted proxy. This
+// makes req.ip usable for rate limits without manually trusting user headers.
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3001;
 const PLATFORM_OWNER_PHONE = process.env.PLATFORM_OWNER_PHONE || "+919653043939";
 const INSTANCE_ID = `${process.env.RENDER_INSTANCE_ID || process.env.HOSTNAME || "local"}-${process.pid}`;

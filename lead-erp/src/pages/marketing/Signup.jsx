@@ -10,7 +10,7 @@ import Logo from "../../components/marketing/Logo";
 import { TRIAL_DAYS, mergePlansWithConfig } from "../../data/plans";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
 import {
-  getBillingConfig, createSignupOrder, verifySignupPayment, getSignupPayuHash,
+  getAccountStatus, getBillingConfig, createSignupOrder, verifySignupPayment, getSignupPayuHash,
   provisionTrialWorkspace, loadRazorpayScript, submitPayuForm,
 } from "../../utils/billingApi";
 
@@ -27,6 +27,8 @@ export default function Signup() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [confirmation, setConfirmation] = useState(null);
+  const [checkingAccount, setCheckingAccount] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
@@ -60,14 +62,56 @@ export default function Signup() {
   const canFreeTrial = planIsStarter && plan.trial && trialAvailable;
   const anyGateway = gateways.razorpay || gateways.payu;
 
-  // ---- Step 1: details -> send OTP ----
+  const checkExistingPhone = async (value = phone) => {
+    const normalizedPhone = String(value || "").replace(/\D/g, "");
+    if (normalizedPhone.length !== 10) {
+      setExistingAccount(false);
+      return false;
+    }
+    setCheckingAccount(true);
+    try {
+      const result = await getAccountStatus(normalizedPhone);
+      setExistingAccount(Boolean(result.registered));
+      return Boolean(result.registered);
+    } catch (error) {
+      setErr(error.message || "Could not check this number. Please try again.");
+      return null;
+    } finally {
+      setCheckingAccount(false);
+    }
+  };
+
+  const handlePhoneChange = (value) => {
+    setPhone(value.replace(/\D/g, ""));
+    setExistingAccount(false);
+    setErr("");
+  };
+
+  // ---- Step 1: details -> account check -> send OTP ----
   const submitDetails = async (e) => {
     e.preventDefault();
     setErr("");
-    if (!fullName.trim()) return setErr("Please enter your name.");
-    if (!orgName.trim()) return setErr("Please enter your organization name.");
     if (phone.length !== 10) return setErr("Please enter a valid 10-digit mobile number.");
+
     setLoading(true);
+    const registered = await checkExistingPhone(phone);
+    if (registered === null) {
+      setLoading(false);
+      return;
+    }
+    if (registered) {
+      setLoading(false);
+      setStep("registered");
+      return;
+    }
+    if (!fullName.trim()) {
+      setLoading(false);
+      return setErr("Please enter your name.");
+    }
+    if (!orgName.trim()) {
+      setLoading(false);
+      return setErr("Please enter your organization name.");
+    }
     const res = await requestOtp(phone.trim());
     setLoading(false);
     if (res.ok) { setConfirmation(res.confirmation); setStep("otp"); }
@@ -234,8 +278,16 @@ export default function Signup() {
                           <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" size={18} />
                           <span className="absolute left-11 top-1/2 -translate-y-1/2 text-ink-soft font-medium text-sm">+91</span>
                           <input type="tel" className="input pl-[4.5rem]" placeholder="98XXXXXXXX" value={phone}
-                            onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} maxLength={10} disabled={loading} />
+                            onChange={(e) => handlePhoneChange(e.target.value)}
+                            onBlur={() => checkExistingPhone()}
+                            maxLength={10} disabled={loading || checkingAccount} />
                         </div>
+                        {checkingAccount && <p className="mt-1.5 text-xs text-ink-muted">Checking your number…</p>}
+                        {existingAccount && (
+                          <p className="mt-1.5 text-xs text-orange-700">
+                            This number is already registered. <button type="button" onClick={() => navigate("/login")} className="font-semibold underline">Log in instead</button>.
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-ink mb-1.5">Choose your plan</label>
@@ -250,13 +302,28 @@ export default function Signup() {
                           ))}
                         </div>
                       </div>
-                      <button type="submit" disabled={loading} className="btn btn-primary w-full py-3.5 text-base">
-                        {loading ? <><Loader2 size={18} className="animate-spin" /> Sending code…</> : <>Continue <ArrowRight size={18} /></>}
+                      <button type="submit" disabled={loading || checkingAccount || existingAccount} className="btn btn-primary w-full py-3.5 text-base">
+                        {loading || checkingAccount ? <><Loader2 size={18} className="animate-spin" /> Checking…</> : existingAccount ? <>Account already registered</> : <>Continue <ArrowRight size={18} /></>}
                       </button>
                     </form>
                     <p className="text-center text-sm text-ink-muted mt-5">
                       Already have an account? <Link to="/login" className="text-orange-600 font-semibold hover:underline">Sign in</Link>
                     </p>
+                  </>
+                )}
+
+                {step === "registered" && (
+                  <>
+                    <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4"><ShieldCheck className="text-orange-600" size={24} /></div>
+                    <p className="eyebrow mb-2">Account found</p>
+                    <h1 className="font-display font-bold text-2xl text-ink mb-2">You are already registered</h1>
+                    <p className="text-sm text-ink-soft mb-6">This mobile number already has a CodeSkate account. Please sign in to continue—no new OTP or purchase is needed here.</p>
+                    <button onClick={() => navigate("/login")} className="btn btn-primary w-full py-3.5 text-base">
+                      Go to login <ArrowRight size={18} />
+                    </button>
+                    <button onClick={() => { setExistingAccount(false); setStep("details"); }} className="w-full mt-3 text-sm font-medium text-ink-muted hover:text-orange-600">
+                      Use a different number
+                    </button>
                   </>
                 )}
 

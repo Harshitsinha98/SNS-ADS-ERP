@@ -25,6 +25,21 @@ async function authedPost(path, body) {
   return data;
 }
 
+export async function getAccountStatus(phone) {
+  const res = await fetch(`${BASE}/api/billing/account-status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const error = new Error(data.error || `Could not check account (${res.status})`);
+    Object.assign(error, data, { status: res.status });
+    throw error;
+  }
+  return data;
+}
+
 export async function getBillingConfig() {
   try {
     const res = await fetch(`${BASE}/api/billing/config`);

@@ -51,7 +51,7 @@ export default function Login() {
       return;
     }
     if (portal === "employee" && isAdminish) {
-      setRoleError("Access denied — you're an admin/owner. Please use the admin login.");
+      setRoleError("Access denied — you're an admin. Please use the admin login.");
       logout();
       return;
     }
@@ -120,7 +120,7 @@ export default function Login() {
                     <Shield className="text-white" size={22} />
                   </div>
                   <div className="flex-1">
-                    <p className="font-display font-semibold text-ink">Admin / Owner login</p>
+                    <p className="font-display font-semibold text-ink">Admin login</p>
                     <p className="text-xs text-ink-muted">Manage organization, team & billing</p>
                   </div>
                   <ArrowRight size={18} className="text-ink-muted group-hover:text-orange-600" />
@@ -155,7 +155,7 @@ export default function Login() {
 
               <div className={`inline-flex items-center gap-2 badge mb-3 ${portal === "admin" ? "badge-primary" : "bg-ink text-orange-300"}`}>
                 {portal === "admin" ? <Shield size={13} /> : <Users size={13} />}
-                {portal === "admin" ? "Admin / Owner" : "Employee"} login
+                {portal === "admin" ? "Admin" : "Employee"} login
               </div>
 
               <h1 className="font-display font-bold text-2xl text-ink mb-1">

@@ -150,6 +150,8 @@ service cloud.firestore {
     match /whatsappMessageEvents/{id} { allow read, write: if false; }
     match /systemLocks/{id} { allow read, write: if false; }
     match /subscriptionIntents/{id} { allow read, write: if false; }
+    match /signupSessions/{id} { allow read, write: if false; }
+    match /signupSessionRecoveries/{id} { allow read, write: if false; }
     match /leadImports/{id} { allow read, write: if false; }
     match /razorpayPlans/{id} { allow read, write: if false; }
   }
