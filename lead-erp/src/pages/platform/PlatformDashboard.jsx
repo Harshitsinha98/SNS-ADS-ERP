@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, doc, getDoc, onSnapshot, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import { subscribePlatformConfig, savePlatformConfig } from "../../utils/platformConfig";
-import { mergePlansWithConfig, limitsForPlan } from "../../data/plans";
+import { mergePlansWithConfig } from "../../data/plans";
+import { platformOrgAction } from "../../utils/billingApi";
 import { PLATFORM_OWNER_PHONE } from "../../data/constants";
 import Logo from "../../components/marketing/Logo";
 import {
@@ -24,7 +25,7 @@ export default function PlatformDashboard() {
   const [rowMsg, setRowMsg] = useState("");
 
   // config editor state
-  const [trialDays, setTrialDays] = useState(14);
+  const [trialDays, setTrialDays] = useState(7);
   const [plansDraft, setPlansDraft] = useState({});
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
@@ -53,7 +54,7 @@ export default function PlatformDashboard() {
     }, (err) => console.warn("orgs listener:", err?.code));
     const unsubCfg = subscribePlatformConfig((c) => {
       setConfig(c);
-      setTrialDays(c && Number.isFinite(c.trialDays) ? c.trialDays : 14);
+      setTrialDays(c && Number.isFinite(c.trialDays) ? c.trialDays : 7);
     });
     return () => { unsubOrgs(); unsubCfg(); };
   }, [isPlatformAdmin]);
@@ -79,7 +80,7 @@ export default function PlatformDashboard() {
     setSavedMsg("");
     try {
       await savePlatformConfig(
-        { trialDays: Number(trialDays) || 14, plans: plansDraft },
+        { trialDays: Number(trialDays) || 7, plans: plansDraft },
         user.uid
       );
       setSavedMsg("✅ Saved — applies immediately to the website and new signups.");
@@ -94,62 +95,34 @@ export default function PlatformDashboard() {
   const activateOrg = async (org) => {
     setRowBusy(org.id); setRowMsg("");
     try {
-      const limits = limitsForPlan(org.planId || "growth", config);
-      await updateDoc(doc(db, "organizations", org.id), {
-        planId: limits.planId,
-        planName: limits.planName,
-        seatsLimit: limits.seatsLimit,
-        leadsLimit: limits.leadsLimit,
-        subscriptionStatus: "active",
-        trialEndsAt: null,
-        trialEndsAtMs: 0,
-      });
-      setRowMsg(`✅ ${org.name || org.id} activated (${limits.planName}).`);
+      const result = await platformOrgAction({ orgId: org.id, action: "activate" });
+      setRowMsg(`✅ ${org.name || org.id}: ${result.message}`);
     } catch (e) {
-      setRowMsg("❌ " + (e?.code || e?.message));
+      setRowMsg("❌ " + (e?.message || "Activation failed"));
     } finally { setRowBusy(null); }
   };
 
   const startTrialOrg = async (org) => {
     setRowBusy(org.id); setRowMsg("");
     try {
-      const days = config && Number.isFinite(config.trialDays) ? config.trialDays : 14;
-      const endMs = Date.now() + days * 24 * 60 * 60 * 1000;
-      const limits = limitsForPlan(org.planId || "growth", config);
-      await updateDoc(doc(db, "organizations", org.id), {
-        subscriptionStatus: "trialing",
-        seatsLimit: limits.seatsLimit,
-        leadsLimit: limits.leadsLimit,
-        trialEndsAt: new Date(endMs).toISOString(),
-        trialEndsAtMs: endMs,
-      });
-      setRowMsg(`✅ A ${days}-day trial has been set for ${org.name || org.id}.`);
+      const result = await platformOrgAction({ orgId: org.id, action: "trial" });
+      setRowMsg(`✅ ${org.name || org.id}: ${result.message}`);
     } catch (e) {
-      setRowMsg("❌ " + (e?.code || e?.message));
+      setRowMsg("❌ " + (e?.message || "Could not start trial"));
     } finally { setRowBusy(null); }
   };
 
-  // Create an owner membership for the current platform admin, then jump into
-  // that org's admin dashboard. Lets the owner get into any workspace.
+  // A platform owner is granted a server-audited owner membership before the
+  // workspace is opened; the browser never writes privileged memberships.
   const joinAsOwner = async (org) => {
     setRowBusy(org.id); setRowMsg("");
     try {
-      await setDoc(doc(db, "memberships", `${user.uid}_${org.id}`), {
-        uid: user.uid,
-        orgId: org.id,
-        role: "owner",
-        displayName: user.displayName || "Owner",
-        active: true,
-        invitedBy: user.uid,
-        joinedAt: serverTimestamp(),
-        lastActiveAt: serverTimestamp(),
-      }, { merge: true });
-      await setDoc(doc(db, "users", user.uid), { defaultOrgId: org.id }, { merge: true });
+      await platformOrgAction({ orgId: org.id, action: "join" });
       localStorage.setItem("activeOrgId", org.id);
       setRowMsg(`✅ You're now the owner of ${org.name || org.id}. Opening the dashboard…`);
       setTimeout(() => { window.location.assign("/admin"); }, 1200);
     } catch (e) {
-      setRowMsg("❌ " + (e?.code || e?.message));
+      setRowMsg("❌ " + (e?.message || "Could not grant owner access"));
     } finally { setRowBusy(null); }
   };
 

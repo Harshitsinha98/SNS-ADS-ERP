@@ -18,8 +18,8 @@ export async function initTestEnv() {
     projectId: 'sns-ads-erp-test',
     firestore: {
       rules: readFileSync('../firestore.rules', 'utf8'),
-      host: 'localhost',
-      port: 8080,
+      host: '127.0.0.1',
+      port: 18080,
     },
   });
 
@@ -65,12 +65,57 @@ export function getDbAsUnauthenticated() {
 }
 
 /**
- * Get an admin Firestore instance (bypasses all rules)
- * @returns Firestore instance
+ * Run one Firestore operation while emulator rules are disabled. The current
+ * rules-unit-testing API deliberately scopes the bypass to this callback.
+ */
+async function runAsAdmin(operation) {
+  if (!testEnv) throw new Error('Test environment not initialized');
+
+  let result;
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    result = await operation(context.firestore());
+  });
+  return result;
+}
+
+function resolveReference(db, path) {
+  return path.reduce((reference, segment) => reference[segment.type](segment.id), db);
+}
+
+function createAdminReference(path) {
+  return {
+    collection(id) {
+      return createAdminReference([...path, { type: 'collection', id }]);
+    },
+    doc(id) {
+      return createAdminReference([...path, { type: 'doc', id }]);
+    },
+    set(data, options) {
+      return runAsAdmin((db) => resolveReference(db, path).set(data, options));
+    },
+    update(data) {
+      return runAsAdmin((db) => resolveReference(db, path).update(data));
+    },
+    delete() {
+      return runAsAdmin((db) => resolveReference(db, path).delete());
+    },
+    add(data) {
+      return runAsAdmin((db) => resolveReference(db, path).add(data));
+    },
+    get() {
+      return runAsAdmin((db) => resolveReference(db, path).get());
+    },
+  };
+}
+
+/**
+ * Get an admin Firestore-like reference that bypasses rules for test seeding.
+ * Each operation receives a short-lived rules-disabled context, as required by
+ * @firebase/rules-unit-testing v3.
  */
 export function getDbAsAdmin() {
   if (!testEnv) throw new Error('Test environment not initialized');
-  return testEnv.withSecurityRulesDisabled().firestore();
+  return createAdminReference([]);
 }
 
 /**

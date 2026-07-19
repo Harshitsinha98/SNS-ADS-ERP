@@ -4,49 +4,94 @@ import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
 
 const CallTracker = registerPlugin("CallTracker");
+const last10 = (number) => String(number || "").replace(/\D/g, "").slice(-10);
+const STORAGE_KEY = "codeskate_processed_call_ids";
 
-// Indian numbers arrive as +91987.., 0987.., or 987.. on the phone. In the DB they're stored as 91987...
-// So matching on the 'last 10 digits' is the most reliable trick.
-const last10 = (num) => (num || "").replace(/\D/g, "").slice(-10);
+function readProcessedIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")); }
+  catch { return new Set(); }
+}
 
+function saveProcessedIds(ids) {
+  const newest = Array.from(ids).slice(-200);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(newest));
+}
+
+// Android-only optional helper. It never replaces the reliable in-app
+// call/outcome workflow: Android/OEM background restrictions can still stop a
+// process while the app is closed. Stable call-log IDs prevent duplicate notes
+// when the bridge remounts or an event is delivered twice.
 export function useCallTracker() {
   const { user } = useAuth();
   const { leads, addNote } = useData();
-  
   const leadsRef = useRef(leads);
+  const processedIdsRef = useRef(readProcessedIds());
+  const inFlightCallIdsRef = useRef(new Set());
   leadsRef.current = leads;
 
   useEffect(() => {
-    // If it's a web browser or an admin, stay idle
-    if (!user || user.role !== "employee" || !Capacitor.isNativePlatform()) return;
+    if (!user || user.activeOrgRole !== "employee" || !Capacitor.isNativePlatform()) return undefined;
+    let disposed = false;
+    let listenerHandle;
 
-    CallTracker.startListening().catch((e) => console.error("Call Tracker start failed:", e));
+    const processCall = async (event) => {
+      const callId = event?.id;
+      if (!callId || event.duration <= 0 || processedIdsRef.current.has(callId) || inFlightCallIdsRef.current.has(callId)) return;
+      const matchedLead = leadsRef.current.find((lead) => last10(lead.phone) === last10(event.number));
+      if (!matchedLead) {
+        // Personal/unmatched calls never enter the CRM, but must still advance
+        // the native cursor so they do not block later completed calls.
+        await CallTracker.markCallProcessed({ id: callId }).catch(() => {});
+        return;
+      }
 
-    const listener = CallTracker.addListener("callEnded", (event) => {
-      if (event.duration <= 0) return; // Ignore missed calls or 0-second cuts
+      inFlightCallIdsRef.current.add(callId);
+      try {
+        const saved = await addNote(
+          matchedLead.id,
+          `${event.type === "outgoing" ? "Outgoing" : "Incoming"} call logged from Android dialer.`,
+          "call",
+          {
+            callLogId: callId,
+            callStartedAt: event.date || null,
+            duration: event.duration,
+            authorId: user.uid,
+            authorName: user.displayName || "Employee",
+            authorRole: user.activeOrgRole,
+            visibility: "team",
+          }
+        );
+        if (!saved) return;
+        await CallTracker.markCallProcessed({ id: callId });
+        processedIdsRef.current.add(callId);
+        saveProcessedIds(processedIdsRef.current);
+      } catch (error) {
+        console.warn("Call activity was not persisted; it will be retried:", error?.message || error);
+      } finally {
+        inFlightCallIdsRef.current.delete(callId);
+      }
+    };
 
-      const calledNumber = last10(event.number);
-      const matchedLead = leadsRef.current.find((l) => last10(l.phone) === calledNumber);
-
-      if (!matchedLead) return; // Number not found in the ERP means it was a personal call, skip it
-
-      addNote(
-        matchedLead.id,
-        `${event.type === "outgoing" ? "Outgoing" : "Incoming"} call — auto-logged from Android dialer.`,
-        "call",
-        {
-          duration: event.duration,
-          authorId: user.id,
-          authorName: user.name,
-          authorRole: user.role,
-          visibility: "team",
+    const start = async () => {
+      try {
+        listenerHandle = await CallTracker.addListener("callEnded", processCall);
+        if (disposed) {
+          await listenerHandle.remove();
+          return;
         }
-      );
-    });
+        await CallTracker.startListening();
+        const pendingCall = await CallTracker.getLastCall();
+        if (pendingCall?.found) await processCall(pendingCall);
+      } catch (error) {
+        console.warn("Call tracker is unavailable:", error?.message || error);
+      }
+    };
+    start();
 
     return () => {
-      listener.remove();
+      disposed = true;
+      Promise.resolve(listenerHandle?.remove?.()).catch(() => {});
       CallTracker.stopListening().catch(() => {});
     };
-  }, [user]);
+  }, [user?.uid, user?.activeOrgRole]);
 }

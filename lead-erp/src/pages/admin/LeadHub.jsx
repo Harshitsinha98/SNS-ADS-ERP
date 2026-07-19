@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import Layout from "../../components/Layout";
 import { useData } from "../../context/DataContext";
@@ -30,6 +30,9 @@ export default function LeadHub() {
   const [sortBy, setSortBy] = useState("createdAt");
   const [filterStatus, setFilterStatus] = useState("All");
   const [syncing, setSyncing] = useState(false);
+  // Keep one idempotency key for a selected CSV so a timeout/partial failure
+  // can be safely retried by selecting the same file again.
+  const importIdsRef = useRef(new Map());
   const employees = users.filter((u) => u.role === "employee");
 
   const activeLeads = useMemo(() => leads.filter((l) => !isLost(l)), [leads]);
@@ -45,14 +48,29 @@ export default function LeadHub() {
     return list;
   }, [activeLeads, lostLeads, section, sortBy, filterStatus]);
 
-  const handleImport = (e) => {
+  const handleImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    const importKey = `${file.name}:${file.size}:${file.lastModified}`;
+    const importId = importIdsRef.current.get(importKey)
+      || globalThis.crypto?.randomUUID?.()
+      || `import_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    importIdsRef.current.set(importKey, importId);
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const rows = parseCSV(ev.target.result);
-      const count = addBulkLeads(rows, settings.autoAssign);
-      alert(`${count} leads imported & auto-assigned (${settings.autoAssign}).`);
+    reader.onload = async (ev) => {
+      try {
+        const rows = parseCSV(ev.target.result);
+        const count = await addBulkLeads(rows, settings.autoAssign, importId);
+        importIdsRef.current.delete(importKey);
+        alert(`${count} leads imported & auto-assigned (${settings.autoAssign}).`);
+      } catch (error) {
+        // Retain this key for a safe retry of the same file. The backend also
+        // returns it with an error if the first request reached the server.
+        if (error.importId) importIdsRef.current.set(importKey, error.importId);
+        alert(error.message || "Could not import leads.");
+      } finally {
+        e.target.value = "";
+      }
     };
     reader.readAsText(file);
   };

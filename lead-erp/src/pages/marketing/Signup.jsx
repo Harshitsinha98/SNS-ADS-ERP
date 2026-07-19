@@ -4,20 +4,15 @@ import {
   Building2, User, Phone, ArrowRight, ArrowLeft, Loader2, ShieldCheck,
   CheckCircle2, Sparkles, Check, CreditCard, Gift, Users, Inbox, Lock,
 } from "lucide-react";
-import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
-import { auth, db } from "../../firebase";
+import { auth } from "../../firebase";
 import Logo from "../../components/marketing/Logo";
-import { PLANS, TRIAL_DAYS, limitsForPlan, mergePlansWithConfig } from "../../data/plans";
+import { TRIAL_DAYS, mergePlansWithConfig } from "../../data/plans";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
-import { withTimeout } from "../../utils/withTimeout";
 import {
   getBillingConfig, createSignupOrder, verifySignupPayment, getSignupPayuHash,
-  loadRazorpayScript, submitPayuForm,
+  provisionTrialWorkspace, loadRazorpayScript, submitPayuForm,
 } from "../../utils/billingApi";
-
-const phoneKey = (e164) => String(e164 || "").replace(/\D/g, "");
-const DEFAULT_STATUSES = ["New", "Ringing", "Meeting Fixed", "Negotiation", "Follow-up", "Closed-Won", "Lost"];
 
 export default function Signup() {
   const { user, requestOtp, verifyOtp } = useAuth();
@@ -88,13 +83,9 @@ export default function Signup() {
     const res = await verifyOtp(confirmation, otp.trim());
     if (!res.ok) { setLoading(false); return setErr(res.error); }
 
-    // Check trial availability for this phone (one trial per number).
-    const e164 = auth.currentUser?.phoneNumber || `+91${phone}`;
-    try {
-      const t = await withTimeout(getDoc(doc(db, "trialsUsed", phoneKey(e164))), 8000, "trial check");
-      setTrialAvailable(!t.exists());
-    } catch { setTrialAvailable(true); }
-
+    // The backend is authoritative for one-trial-per-phone enforcement. It
+    // returns a clear error if this verified number has already used a trial.
+    setTrialAvailable(true);
     setLoading(false);
     setStep("checkout");
   };
@@ -103,9 +94,8 @@ export default function Signup() {
   const startFreeTrial = async () => {
     setErr(""); setPayBusy(true);
     try {
-      const uid = auth.currentUser?.uid;
-      if (!uid) throw new Error("Session expired — please sign in again.");
-      await createTrialWorkspace(uid);
+      if (!auth.currentUser?.uid) throw new Error("Session expired — please sign in again.");
+      await provisionTrialWorkspace({ orgName: orgName.trim(), fullName: fullName.trim() });
       setStep("done");
       setTimeout(() => window.location.assign("/admin"), 1600);
     } catch (e2) {
@@ -124,7 +114,7 @@ export default function Signup() {
       if (method === "razorpay" && gateways.razorpay) {
         const ok = await loadRazorpayScript();
         if (!ok) throw new Error("Razorpay checkout failed to load.");
-        const order = await createSignupOrder({ planId: plan.id, cycle });
+        const order = await createSignupOrder({ orgName: orgName.trim(), fullName: fullName.trim(), planId: plan.id, cycle });
         await new Promise((resolve, reject) => {
           const rzp = new window.Razorpay({
             key: order.keyId, amount: order.amount, currency: order.currency,
@@ -134,7 +124,6 @@ export default function Signup() {
             handler: async (resp) => {
               try {
                 await verifySignupPayment({
-                  orgName, fullName, planId: plan.id, cycle,
                   razorpay_order_id: resp.razorpay_order_id,
                   razorpay_payment_id: resp.razorpay_payment_id,
                   razorpay_signature: resp.razorpay_signature,
@@ -165,49 +154,6 @@ export default function Signup() {
     if (e2?.code === "permission-denied") return "Firestore rules are not published. Publish them in Console → Rules.";
     if (e2?.code === "deadline-exceeded") return "Can't reach Firestore. Check that the database has been created.";
     return e2?.message || "Something went wrong. Please try again.";
-  };
-
-  // Client-side trial workspace (Starter free trial only).
-  const createTrialWorkspace = async (uid) => {
-    const orgId = `org_${Date.now()}`;
-    const e164 = auth.currentUser?.phoneNumber || `+91${phone}`;
-    const pKey = phoneKey(e164);
-    const limits = limitsForPlan("starter", config);
-    const trialEndMs = Date.now() + trialDays * 24 * 60 * 60 * 1000;
-
-    await withTimeout(setDoc(doc(db, "organizations", orgId), {
-      name: orgName.trim(),
-      slug: orgName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
-      createdAt: serverTimestamp(), createdBy: uid, ownerPhone: e164,
-      planId: limits.planId, planName: limits.planName,
-      subscriptionStatus: "trialing",
-      seatsUsed: 1, seatsLimit: limits.seatsLimit,
-      leadsUsed: 0, leadsLimit: limits.leadsLimit,
-      trialEndsAt: new Date(trialEndMs).toISOString(), trialEndsAtMs: trialEndMs,
-    }), 15000, "create organization");
-
-    await withTimeout(setDoc(doc(db, "users", uid), {
-      phone: e164, displayName: fullName.trim(),
-      createdAt: serverTimestamp(), lastLoginAt: serverTimestamp(), defaultOrgId: orgId,
-    }, { merge: true }), 15000, "create user");
-
-    await withTimeout(setDoc(doc(db, "memberships", `${uid}_${orgId}`), {
-      uid, orgId, role: "owner", displayName: fullName.trim(), phone: e164,
-      active: true, invitedBy: uid, joinedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
-    }), 15000, "create membership");
-
-    try {
-      await withTimeout(setDoc(doc(db, "trialsUsed", pKey), {
-        phone: e164, uid, orgId, usedAt: new Date().toISOString(),
-      }), 8000, "trial ledger");
-      await withTimeout(setDoc(doc(db, "organizations", orgId, "settings", "config"), {
-        statuses: DEFAULT_STATUSES, autoAssign: "round-robin",
-      }), 8000, "settings");
-      await withTimeout(setDoc(doc(db, "organizations", orgId, "meta", "leadAssignment"), { lastIndex: 0 }), 8000, "meta");
-      await withTimeout(setDoc(doc(db, "organizations", orgId, "activity", `welcome_${Date.now()}`), {
-        text: `🎉 ${fullName.trim()} started a ${trialDays}-day free trial on Starter`, at: new Date().toISOString(), orgId,
-      }), 8000, "activity");
-    } catch (e) { console.warn("[signup] optional setup skipped:", e?.code || e?.message); }
   };
 
   return (

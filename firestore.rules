@@ -1,203 +1,110 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // ============================================================
-    // HELPERS
-    // ============================================================
-
-    function isAuthenticated() {
-      return request.auth != null;
+    // Client rules are a tenant-data boundary. Billing, ownership, membership
+    // lifecycle, quotas, and system events are deliberately server-only.
+    function signedIn() { return request.auth != null; }
+    function memberPath(orgId) {
+      return /databases/$(database)/documents/memberships/$(request.auth.uid + '_' + orgId);
     }
-
-    // Platform super-admin (CodeSkate owner). The hardcoded owner phone always
-    // qualifies; additional admins can be added via the platformAdmins collection.
+    function hasMembership(orgId) { return signedIn() && exists(memberPath(orgId)); }
+    function membership(orgId) { return get(memberPath(orgId)).data; }
+    function isActiveMember(orgId) { return hasMembership(orgId) && membership(orgId).active == true; }
+    function hasRole(orgId, role) { return isActiveMember(orgId) && membership(orgId).role == role; }
+    function isAdmin(orgId) { return hasRole(orgId, 'owner') || hasRole(orgId, 'admin'); }
     function isPlatformAdmin() {
-      return isAuthenticated() && (
+      return signedIn() && (
         request.auth.token.phone_number == '+919653043939' ||
         exists(/databases/$(database)/documents/platformAdmins/$(request.auth.uid))
       );
     }
-
-    function membershipPath(orgId) {
-      return /databases/$(database)/documents/memberships/$(request.auth.uid + '_' + orgId);
+    function leadPath(orgId, leadId) {
+      return /databases/$(database)/documents/organizations/$(orgId)/leads/$(leadId);
     }
-    function hasMembershipDoc(orgId) {
-      return isAuthenticated() && exists(membershipPath(orgId));
+    function isLeadAssignee(orgId, leadId) {
+      return isActiveMember(orgId) &&
+        exists(leadPath(orgId, leadId)) &&
+        get(leadPath(orgId, leadId)).data.assignedTo == request.auth.uid;
     }
-    function memberData(orgId) {
-      return get(membershipPath(orgId)).data;
+    function employeeLeadFieldsOnly() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'status', 'priority', 'followUp', 'lastUpdated', 'lastContactedAt'
+      ]);
     }
-    function isActiveMember(orgId) {
-      return hasMembershipDoc(orgId) && memberData(orgId).active == true;
-    }
-    function hasRole(orgId, role) {
-      return hasMembershipDoc(orgId)
-             && memberData(orgId).active == true
-             && memberData(orgId).role == role;
-    }
-    function isAdmin(orgId) {
-      return hasRole(orgId, 'admin') || hasRole(orgId, 'owner');
-    }
-    function isOwner(orgId) {
-      return hasRole(orgId, 'owner');
-    }
-
-    // Org billing helpers (safe .get with defaults)
-    function orgData(orgId) {
-      return get(/databases/$(database)/documents/organizations/$(orgId)).data;
-    }
-    function seatAvailable(orgId) {
-      let o = orgData(orgId);
-      return o.get('seatsUsed', 0) < o.get('seatsLimit', 0);
-    }
-    // Subscription usable? active plan, OR trialing and not past trialEndsAtMs.
-    // If trialEndsAtMs is missing (older orgs created before this field), we
-    // give the benefit of the doubt so existing workspaces keep working.
-    function subActive(orgId) {
-      let o = orgData(orgId);
-      let status = o.get('subscriptionStatus', 'trialing');
-      return status == 'active'
-             || (status == 'trialing'
-                 && (o.get('trialEndsAtMs', 0) == 0
-                     || o.get('trialEndsAtMs', 0) > request.time.toMillis()));
-    }
-
-    // ============================================================
-    // PLATFORM (super-admin only)
-    // ============================================================
 
     match /platformAdmins/{uid} {
-      allow read: if isAuthenticated() && (request.auth.uid == uid || isPlatformAdmin());
-      allow write: if false; // create manually in console / via admin SDK
+      allow read: if signedIn() && (request.auth.uid == uid || isPlatformAdmin());
+      allow write: if false;
     }
 
-    // Global config (trial length, plan limits/prices). Public read so the
-    // marketing site can show current pricing/trial; only owner can write.
+    // Public pricing can be read by the marketing site. Only the platform owner
+    // can alter global configuration.
     match /platformConfig/{docId} {
       allow read: if true;
       allow write: if isPlatformAdmin();
     }
 
-    // One free trial per phone number, ever.
+    // The backend atomically records and checks trial usage.
     match /trialsUsed/{phoneKey} {
-      allow read: if isAuthenticated();
-      // Only the owner of the verified phone can record its trial usage.
-      allow create: if isAuthenticated()
-                    && request.resource.data.phone == request.auth.token.phone_number;
-      allow update, delete: if false;
+      allow read, write: if false;
     }
 
-    // Employee INVITES (pending until the invitee logs in and claims them).
-    // Keyed by {phoneE164}_{orgId}.
+    // Invites and memberships are created/claimed by authenticated backend
+    // routes so a client can never alter role, org, or active state.
     match /invites/{inviteId} {
-      // `resource == null` → the invite doesn't exist yet. Allowing that read
-      // is safe (no data to leak) and is REQUIRED so the addUser transaction
-      // can check for an existing invite before creating one.
-      allow read: if isAuthenticated() && (
-        resource == null ||
-        request.auth.token.phone_number == resource.data.phone ||
-        isAdmin(resource.data.orgId) ||
-        isPlatformAdmin()
-      );
-      allow create: if isAuthenticated() && isAdmin(request.resource.data.orgId);
-      // Admin manages the invite; the invited user can deactivate it on claim.
-      allow update: if isAuthenticated() && (
-        isAdmin(resource.data.orgId) ||
-        request.auth.token.phone_number == resource.data.phone
-      );
-      allow delete: if isAuthenticated() && (
-        isAdmin(resource.data.orgId) ||
-        request.auth.token.phone_number == resource.data.phone
-      );
+      allow read: if isPlatformAdmin() || (resource != null && isAdmin(resource.data.orgId));
+      allow write: if false;
     }
 
-    // WhatsApp number → org routing map (phoneNumberId is the doc id).
-    // Backend reads this with the Admin SDK (bypasses rules).
+    // A tenant admin may manage only mappings already owned by their tenant.
+    // These documents are otherwise unavailable to other tenants.
     match /whatsappConfigs/{phoneNumberId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAuthenticated() && isAdmin(request.resource.data.orgId);
-      allow delete: if isAuthenticated() && isAdmin(resource.data.orgId);
+      allow read: if isPlatformAdmin() || (resource != null && isAdmin(resource.data.orgId));
+      allow create: if isAdmin(request.resource.data.orgId);
+      allow update: if isAdmin(resource.data.orgId)
+                    && request.resource.data.orgId == resource.data.orgId;
+      allow delete: if isAdmin(resource.data.orgId);
     }
-
-    // ============================================================
-    // GLOBAL USER IDENTITY
-    // ============================================================
 
     match /users/{uid} {
-      allow read: if isAuthenticated() && (request.auth.uid == uid || isPlatformAdmin());
-      allow create: if isAuthenticated() && request.auth.uid == uid;
-      allow update: if isAuthenticated() && request.auth.uid == uid;
-      allow delete: if false;
+      allow read: if signedIn() && (request.auth.uid == uid || isPlatformAdmin());
+      allow write: if false;
     }
 
-    // ============================================================
-    // MEMBERSHIPS
-    // ============================================================
-
     match /memberships/{membershipId} {
-      allow read: if isAuthenticated() && (
+      allow read: if signedIn() && (
         request.auth.uid == resource.data.uid ||
         isAdmin(resource.data.orgId) ||
         isPlatformAdmin()
       );
-
-      // Membership creation is allowed when:
-      // 1. Self-serve signup — creating your OWN owner membership, OR
-      // 2. Claiming an invite — an invite for your verified phone + this org
-      //    exists and the role matches (invited employee's first login), OR
-      // 3. An admin adds a teammate with a free seat + active subscription.
-      allow create: if isAuthenticated() && (
-        (request.resource.data.uid == request.auth.uid &&
-         request.resource.data.role == 'owner') ||
-
-        (request.resource.data.uid == request.auth.uid &&
-         exists(/databases/$(database)/documents/invites/$(request.auth.token.phone_number + '_' + request.resource.data.orgId)) &&
-         get(/databases/$(database)/documents/invites/$(request.auth.token.phone_number + '_' + request.resource.data.orgId)).data.role == request.resource.data.role) ||
-
-        (request.auth.uid != request.resource.data.uid &&
-         isAdmin(request.resource.data.orgId) &&
-         seatAvailable(request.resource.data.orgId) &&
-         subActive(request.resource.data.orgId))
-      );
-
-      allow update: if isAuthenticated() && (
-        isAdmin(resource.data.orgId) ||
-        request.auth.uid == resource.data.uid
-      );
-
-      allow delete: if isAuthenticated() && isOwner(resource.data.orgId);
+      allow write: if false;
     }
 
-    // ============================================================
-    // ORGANIZATIONS
-    // ============================================================
-
     match /organizations/{orgId} {
-      // Members read their org; platform admin reads/lists all.
       allow read: if isActiveMember(orgId) || isPlatformAdmin();
-      allow create: if isAuthenticated();
-      // Admin/owner manage the org (incl. seat counter + plan changes);
-      // platform admin can manage any org.
-      allow update: if isAdmin(orgId) || isPlatformAdmin();
-      allow delete: if false;
+      allow create, update, delete: if false;
 
       match /leads/{leadId} {
-        allow read: if isActiveMember(orgId);
-        // New leads require an active subscription/trial.
-        allow create: if isActiveMember(orgId)
-                      && request.resource.data.orgId == orgId
-                      && subActive(orgId);
+        allow read: if isAdmin(orgId) || isLeadAssignee(orgId, leadId);
+        // Backend creates and counts every lead so quotas cannot be bypassed.
+        allow create, delete: if false;
         allow update: if isAdmin(orgId)
-                      || (isActiveMember(orgId) && resource.data.assignedTo == request.auth.uid);
-        allow delete: if isAdmin(orgId);
+          || (isLeadAssignee(orgId, leadId) && employeeLeadFieldsOnly());
 
         match /notes/{noteId} {
-          allow read: if isActiveMember(orgId) && (resource.data.visibility == 'team' || isAdmin(orgId));
-          allow create: if isActiveMember(orgId);
-          allow update: if isActiveMember(orgId) && (isAdmin(orgId) || resource.data.authorId == request.auth.uid);
-          allow delete: if isAdmin(orgId);
+          allow read: if isAdmin(orgId)
+            || (isLeadAssignee(orgId, leadId) && resource.data.visibility == 'team');
+          allow create: if (
+              isAdmin(orgId)
+              && request.resource.data.authorId == request.auth.uid
+            ) || (
+              isLeadAssignee(orgId, leadId)
+              && request.resource.data.authorId == request.auth.uid
+              && request.resource.data.visibility == 'team'
+            );
+          allow update, delete: if false;
         }
+
         match /private/{docId} {
           allow read, write: if isAdmin(orgId);
         }
@@ -211,23 +118,39 @@ service cloud.firestore {
         allow read: if isActiveMember(orgId);
         allow write: if isAdmin(orgId);
       }
-      match /activity/{activityId} {
-        allow read: if isActiveMember(orgId);
-        allow create: if isActiveMember(orgId) && request.resource.data.orgId == orgId;
-        allow update, delete: if false;
-      }
-      match /notifications/{notifId} {
-        allow read: if isActiveMember(orgId) && resource.data.userId == request.auth.uid;
-        allow create: if isActiveMember(orgId);
-        allow update, delete: if isActiveMember(orgId) && resource.data.userId == request.auth.uid;
-      }
-      match /goals/{goalsId} {
+      match /goals/{goalId} {
         allow read: if isActiveMember(orgId);
         allow write: if isAdmin(orgId);
       }
-      match /pending_leads/{pendingId} {
-        allow read, write: if isAdmin(orgId);
+
+      // Activity is a backend-authored audit trail.
+      match /activity/{activityId} {
+        allow read: if isAdmin(orgId) || isPlatformAdmin();
+        allow write: if false;
       }
+
+      match /notifications/{notificationId} {
+        allow read: if isActiveMember(orgId) && resource.data.userId == request.auth.uid;
+        allow create: if isAdmin(orgId) && request.resource.data.orgId == orgId;
+        allow update: if isActiveMember(orgId)
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.userId == resource.data.userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+        allow delete: if false;
+      }
+
+      // Queue documents and all billing/invoice data are backend-only.
+      match /pending_leads/{pendingId} { allow read, write: if false; }
+      match /invoices/{invoiceId} { allow read: if isAdmin(orgId); allow write: if false; }
     }
+
+    match /paymentIntents/{id} { allow read, write: if false; }
+    match /billingEvents/{id} { allow read, write: if false; }
+    match /razorpayWebhookEvents/{id} { allow read, write: if false; }
+    match /whatsappMessageEvents/{id} { allow read, write: if false; }
+    match /systemLocks/{id} { allow read, write: if false; }
+    match /subscriptionIntents/{id} { allow read, write: if false; }
+    match /leadImports/{id} { allow read, write: if false; }
+    match /razorpayPlans/{id} { allow read, write: if false; }
   }
 }
