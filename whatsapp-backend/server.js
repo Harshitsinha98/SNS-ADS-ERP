@@ -578,8 +578,12 @@ app.post("/api/whatsapp/connect", requireAuth, async (req, res) => {
     const code = String(req.body?.code || "").trim();
     const wabaId = String(req.body?.wabaId || "").trim();
     const phoneNumberId = String(req.body?.phoneNumberId || "").trim();
+    const registrationPin = String(req.body?.registrationPin || "").trim();
     if (!orgId || !code || !validMetaId(wabaId) || !validMetaId(phoneNumberId)) {
       return res.status(400).json({ error: "Complete WhatsApp Business connection details are required" });
+    }
+    if (!/^\d{6}$/.test(registrationPin)) {
+      return res.status(400).json({ error: "Enter a six-digit WhatsApp registration PIN" });
     }
     if (!(await isOrgAdmin(req.authUser.uid, orgId))) {
       return res.status(403).json({ error: "Organization admin access required" });
@@ -625,6 +629,21 @@ app.post("/api/whatsapp/connect", requireAuth, async (req, res) => {
       };
     });
     try {
+      // Register the selected Cloud API phone before treating the workspace as
+      // connected. Meta leaves a newly-added number in Pending state until this
+      // server-side call supplies the tenant's six-digit two-step PIN.
+      try {
+        await metaGraphRequest(`${phoneNumberId}/register`, {
+          method: "POST",
+          token: accessToken,
+          body: { messaging_product: "whatsapp", pin: registrationPin },
+        });
+      } catch (error) {
+        throw Object.assign(new Error("Meta could not register this phone number. Confirm the six-digit WhatsApp registration PIN and try again."), {
+          status: error.status || 502,
+          deliveryUnknown: error.deliveryUnknown,
+        });
+      }
       // Activate durable routing before subscribing. If Meta emits an event as
       // soon as it accepts the subscription, it can be routed safely.
       await metaGraphRequest(`${wabaId}/subscribed_apps`, { method: "POST", token: accessToken });

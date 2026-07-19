@@ -47,6 +47,7 @@ export default function WhatsApp() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connection, setConnection] = useState({ connected: false });
+  const [registrationPin, setRegistrationPin] = useState("");
   const [message, setMessage] = useState("");
   const completionRef = useRef({ code: null, signup: null, done: false });
 
@@ -68,6 +69,10 @@ export default function WhatsApp() {
       setMessage("WhatsApp onboarding is not configured yet. Ask the platform administrator to add the Meta App ID and Embedded Signup Configuration ID in Vercel.");
       return;
     }
+    if (!/^\d{6}$/.test(registrationPin)) {
+      setMessage("Enter a six-digit WhatsApp registration PIN before connecting. This is not an SMS OTP.");
+      return;
+    }
     setSaving(true);
     setMessage("");
     completionRef.current = { code: null, signup: null, done: false };
@@ -83,8 +88,10 @@ export default function WhatsApp() {
           code: state.code,
           wabaId: state.signup.wabaId,
           phoneNumberId: state.signup.phoneNumberId,
+          registrationPin,
         });
         await refreshConnection();
+        setRegistrationPin("");
         setMessage("WhatsApp Business connected. New inbound messages will be routed to this workspace and your team can reply from lead records.");
       } catch (error) {
         setMessage(error.message || "Could not verify the WhatsApp Business connection.");
@@ -203,6 +210,22 @@ export default function WhatsApp() {
           <p className="text-sm text-ink-soft leading-6">
             Each customer connects their own WhatsApp Business Account through Meta. CodeSkate verifies the number before routing messages, so another workspace cannot claim or receive its leads.
           </p>
+          {!connection.connected && (
+            <label className="block mt-5">
+              <span className="block text-sm font-medium text-ink mb-1.5">WhatsApp registration PIN</span>
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={6}
+                value={registrationPin}
+                onChange={(event) => setRegistrationPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="Six digits"
+                className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm text-ink focus:border-orange-500 focus:outline-none"
+              />
+              <span className="block text-xs text-ink-muted mt-1.5">For a new number, choose and keep a six-digit PIN. For an existing number, enter its current WhatsApp two-step PIN. This is not an SMS OTP and is never stored.</span>
+            </label>
+          )}
           <button onClick={connect} disabled={saving || connection.connected} className="btn btn-primary w-full mt-6">
             {saving ? <><Loader2 size={16} className="animate-spin" /> Connecting…</> : <><Plug size={16} /> Connect with Meta <ArrowRight size={16} /></>}
           </button>
