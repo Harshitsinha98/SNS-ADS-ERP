@@ -46,8 +46,8 @@ export default function MarketingFooter() {
           <div>
             <h4 className="font-display font-semibold text-white text-sm mb-4">Legal</h4>
             <ul className="space-y-2.5 text-sm">
-              <li><span className="text-cream-400/80">Privacy</span></li>
-              <li><span className="text-cream-400/80">Terms</span></li>
+              <li><Link to="/privacy" className="text-cream-400/80 hover:text-orange-400 transition-colors">Privacy</Link></li>
+              <li><Link to="/terms" className="text-cream-400/80 hover:text-orange-400 transition-colors">Terms</Link></li>
               <li><span className="text-cream-400/80">Security</span></li>
             </ul>
           </div>

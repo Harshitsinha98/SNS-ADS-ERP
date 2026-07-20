@@ -3,6 +3,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Landing from "./pages/marketing/Landing";
 import Pricing from "./pages/marketing/Pricing";
 import Signup from "./pages/marketing/Signup";
+import Privacy from "./pages/marketing/Privacy";
+import Terms from "./pages/marketing/Terms";
 import Login from "./pages/Login";
 import Setup from "./pages/Setup";
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -43,6 +45,8 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/website-lead-form/:orgId/:token" element={<WebsiteLeadForm />} />
 
         <Route path="/login" element={<Login />} />
