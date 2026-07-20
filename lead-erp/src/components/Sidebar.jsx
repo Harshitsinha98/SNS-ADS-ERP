@@ -12,6 +12,7 @@ import {
   ChevronRight,
   CreditCard,
   MessageCircle,
+  Globe2,
 } from "lucide-react";
 
 const adminLinks = [
@@ -19,6 +20,7 @@ const adminLinks = [
   { to: "/admin/leads", label: "Lead Hub", icon: Inbox },
   { to: "/admin/employees", label: "Team", icon: Users },
   { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },
   { to: "/admin/billing", label: "Billing", icon: CreditCard },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];

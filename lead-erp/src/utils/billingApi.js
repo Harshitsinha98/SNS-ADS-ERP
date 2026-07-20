@@ -25,6 +25,20 @@ async function authedPost(path, body) {
   return data;
 }
 
+async function authedGet(path) {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const error = new Error(data.error || `Request failed (${res.status})`);
+    Object.assign(error, data, { status: res.status });
+    throw error;
+  }
+  return data;
+}
+
 export async function getAccountStatus(phone) {
   const res = await fetch(`${BASE}/api/billing/account-status`, {
     method: "POST",
@@ -105,6 +119,8 @@ export const cancelPlanDowngrade = (body) => authedPost("/api/billing/subscripti
 export const importBulkLeads = (body) => authedPost("/api/billing/leads/bulk-import", body);
 export const createManualLead = (body) => authedPost("/api/leads/manual", body);
 export const rotateWebsiteLeadIntakeKey = (body) => authedPost("/api/leads/website-key", body);
+export const getWebsiteLeadIntegration = (orgId) => authedGet(`/api/leads/integrations?orgId=${encodeURIComponent(orgId)}`);
+export const createWebsiteLeadIntegration = (body) => authedPost("/api/leads/integrations", body);
 export const reassignBulkLeads = (body) => authedPost("/api/billing/leads/reassign-bulk", body);
 export const platformOrgAction = (body) => authedPost("/api/billing/platform/org-action", body);
 export const triggerWhatsAppSync = (body) => authedPost("/api/whatsapp/sync-now", body);

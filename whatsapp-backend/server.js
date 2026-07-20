@@ -28,6 +28,9 @@ const app = express();
 // makes req.ip usable for rate limits without manually trusting user headers.
 app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3001;
+const isProductionDeployment = process.env.NODE_ENV === "production" || Boolean(process.env.RENDER || process.env.RENDER_SERVICE_ID);
+const publicBackendUrl = process.env.PUBLIC_BACKEND_URL || (isProductionDeployment ? "" : `http://localhost:${PORT}`);
+const publicFrontendUrl = process.env.PUBLIC_FRONTEND_URL || process.env.FRONTEND_URL || (isProductionDeployment ? "" : "http://localhost:5173");
 const PLATFORM_OWNER_PHONE = process.env.PLATFORM_OWNER_PHONE || "+919653043939";
 const INSTANCE_ID = `${process.env.RENDER_INSTANCE_ID || process.env.HOSTNAME || "local"}-${process.pid}`;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -47,7 +50,14 @@ const safeDocId = (value) => String(value).replace(/[^A-Za-z0-9_-]/g, "_").slice
 const orgCollection = (orgId, name) => db.collection("organizations").doc(orgId).collection(name);
 
 const allowedOrigins = new Set(
-  String(process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || "http://localhost:5173")
+  [
+    process.env.ALLOWED_ORIGINS,
+    process.env.FRONTEND_URL,
+    process.env.PUBLIC_FRONTEND_URL,
+    "http://localhost:5173",
+  ]
+    .filter(Boolean)
+    .join(",")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean)
@@ -67,7 +77,11 @@ app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/billing", createBillingRouter(db));
 app.use("/api/leads", createLeadIntakeRouter(db, {
-  publicBackendUrl: process.env.PUBLIC_BACKEND_URL || `http://localhost:${PORT}`,
+  publicBackendUrl,
+  publicFrontendUrl,
+  turnstileSiteKey: process.env.TURNSTILE_SITE_KEY || "",
+  turnstileSecret: process.env.TURNSTILE_SECRET_KEY || "",
+  requireHttpsPublicUrls: isProductionDeployment,
 }));
 
 if (!process.env.WHATSAPP_APP_SECRET) {

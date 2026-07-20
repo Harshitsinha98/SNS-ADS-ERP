@@ -13,6 +13,8 @@ import EmployeeDetail from "./pages/admin/EmployeeDetail";
 import Settings from "./pages/admin/Settings";
 import Billing from "./pages/admin/Billing";
 import WhatsApp from "./pages/admin/WhatsApp";
+import WebsiteLeadIntegration from "./pages/admin/WebsiteLeadIntegration";
+import WebsiteLeadForm from "./pages/public/WebsiteLeadForm";
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
 import Workspace from "./pages/employee/Workspace";
 import LeadAction from "./pages/employee/LeadAction";
@@ -38,6 +40,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/website-lead-form/:orgId/:token" element={<WebsiteLeadForm />} />
 
         <Route path="/login" element={<Login />} />
         <Route path="/setup" element={<ProtectedRoute><Setup /></ProtectedRoute>} />
@@ -51,6 +54,7 @@ export default function App() {
         <Route path="/admin/settings" element={<ProtectedRoute role="admin"><Settings /></ProtectedRoute>} />
         <Route path="/admin/billing" element={<ProtectedRoute role="admin"><Billing /></ProtectedRoute>} />
         <Route path="/admin/whatsapp" element={<ProtectedRoute role="admin"><WhatsApp /></ProtectedRoute>} />
+        <Route path="/admin/website-lead-integration" element={<ProtectedRoute role="admin"><WebsiteLeadIntegration /></ProtectedRoute>} />
 
         {/* --- PLATFORM OWNER PORTAL (self-contained owner login inside the page;
                 only +919653043939 can enter). Accessible at /owner or /platform. --- */}
