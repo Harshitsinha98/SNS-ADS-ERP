@@ -8,19 +8,19 @@ import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import { fmtDate, fmtDuration, toWaNumber } from "../../utils/helpers";
 import { Phone, PhoneOff, MessageCircle } from "lucide-react";
+import FollowUpTaskControls from "../../components/FollowUpTaskControls";
 
 export default function LeadAction() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { leads, settings, updateLeadStatus, updateFollowUpDate, addNote, addWorknote } = useData();
+  const { leads, settings, updateLeadStatus, addNote, addWorknote } = useData();
   const orgId = user?.activeOrgId;
   const currentUserId = user?.uid || user?.id;
   const lead = leads.find((l) => l.id === id);
 
   const [notes, setNotes] = useState([]);
   const [note, setNote] = useState("");
-  const [followDate, setFollowDate] = useState("");
 
   const [callActive, setCallActive] = useState(false);
   const [callStart, setCallStart] = useState(null);
@@ -79,13 +79,6 @@ export default function LeadAction() {
 
   const setStatus = (status) => updateLeadStatus(lead.id, status, user);
 
-  const scheduleFollowUp = () => {
-    if (!followDate) return;
-    updateFollowUpDate(lead.id, new Date(followDate).toISOString(), user);
-    updateLeadStatus(lead.id, "Follow-up", user);
-    setFollowDate("");
-  };
-
   const saveNote = () => {
     if (!note.trim()) return;
     addWorknote(lead.id, note, user, { visibility: "team" });
@@ -138,11 +131,7 @@ export default function LeadAction() {
           </select>
           <p className="text-xs text-ink/35 num mb-4">Last updated: {fmtDate(lead.lastUpdated)}</p>
 
-          <p className="eyebrow mb-2">Schedule follow-up</p>
-          <input type="datetime-local" className="w-full border border-paper-line rounded-md p-2 text-sm mb-2"
-            value={followDate} onChange={(e) => setFollowDate(e.target.value)} />
-          <button onClick={scheduleFollowUp} className="w-full bg-ink text-white rounded-md p-2 text-sm">Schedule</button>
-          {lead.followUp && <p className="text-xs text-signal num mt-2">Next follow-up: {fmtDate(lead.followUp)}</p>}
+          <FollowUpTaskControls lead={lead} compact />
 
           <p className="eyebrow mt-5 mb-2">Add work note</p>
           <textarea className="w-full border border-paper-line rounded-md p-2 text-sm mb-2" rows="3"

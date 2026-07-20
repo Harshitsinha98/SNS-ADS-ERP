@@ -10,6 +10,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getNextEmployeeRoundRobin, getNextEmployeeByWorkload } from "./utils/assignLead.js";
 import createBillingRouter from "./billing.js";
 import createLeadIntakeRouter from "./leadIntake.js";
+import createFollowUpTasksRouter from "./followUpTasks.js";
 import { getMergedPlans } from "./plans.js";
 
 function loadServiceAccount() {
@@ -83,6 +84,7 @@ app.use("/api/leads", createLeadIntakeRouter(db, {
   turnstileSecret: process.env.TURNSTILE_SECRET_KEY || "",
   requireHttpsPublicUrls: isProductionDeployment,
 }));
+app.use("/api/follow-ups", createFollowUpTasksRouter(db));
 
 if (!process.env.WHATSAPP_APP_SECRET) {
   console.warn("⚠️ WHATSAPP_APP_SECRET is not set. Meta webhook ingestion will reject requests until it is configured.");

@@ -6,12 +6,12 @@ import ConvBar from "../../components/charts/BarChart";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import { StatusLamp, PriorityBadge } from "../../components/StatusLamp";
-import { isToday, fmtDate, daysSince, last7DaysTrend, employeeRank, toWaNumber, sourceStats } from "../../utils/helpers";
+import { daysSince, last7DaysTrend, employeeRank, toWaNumber, sourceStats } from "../../utils/helpers";
 import { Target, Flame, Clock, Trophy, Phone, MessageCircle, ListChecks } from "lucide-react";
 
 export default function Workspace() {
   const { user } = useAuth();
-  const { leads, users, settings, notifications, markRead, updateLeadStatus, addNote, goals, setMyGoal } = useData();
+  const { leads, users, settings, notifications, markRead, updateLeadStatus, addNote, goals, setMyGoal, followUpTasks } = useData();
 
   const [goalInput, setGoalInput] = useState("");
   const [editingGoal, setEditingGoal] = useState(false);
@@ -19,13 +19,22 @@ export default function Workspace() {
 
   const myLeads = leads.filter((l) => l.assignedTo === user.id && !l.blacklisted);
   const isClosed = (l) => ["Closed-Won", "Lost"].includes(l.status);
-  // FIX: same overdue bug that was in Tasks.jsx — time-based check, so "today's
-  // follow-up whose time has passed" now correctly shows up as Overdue.
-  const isPast = (l) => l.followUp && new Date(l.followUp) < new Date();
+  const now = new Date();
+  const tomorrow = new Date();
+  tomorrow.setHours(24, 0, 0, 0);
+  const leadsById = new Map(myLeads.map((lead) => [lead.id, lead]));
+  const myOpenTasks = followUpTasks.filter((task) => task.status === "open");
+  const taskLead = (task) => {
+    const lead = leadsById.get(task.leadId);
+    return lead ? { ...lead, taskDueAt: task.dueAt, taskType: task.type } : null;
+  };
 
   const newToCall = myLeads.filter((l) => l.status === "New");
-  const followToday = myLeads.filter((l) => isToday(l.followUp) && !isPast(l) && !isClosed(l));
-  const overdue = myLeads.filter((l) => isPast(l) && !isClosed(l));
+  const followToday = myOpenTasks.filter((task) => {
+    const due = new Date(task.dueAt);
+    return due >= now && due < tomorrow;
+  }).map(taskLead).filter(Boolean);
+  const overdue = myOpenTasks.filter((task) => new Date(task.dueAt) < now).map(taskLead).filter(Boolean);
   const hotLeads = myLeads.filter((l) => l.priority === "Hot" && !isClosed(l));
   const idleLeads = myLeads.filter((l) => !isClosed(l) && daysSince(l.lastUpdated) >= 2);
   const myNotifs = notifications.filter((n) => n.userId === user.id && !n.read);
@@ -104,11 +113,11 @@ export default function Workspace() {
 
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 bg-white rounded-lg shadow-card border border-paper-line p-4 mb-6">
         <div>
-          <p className="font-medium text-sm">{myLeads.length} leads assigned to you</p>
-          <p className="text-xs text-ink/40">See all your leads in one place and change status/priority/follow-up right from here.</p>
+          <p className="font-medium text-sm">{myOpenTasks.length} open follow-up task(s)</p>
+          <p className="text-xs text-ink/40">Complete each follow-up with an outcome, note, and next action.</p>
         </div>
         <Link to="/app/tasks" className="flex items-center justify-center gap-1.5 bg-ink text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-ink/90">
-          <ListChecks size={15} /> View all my leads
+          <ListChecks size={15} /> Open my follow-ups
         </Link>
       </div>
 
@@ -116,7 +125,7 @@ export default function Workspace() {
         <StatCard label="Active pipeline" value={myLeads.length} tone="ink" />
         <StatCard label="New to call" value={newToCall.length} tone="info" />
         <StatCard label="Follow-ups today" value={followToday.length} tone="signal" icon={Clock} />
-        <StatCard label="Overdue" value={overdue.length} tone="danger" />
+        <StatCard label="Overdue tasks" value={overdue.length} tone="danger" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <StatCard label="Conversions" value={won} tone="ok" />

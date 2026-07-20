@@ -7,7 +7,9 @@ import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import {
   inviteTeamMember, setTeamMemberStatus, setTeamMemberRole, schedulePlanDowngrade, cancelPlanDowngrade,
-  importBulkLeads, createManualLead, rotateWebsiteLeadIntakeKey, reassignBulkLeads, triggerWhatsAppSync as requestWhatsAppSync,
+  importBulkLeads, createManualLead, rotateWebsiteLeadIntakeKey, reassignBulkLeads,
+  scheduleFollowUpTask, completeFollowUpTask, updateFollowUpLeadStatus, reassignFollowUpLead,
+  triggerWhatsAppSync as requestWhatsAppSync,
 } from "../utils/billingApi";
 
 const DataContext = createContext();
@@ -82,10 +84,11 @@ export function DataProvider({ children }) {
   const [activity, setActivity] = useState([]);
   const [goals, setGoals] = useState({});
   const [financials, setFinancials] = useState({});
+  const [followUpTasks, setFollowUpTasks] = useState([]);
 
   useEffect(() => {
     if (!user || !user.activeOrgId) {
-      setLeads([]); setMembers([]); setPendingInvites([]); setNotifications([]); setActivity([]); setGoals({}); setFinancials({});
+      setLeads([]); setMembers([]); setPendingInvites([]); setNotifications([]); setActivity([]); setGoals({}); setFinancials({}); setFollowUpTasks([]);
       return;
     }
 
@@ -187,6 +190,19 @@ export function DataProvider({ children }) {
     }
 
     // ============================================================
+    // FOLLOW-UP TASKS - backend-authored; admins see the full SLA queue and
+    // employees see only their own assignments (enforced again in rules).
+    // ============================================================
+    const tasksQuery = isAdmin
+      ? orgCollection(orgId, "followUpTasks")
+      : query(orgCollection(orgId, "followUpTasks"), where("assignedTo", "==", user.uid));
+    const unsubFollowUpTasks = onSnapshot(
+      tasksQuery,
+      (snap) => setFollowUpTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (err) => console.error("Follow-up tasks listener error:", err)
+    );
+
+    // ============================================================
     // FINANCIALS - admin only, use collectionGroup but filter by orgId client-side
     // ============================================================
     let unsubFinancials = () => {};
@@ -217,6 +233,7 @@ export function DataProvider({ children }) {
       unsubNotifs(); 
       unsubActivity(); 
       unsubGoals(); 
+      unsubFollowUpTasks();
       unsubFinancials(); 
     };
   }, [user]);
@@ -269,17 +286,7 @@ export function DataProvider({ children }) {
       ...extra,
     });
     if (!noteWritten) return false;
-    const patch = { lastUpdated: new Date().toISOString() };
-    if (type === "call" || type === "worknote") {
-      patch.lastContactedAt = new Date().toISOString();
-    }
-    try {
-      await updateDoc(orgDoc(user.activeOrgId, "leads", id), patch);
-      return true;
-    } catch (error) {
-      console.error("Error updating lead activity:", error);
-      return false;
-    }
+    return true;
   };
 
   const addWorknote = (id, text, currentUser, extra = {}) => {
@@ -298,34 +305,24 @@ export function DataProvider({ children }) {
   // LEAD OPERATIONS - org-scoped
   // ============================================================
 
-  const updateLead = async (id, patch, currentUser) => {
-    if (!user?.activeOrgId) return;
-    try {
-      await updateDoc(orgDoc(user.activeOrgId, "leads", id), { 
-        ...patch, 
-        lastUpdated: new Date().toISOString() 
-      });
-      if (patch.status) {
-        await writeNote(id, {
-          type: "status",
-          text: `Status changed to "${patch.status}"${currentUser?.displayName || currentUser?.name ? ` by ${currentUser?.displayName || currentUser?.name}` : ""}`,
-          visibility: "team",
-          authorName: currentUser?.displayName || currentUser?.name || "System",
-        });
-        logActivity(`Lead ${id} status changed to "${patch.status}"`);
-      }
-    } catch (e) { console.error("Error updating lead:", e); }
+  const updateLead = async (id, patch) => {
+    if (!user?.activeOrgId) throw new Error("No active organization selected");
+    if (!Object.hasOwn(patch, "status") && !Object.hasOwn(patch, "blacklisted")) {
+      throw new Error("Lead changes outside priority must use a secured workflow.");
+    }
+    return updateFollowUpLeadStatus(id, {
+      orgId: user.activeOrgId,
+      status: patch.status || (patch.blacklisted ? "Lost" : "New"),
+      ...(Object.hasOwn(patch, "blacklisted") ? { blacklisted: patch.blacklisted } : {}),
+    });
   };
 
-  const updateLeadStatus = (id, status, currentUser) => updateLead(id, { status }, currentUser);
+  const updateLeadStatus = (id, status) => updateLead(id, { status });
 
   const updatePriority = async (id, priority, currentUser) => {
     if (!user?.activeOrgId) return;
     try {
-      await updateDoc(orgDoc(user.activeOrgId, "leads", id), { 
-        priority, 
-        lastUpdated: new Date().toISOString() 
-      });
+      await updateDoc(orgDoc(user.activeOrgId, "leads", id), { priority });
       await writeNote(id, {
         type: "system",
         text: `Priority changed to "${priority}"${currentUser?.displayName || currentUser?.name ? ` by ${currentUser?.displayName || currentUser?.name}` : ""}`,
@@ -335,20 +332,10 @@ export function DataProvider({ children }) {
     } catch (e) { console.error("Error updating priority:", e); }
   };
 
-  const updateFollowUpDate = async (id, date, currentUser) => {
-    if (!user?.activeOrgId) return;
-    try {
-      await updateDoc(orgDoc(user.activeOrgId, "leads", id), { 
-        followUp: date, 
-        lastUpdated: new Date().toISOString() 
-      });
-      await writeNote(id, {
-        type: "system",
-        text: `Follow-up date updated${currentUser?.displayName || currentUser?.name ? ` by ${currentUser?.displayName || currentUser?.name}` : ""}`,
-        visibility: "team",
-        authorName: currentUser?.displayName || currentUser?.name || "System",
-      });
-    } catch (e) { console.error("Error updating follow-up date:", e); }
+  // Follow-up dates are intentionally server-owned so the task, audit entry,
+  // notification, and lead state are written atomically by the backend.
+  const updateFollowUpDate = async () => {
+    throw new Error("Use the Follow-up task control to schedule follow-ups.");
   };
 
   const updateLeadRevenue = async (id, revenue, currentUser) => {
@@ -367,16 +354,9 @@ export function DataProvider({ children }) {
     }
   };
 
-  const reassignLead = async (id, employeeId, employeeName, currentUser) => {
-    await updateLead(id, { assignedTo: employeeId, assignedToName: employeeName || null });
-    await writeNote(id, {
-      type: "assignment",
-      text: `Reassigned to ${employeeName || employeeId}${currentUser?.displayName || currentUser?.name ? ` by ${currentUser?.displayName || currentUser?.name}` : ""}`,
-      visibility: "team",
-      authorName: currentUser?.displayName || currentUser?.name || "System",
-    });
-    pushNotif(employeeId, `New lead assigned to you (${id})`);
-    logActivity(`Lead ${id} reassigned to ${employeeName || employeeId}`);
+  const reassignLead = async (id, employeeId) => {
+    if (!user?.activeOrgId) throw new Error("No active organization selected");
+    return reassignFollowUpLead(id, { orgId: user.activeOrgId, assignedTo: employeeId });
   };
 
   const reassignAllLeads = async (fromEmployeeId, toEmployeeId, toEmployeeName) => {
@@ -428,6 +408,30 @@ export function DataProvider({ children }) {
   const createWebsiteLeadIntakeKey = async () => {
     if (!user?.activeOrgId) throw new Error("No active organization selected");
     return rotateWebsiteLeadIntakeKey({ orgId: user.activeOrgId });
+  };
+
+  const scheduleFollowUp = async ({ leadId, dueAt, type = "Call", title = "", assignedTo = "" }) => {
+    if (!user?.activeOrgId) throw new Error("No active organization selected");
+    return scheduleFollowUpTask({
+      orgId: user.activeOrgId,
+      leadId,
+      dueAt,
+      type,
+      title,
+      assignedTo: assignedTo || undefined,
+    });
+  };
+
+  const completeFollowUp = async (taskId, { outcome, note = "", nextDueAt = null, leadStatus = "", expectedRevision } = {}) => {
+    if (!user?.activeOrgId) throw new Error("No active organization selected");
+    return completeFollowUpTask(taskId, {
+      orgId: user.activeOrgId,
+      outcome,
+      note,
+      nextDueAt: nextDueAt || null,
+      leadStatus: leadStatus || "",
+      expectedRevision,
+    });
   };
 
   // ============================================================
@@ -581,11 +585,11 @@ export function DataProvider({ children }) {
 
   return (
     <DataContext.Provider value={{
-      leads, users, settings, notifications, activity, goals, financials,
+      leads, users, settings, notifications, activity, goals, financials, followUpTasks,
       setSettings: setSettingsValue, updateLead, addNote, addWorknote,
       updateLeadStatus, updatePriority, updateFollowUpDate, updateLeadRevenue,
       reassignLead, reassignAllLeads, blacklistLead,
-      addBulkLeads, addManualLead, createWebsiteLeadIntakeKey,
+      addBulkLeads, addManualLead, createWebsiteLeadIntakeKey, scheduleFollowUp, completeFollowUp,
       addUser, updateUser, deactivateUser, activateUser, pushNotif, markRead, logActivity, setMyGoal,
       triggerWhatsAppSync, changePlan, scheduleDowngrade, cancelDowngrade,
     }}>

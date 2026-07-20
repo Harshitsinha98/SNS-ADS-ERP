@@ -15,6 +15,7 @@ import Billing from "./pages/admin/Billing";
 import WhatsApp from "./pages/admin/WhatsApp";
 import WebsiteLeadIntegration from "./pages/admin/WebsiteLeadIntegration";
 import WebsiteLeadForm from "./pages/public/WebsiteLeadForm";
+import FollowUpQueue from "./pages/admin/FollowUpQueue";
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
 import Workspace from "./pages/employee/Workspace";
 import LeadAction from "./pages/employee/LeadAction";
@@ -55,6 +56,7 @@ export default function App() {
         <Route path="/admin/billing" element={<ProtectedRoute role="admin"><Billing /></ProtectedRoute>} />
         <Route path="/admin/whatsapp" element={<ProtectedRoute role="admin"><WhatsApp /></ProtectedRoute>} />
         <Route path="/admin/website-lead-integration" element={<ProtectedRoute role="admin"><WebsiteLeadIntegration /></ProtectedRoute>} />
+        <Route path="/admin/follow-ups" element={<ProtectedRoute role="admin"><FollowUpQueue /></ProtectedRoute>} />
 
         {/* --- PLATFORM OWNER PORTAL (self-contained owner login inside the page;
                 only +919653043939 can enter). Accessible at /owner or /platform. --- */}

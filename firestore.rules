@@ -26,17 +26,14 @@ service cloud.firestore {
         exists(leadPath(orgId, leadId)) &&
         get(leadPath(orgId, leadId)).data.assignedTo == request.auth.uid;
     }
+    // Follow-up lifecycle, lead assignment, terminal status, and SLA timestamps
+    // are server-owned so they cannot diverge from the task/audit workflow.
     function employeeLeadFieldsOnly() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'status', 'priority', 'followUp', 'lastUpdated', 'lastContactedAt'
-      ]);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['priority']);
     }
     // Provider timestamps and entitlement/accounting fields stay server-owned.
     function adminLeadFieldsOnly() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-        'status', 'priority', 'followUp', 'lastUpdated', 'lastContactedAt',
-        'assignedTo', 'assignedToName', 'blacklisted'
-      ]);
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['priority']);
     }
 
     match /platformAdmins/{uid} {
@@ -128,7 +125,16 @@ service cloud.firestore {
         }
       }
 
-      // WhatsApp connection state is backend-authored. Other settings remain
+      // Follow-up tasks are written, audited, and completed only by the backend.
+    // Members can read only their own assignments; admins can oversee all work.
+    match /followUpTasks/{taskId} {
+      allow read: if isAdmin(orgId)
+        || (isActiveMember(orgId) && resource.data.assignedTo == request.auth.uid);
+      allow write: if false;
+    }
+    match /followUpTaskEvents/{eventId} { allow read, write: if false; }
+
+    // WhatsApp connection state is backend-authored. Other settings remain
       // tenant-admin editable through their existing UI.
       match /settings/whatsapp {
         allow read: if isActiveMember(orgId);

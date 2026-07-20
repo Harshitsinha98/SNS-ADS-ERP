@@ -9,18 +9,9 @@ import { CheckCircle, Phone, PhoneOff } from "lucide-react";
 import { fmtDuration } from "../../utils/helpers";
 import Timeline from "../../components/Timeline";
 import WhatsAppConversation from "../../components/WhatsAppConversation";
+import FollowUpTaskControls from "../../components/FollowUpTaskControls";
 
 const PRIORITIES = ["Hot", "Warm", "Cold"];
-
-// A datetime-local input needs "YYYY-MM-DDTHH:mm" — passing a full ISO (...Z)
-// string directly showed a blank input, so the conversion is necessary
-const toDatetimeLocal = (iso) => {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (isNaN(d)) return "";
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
 
 export default function LeadDetail() {
   const { id } = useParams();
@@ -29,7 +20,7 @@ export default function LeadDetail() {
 
   const {
     leads, users, settings,
-    updateLeadStatus, addWorknote, updateFollowUpDate,
+    updateLeadStatus, addWorknote,
     reassignLead, updateLeadRevenue, updatePriority, addNote
   } = useData();
 
@@ -76,7 +67,6 @@ export default function LeadDetail() {
   if (!lead) return <Layout title="Lead"><p className="text-red-500">Lead not found.</p></Layout>;
 
   const employees = users.filter((u) => u.role === "employee");
-  const isOverdue = lead.followUp && new Date(lead.followUp) < new Date() && !["Closed-Won", "Lost"].includes(lead.status);
 
   const handleAddWorknote = () => {
     if (!noteText.trim()) return;
@@ -159,12 +149,7 @@ export default function LeadDetail() {
                 </select>
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-gray-500">Follow-up Date {isOverdue && <span className="text-red-500">(Overdue)</span>}</label>
-                <input type="datetime-local" value={toDatetimeLocal(lead.followUp)}
-                  onChange={(e) => updateFollowUpDate(lead.id, e.target.value ? new Date(e.target.value).toISOString() : null, user)}
-                  className="w-full border rounded p-2 mt-1" />
-              </div>
+              <FollowUpTaskControls lead={lead} />
 
               {isOrgAdmin && (
                 <div>

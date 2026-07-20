@@ -13,11 +13,13 @@ import {
   CreditCard,
   MessageCircle,
   Globe2,
+  CalendarCheck2,
 } from "lucide-react";
 
 const adminLinks = [
   { to: "/admin", label: "Dashboard", end: true, icon: LayoutDashboard },
   { to: "/admin/leads", label: "Lead Hub", icon: Inbox },
+  { to: "/admin/follow-ups", label: "Follow-ups", icon: CalendarCheck2 },
   { to: "/admin/employees", label: "Team", icon: Users },
   { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },
@@ -27,7 +29,7 @@ const adminLinks = [
 
 const empLinks = [
   { to: "/app", label: "Workspace", end: true, icon: LayoutDashboard },
-  { to: "/app/tasks", label: "My Leads", icon: ClipboardList },
+  { to: "/app/tasks", label: "My Follow-ups", icon: ClipboardList },
 ];
 
 export default function Sidebar({ isOpen = false, onClose = () => {} }) {

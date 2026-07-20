@@ -1384,20 +1384,45 @@ export default function createBillingRouter(db) {
 
   router.post("/leads/reassign-bulk", requireAuth, requireOrgAdmin, async (req, res) => {
     try {
-      const { orgId, fromEmployeeId, toEmployeeId, toEmployeeName } = req.body;
-      const leads = await db.collection("organizations").doc(orgId).collection("leads").where("assignedTo", "==", fromEmployeeId).get();
-      const open = leads.docs.filter((d) => !["Closed-Won", "Lost"].includes(d.data().status));
-      for (let start = 0; start < open.length; start += 400) {
-        const batch = db.batch();
-        open.slice(start, start + 400).forEach((lead) => batch.update(lead.ref, {
-          assignedTo: toEmployeeId,
-          assignedToName: toEmployeeName || null,
-          lastUpdated: nowIso(),
-        }));
-        await batch.commit();
+      const { orgId, fromEmployeeId, toEmployeeId } = req.body;
+      const orgRef = db.collection("organizations").doc(orgId);
+      const targetMembership = await db.collection("memberships").doc(`${toEmployeeId}_${orgId}`).get();
+      if (!targetMembership.exists || targetMembership.data().active !== true) {
+        throw httpError(409, "Choose an active team member.");
       }
-      await audit(orgId, `${open.length} open leads bulk reassigned`, { actorId: req.authUser.uid, fromEmployeeId, toEmployeeId });
-      res.json({ ok: true, count: open.length });
+      const toEmployeeName = targetMembership.data().displayName || "Team member";
+      const leads = await orgRef.collection("leads").where("assignedTo", "==", fromEmployeeId).get();
+      const open = leads.docs.filter((d) => !["Closed-Won", "Lost"].includes(d.data().status));
+      let reassigned = 0;
+      for (const initialLead of open) {
+        const moved = await db.runTransaction(async (tx) => {
+          const leadSnap = await tx.get(initialLead.ref);
+          if (!leadSnap.exists) return false;
+          const lead = leadSnap.data();
+          if (lead.assignedTo !== fromEmployeeId || ["Closed-Won", "Lost"].includes(lead.status)) return false;
+          const taskRef = orgRef.collection("followUpTasks").doc(safeDocId(initialLead.id));
+          const taskSnap = await tx.get(taskRef);
+          const reassignedAt = nowIso();
+          tx.update(initialLead.ref, {
+            assignedTo: toEmployeeId,
+            assignedToName: toEmployeeName,
+            lastUpdated: reassignedAt,
+          });
+          if (taskSnap.exists && taskSnap.data().status === "open") {
+            const task = taskSnap.data();
+            tx.update(taskRef, {
+              assignedTo: toEmployeeId,
+              assignedToName: toEmployeeName,
+              updatedAt: reassignedAt,
+              revision: Number(task.revision || 1) + 1,
+            });
+          }
+          return true;
+        });
+        if (moved) reassigned += 1;
+      }
+      await audit(orgId, `${reassigned} open leads bulk reassigned with their follow-up tasks`, { actorId: req.authUser.uid, fromEmployeeId, toEmployeeId });
+      res.json({ ok: true, count: reassigned });
     } catch (error) {
       res.status(error.status || 500).json({ error: error.message || "Could not reassign leads" });
     }
