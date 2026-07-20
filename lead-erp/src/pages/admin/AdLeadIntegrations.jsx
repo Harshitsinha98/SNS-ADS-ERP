@@ -25,6 +25,7 @@ import {
 
 const META_APP_ID = import.meta.env.VITE_META_APP_ID || "";
 const META_GRAPH_API_VERSION = import.meta.env.VITE_META_GRAPH_API_VERSION || "v22.0";
+const META_LEAD_LOGIN_CONFIG_ID = import.meta.env.VITE_META_LEAD_LOGIN_CONFIG_ID || "";
 
 function loadMetaSdk() {
   if (!META_APP_ID) return Promise.reject(new Error("Meta Lead Ads is not enabled for this CRM yet."));
@@ -122,11 +123,15 @@ export default function AdLeadIntegrations() {
   };
 
   const chooseMetaPage = async () => {
+    if (!META_LEAD_LOGIN_CONFIG_ID) {
+      setError("Meta Lead Ads Login Configuration is not connected yet. Ask the platform administrator to set VITE_META_LEAD_LOGIN_CONFIG_ID in Vercel after creating the configuration in Meta.");
+      return;
+    }
     setBusy("meta-login"); setError(""); setNotice("");
     try {
       const FB = await loadMetaSdk();
       const response = await new Promise((resolve) => FB.login(resolve, {
-        scope: "pages_show_list,pages_read_engagement,pages_manage_metadata,ads_management,leads_retrieval",
+        config_id: META_LEAD_LOGIN_CONFIG_ID,
         return_scopes: true,
       }));
       const accessToken = response?.authResponse?.accessToken;
