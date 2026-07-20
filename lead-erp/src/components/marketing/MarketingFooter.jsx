@@ -15,7 +15,7 @@ export default function MarketingFooter() {
                 <Zap size={18} className="text-white" fill="currentColor" strokeWidth={1.5} />
               </div>
               <span className="font-display font-bold text-xl text-white">
-                Code<span className="text-orange-400">Skate</span>
+                Codeskate <span className="text-orange-400">CRM</span>
               </span>
             </div>
             <p className="text-sm text-cream-400/80 leading-relaxed max-w-xs">
@@ -55,7 +55,7 @@ export default function MarketingFooter() {
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-8 border-t border-cream-200/10">
           <p className="text-xs text-cream-400/60">
-            © {new Date().getFullYear()} CodeSkate. All rights reserved.
+            © {new Date().getFullYear()} Codeskate CRM. All rights reserved.
           </p>
           <div className="flex items-center gap-3">
             {[Globe, MessageCircle, Send, Mail].map((Icon, i) => (

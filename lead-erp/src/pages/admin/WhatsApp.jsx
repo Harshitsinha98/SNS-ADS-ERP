@@ -230,7 +230,7 @@ export default function WhatsApp() {
         <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
           <h3 className="font-display font-semibold text-lg text-ink mb-2 flex items-center gap-2"><ShieldCheck size={19} className="text-success-600" /> Secure per-workspace connection</h3>
           <p className="text-sm text-ink-soft leading-6">
-            Each customer connects their own WhatsApp Business Account through Meta. CodeSkate verifies the number before routing messages, so another workspace cannot claim or receive its leads.
+            Each customer connects their own WhatsApp Business Account through Meta. Codeskate CRM verifies the number before routing messages, so another workspace cannot claim or receive its leads.
           </p>
           {!connection.connected && (
             <label className="block mt-5">
@@ -267,7 +267,7 @@ export default function WhatsApp() {
             </li>
             <li className="flex gap-3">
               <span className="w-6 h-6 shrink-0 rounded-full bg-cream-200 text-ink text-xs font-bold flex items-center justify-center">3</span>
-              <div className="text-sm text-ink-soft leading-5"><strong className="text-ink">Enter a six-digit registration PIN.</strong><br />For a new number, choose a PIN and keep it safe. For an existing Cloud API number, enter its WhatsApp two-step PIN. This is <strong className="text-ink">not</strong> an SMS OTP and is never stored by CodeSkate.</div>
+              <div className="text-sm text-ink-soft leading-5"><strong className="text-ink">Enter a six-digit registration PIN.</strong><br />For a new number, choose a PIN and keep it safe. For an existing Cloud API number, enter its WhatsApp two-step PIN. This is <strong className="text-ink">not</strong> an SMS OTP and is never stored by Codeskate CRM.</div>
             </li>
             <li className="flex gap-3">
               <span className="w-6 h-6 shrink-0 rounded-full bg-cream-200 text-ink text-xs font-bold flex items-center justify-center">4</span>

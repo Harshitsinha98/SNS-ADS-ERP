@@ -81,7 +81,7 @@ export default function Billing() {
 
         await new Promise((resolve, reject) => {
           const rzp = new window.Razorpay({
-            key: sub.keyId, subscription_id: sub.subscriptionId, name: "CodeSkate",
+            key: sub.keyId, subscription_id: sub.subscriptionId, name: "Codeskate CRM",
             description: `${plan.name} (${cycle}) · Autopay`,
             prefill: { name: user?.displayName || "", contact: (user?.phone || "").replace("+91", "") },
             theme: { color: "#F04E00" },
@@ -101,7 +101,7 @@ export default function Billing() {
         await new Promise((resolve, reject) => {
           const rzp = new window.Razorpay({
             key: order.keyId, amount: order.amount, currency: order.currency, order_id: order.orderId,
-            name: "CodeSkate", description: `${plan.name} (${cycle})`,
+            name: "Codeskate CRM", description: `${plan.name} (${cycle})`,
             prefill: { name: user?.displayName || "", contact: (user?.phone || "").replace("+91", "") },
             theme: { color: "#F04E00" },
             handler: async (r) => {

@@ -17,7 +17,7 @@ export default function Logo({ size = "md", onDark = false }) {
           onDark ? "text-white" : "text-ink"
         }`}
       >
-        Code<span className="text-orange-600">Skate</span>
+        Codeskate <span className="text-orange-600">CRM</span>
       </span>
     </div>
   );

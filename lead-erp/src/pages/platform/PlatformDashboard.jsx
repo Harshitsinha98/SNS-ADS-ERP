@@ -159,7 +159,7 @@ export default function PlatformDashboard() {
           </div>
           <h1 className="font-display font-bold text-xl text-ink mb-2">Owner access only</h1>
           <p className="text-sm text-ink-soft mb-5">
-            This portal is only for the CodeSkate owner. Your number doesn't have access.
+            This portal is only for the Codeskate CRM owner. Your number doesn't have access.
           </p>
           <button onClick={logout} className="btn btn-secondary w-full">
             <LogOut size={15} /> Sign out
@@ -440,7 +440,7 @@ function OwnerLogin({ requestOtp, verifyOtp }) {
             </h1>
             <p className="text-sm text-cream-300/70 mb-6">
               {step === "phone"
-                ? "Only the CodeSkate owner's number is allowed."
+                ? "Only the Codeskate CRM owner's number is allowed."
                 : `Code sent to +91${phone}`}
             </p>
 
@@ -495,7 +495,7 @@ function OwnerLogin({ requestOtp, verifyOtp }) {
         </div>
 
         <p className="text-center text-xs text-cream-400/40 mt-6 flex items-center justify-center gap-1.5">
-          <Lock size={12} /> Restricted — CodeSkate platform owner only
+          <Lock size={12} /> Restricted — Codeskate CRM platform owner only
         </p>
       </div>
     </div>

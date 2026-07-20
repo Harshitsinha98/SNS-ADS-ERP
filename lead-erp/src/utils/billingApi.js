@@ -133,3 +133,6 @@ export const connectWhatsAppBusiness = (body) => authedPost("/api/whatsapp/conne
 export const disconnectWhatsAppBusiness = (body) => authedPost("/api/whatsapp/disconnect", body);
 export const repairWhatsAppWebhook = (body) => authedPost("/api/whatsapp/repair-webhook", body);
 export const sendWhatsAppMessage = (body) => authedPost("/api/whatsapp/messages", body);
+export const syncWhatsAppTemplates = (body) => authedPost("/api/whatsapp/templates/sync", body);
+export const sendWhatsAppTemplate = (body) => authedPost("/api/whatsapp/templates/send", body);
+export const runFollowUpAutomation = (body) => authedPost("/api/follow-ups/run-automation", body);

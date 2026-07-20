@@ -11,7 +11,7 @@ const FEATURES = [
   {
     icon: MessageSquare,
     title: "WhatsApp Lead Capture",
-    desc: "Every enquiry from your WhatsApp Business number lands in CodeSkate instantly — no lead ever slips through.",
+    desc: "Every enquiry from your WhatsApp Business number lands in Codeskate CRM instantly — no lead ever slips through.",
   },
   {
     icon: Workflow,
@@ -55,7 +55,7 @@ const STATS = [
 
 const TESTIMONIALS = [
   {
-    quote: "CodeSkate transformed how our team handles WhatsApp enquiries. We stopped losing leads overnight.",
+    quote: "Codeskate CRM transformed how our team handles WhatsApp enquiries. We stopped losing leads overnight.",
     name: "Ananya Reddy",
     role: "Sales Head, BrightHomes",
   },
@@ -100,7 +100,7 @@ export default function Landing() {
           </h1>
 
           <p className="text-lg sm:text-xl text-ink-soft max-w-2xl mx-auto mb-9 leading-relaxed animate-slide-up-delay">
-            CodeSkate captures leads from WhatsApp, assigns them intelligently, tracks
+            Codeskate CRM captures leads from WhatsApp, assigns them intelligently, tracks
             every call, and shows your whole pipeline — so your team can focus on selling.
           </p>
 
@@ -198,7 +198,7 @@ export default function Landing() {
               <span className="text-gradient">sales workflow</span>
             </h2>
             <p className="text-lg text-ink-soft">
-              From the first WhatsApp message to the closed deal, CodeSkate handles it all
+              From the first WhatsApp message to the closed deal, Codeskate CRM handles it all
               with tools built for how Indian sales teams actually work.
             </p>
           </div>
@@ -323,7 +323,7 @@ export default function Landing() {
           <div className="text-center max-w-2xl mx-auto mb-16">
             <p className="eyebrow mb-3">Loved by sales teams</p>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-ink">
-              Teams close faster with CodeSkate
+              Teams close faster with Codeskate CRM
             </h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
@@ -361,7 +361,7 @@ export default function Landing() {
                 Ready to close more deals?
               </h2>
               <p className="text-lg text-cream-100/90 max-w-xl mx-auto mb-9">
-                Join growing teams using CodeSkate to capture, assign, and convert leads faster.
+                Join growing teams using Codeskate CRM to capture, assign, and convert leads faster.
                 Start your free {TRIAL_DAYS}-day trial today.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">

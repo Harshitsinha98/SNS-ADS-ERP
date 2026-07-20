@@ -162,7 +162,7 @@ export default function Signup() {
         await new Promise((resolve, reject) => {
           const rzp = new window.Razorpay({
             key: order.keyId, amount: order.amount, currency: order.currency,
-            name: "CodeSkate", description: `${plan.name} plan (${cycle})`, order_id: order.orderId,
+            name: "Codeskate CRM", description: `${plan.name} plan (${cycle})`, order_id: order.orderId,
             prefill: { name: fullName, contact: phone },
             theme: { color: "#F04E00" },
             handler: async (resp) => {
@@ -317,7 +317,7 @@ export default function Signup() {
                     <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4"><ShieldCheck className="text-orange-600" size={24} /></div>
                     <p className="eyebrow mb-2">Account found</p>
                     <h1 className="font-display font-bold text-2xl text-ink mb-2">You are already registered</h1>
-                    <p className="text-sm text-ink-soft mb-6">This mobile number already has a CodeSkate account. Please sign in to continue—no new OTP or purchase is needed here.</p>
+                    <p className="text-sm text-ink-soft mb-6">This mobile number already has a Codeskate CRM account. Please sign in to continue—no new OTP or purchase is needed here.</p>
                     <button onClick={() => navigate("/login")} className="btn btn-primary w-full py-3.5 text-base">
                       Go to login <ArrowRight size={18} />
                     </button>

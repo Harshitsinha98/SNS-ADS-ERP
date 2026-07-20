@@ -4,6 +4,7 @@ import { getAuth } from "firebase-admin/auth";
 const TASK_TYPES = new Set(["Call", "WhatsApp", "Meeting", "Email", "Other"]);
 const TASK_OUTCOMES = new Set(["Connected", "No answer", "Follow-up required", "Meeting fixed", "Closed-won", "Lost"]);
 const CLOSED_STATUSES = new Set(["Closed-Won", "Lost"]);
+const MIN_FOLLOW_UP_LEAD_TIME_MS = 5 * 60 * 1000;
 
 const nowIso = () => new Date().toISOString();
 const trimText = (value, length = 300) => String(value || "").trim().slice(0, length);
@@ -15,8 +16,8 @@ function parseFutureDate(value, label) {
   if (Number.isNaN(date.getTime())) {
     throw Object.assign(new Error(`${label} is required`), { status: 400 });
   }
-  if (date.getTime() <= Date.now()) {
-    throw Object.assign(new Error(`${label} must be in the future`), { status: 400 });
+  if (date.getTime() <= Date.now() + MIN_FOLLOW_UP_LEAD_TIME_MS) {
+    throw Object.assign(new Error("Follow-up date and time must be at least five minutes in the future"), { status: 400 });
   }
   if (date.getTime() > Date.now() + 5 * 365 * 24 * 60 * 60 * 1000) {
     throw Object.assign(new Error(`${label} is too far in the future`), { status: 400 });
@@ -95,6 +96,9 @@ export default function createFollowUpTasksRouter(db) {
         const assignee = assigneeMembership.data();
         const assignedToName = assignee.displayName || lead.assignedToName || "Team member";
         const currentTask = await tx.get(taskRef);
+        const previousTask = currentTask.exists ? currentTask.data() : null;
+        const dueUnchanged = previousTask?.status === "open" && previousTask?.dueAt === dueAt;
+        const initialAutomationNextAt = new Date(Math.max(Date.now(), Date.parse(dueAt) - 24 * 60 * 60 * 1000)).toISOString();
         const taskData = {
           orgId,
           leadId,
@@ -109,8 +113,13 @@ export default function createFollowUpTasksRouter(db) {
           status: "open",
           createdBy: req.authUser.uid,
           createdByName: actorMembership.displayName || req.authUser.name || "Team member",
-          createdAt: currentTask.exists ? currentTask.data().createdAt || createdAt : createdAt,
+          createdAt: previousTask?.createdAt || createdAt,
           updatedAt: createdAt,
+          reminderSentFor: dueUnchanged ? previousTask.reminderSentFor || null : null,
+          reminderSentAt: dueUnchanged ? previousTask.reminderSentAt || null : null,
+          overdueEscalatedFor: dueUnchanged ? previousTask.overdueEscalatedFor || null : null,
+          overdueEscalatedAt: dueUnchanged ? previousTask.overdueEscalatedAt || null : null,
+          automationNextAt: dueUnchanged ? previousTask.automationNextAt || initialAutomationNextAt : initialAutomationNextAt,
           completedAt: null,
           completedBy: null,
           completedByName: null,
@@ -240,6 +249,11 @@ export default function createFollowUpTasksRouter(db) {
             lastCompletedBy: req.authUser.uid,
             lastCompletionNote: completionNote || null,
             revision: currentRevision + 1,
+            reminderSentFor: null,
+            reminderSentAt: null,
+            overdueEscalatedFor: null,
+            overdueEscalatedAt: null,
+            automationNextAt: new Date(Math.max(Date.now(), Date.parse(nextDueAt) - 24 * 60 * 60 * 1000)).toISOString(),
             completedAt: null,
             completedBy: null,
             completedByName: null,
@@ -256,6 +270,7 @@ export default function createFollowUpTasksRouter(db) {
             outcome,
             completionNote: completionNote || null,
             revision: currentRevision + 1,
+            automationNextAt: null,
           });
         }
         tx.update(leadRef, {
@@ -431,6 +446,7 @@ export default function createFollowUpTasksRouter(db) {
             outcome: leadStatus === "Closed-Won" ? "Closed-won" : "Lost",
             completionNote: `Lead status set to ${leadStatus}.`,
             revision: Number(task.revision || 1) + 1,
+            automationNextAt: null,
           });
         }
         tx.create(noteRef, {

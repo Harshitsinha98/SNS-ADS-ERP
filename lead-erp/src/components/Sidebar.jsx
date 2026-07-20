@@ -14,12 +14,14 @@ import {
   MessageCircle,
   Globe2,
   CalendarCheck2,
+  Workflow,
 } from "lucide-react";
 
 const adminLinks = [
   { to: "/admin", label: "Dashboard", end: true, icon: LayoutDashboard },
   { to: "/admin/leads", label: "Lead Hub", icon: Inbox },
   { to: "/admin/follow-ups", label: "Follow-ups", icon: CalendarCheck2 },
+  { to: "/admin/automation", label: "Automation", icon: Workflow },
   { to: "/admin/employees", label: "Team", icon: Users },
   { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },
@@ -59,7 +61,7 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
             </div>
             <div>
               <p className="font-display font-bold text-lg bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">
-                CodeSkate
+                Codeskate CRM
               </p>
               <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
                 {user?.role === "admin" || user?.role === "owner" ? "Admin Portal" : "Sales Desk"}

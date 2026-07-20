@@ -61,7 +61,7 @@ export default function Setup() {
                     <div className="relative mt-1.5"><User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" size={18} /><input value={fullName} onChange={(e) => setFullName(e.target.value)} className="input pl-11" disabled={loading} /></div>
                   </label>
                   <label className="block text-sm font-medium text-ink">Organization name
-                    <div className="relative mt-1.5"><Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" size={18} /><input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="e.g., CodeSkate Technologies" className="input pl-11" disabled={loading} /></div>
+                    <div className="relative mt-1.5"><Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" size={18} /><input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="e.g., Acme Technologies" className="input pl-11" disabled={loading} /></div>
                   </label>
                   {error && <div className="bg-danger-50 text-danger-600 text-sm px-4 py-3 rounded-xl border border-danger-100">{error}</div>}
                   <button type="submit" disabled={loading} className="btn btn-primary w-full py-3.5 text-base">

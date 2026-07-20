@@ -11,6 +11,8 @@ import { getNextEmployeeRoundRobin, getNextEmployeeByWorkload } from "./utils/as
 import createBillingRouter from "./billing.js";
 import createLeadIntakeRouter from "./leadIntake.js";
 import createFollowUpTasksRouter from "./followUpTasks.js";
+import createWhatsAppTemplatesRouter from "./whatsappTemplates.js";
+import { runFollowUpAutomation } from "./followUpAutomation.js";
 import { getMergedPlans } from "./plans.js";
 
 function loadServiceAccount() {
@@ -85,6 +87,11 @@ app.use("/api/leads", createLeadIntakeRouter(db, {
   requireHttpsPublicUrls: isProductionDeployment,
 }));
 app.use("/api/follow-ups", createFollowUpTasksRouter(db));
+app.use("/api/whatsapp/templates", createWhatsAppTemplatesRouter(db, {
+  metaGraphRequest,
+  decryptWhatsAppToken,
+  isWhatsAppCredentialExpired,
+}));
 
 if (!process.env.WHATSAPP_APP_SECRET) {
   console.warn("⚠️ WHATSAPP_APP_SECRET is not set. Meta webhook ingestion will reject requests until it is configured.");
@@ -1021,11 +1028,29 @@ app.post("/api/whatsapp/sync-now", requireAuth, async (req, res) => {
   }
 });
 
+app.post("/api/follow-ups/run-automation", requireAuth, async (req, res) => {
+  try {
+    const orgId = String(req.body?.orgId || "").trim();
+    if (!(await isOrgAdmin(req.authUser.uid, orgId))) return res.status(403).json({ error: "Organization admin access required" });
+    const reenrollPaused = req.body?.reenrollPaused !== false;
+    const summary = await withLease(`followUpAutomation_${safeDocId(orgId)}`, 4 * 60 * 1000,
+      () => runFollowUpAutomation(db, { orgId, reenrollPaused }));
+    return res.json({ ok: true, ...(summary || { scanned: 0, reminders: 0, escalations: 0 }) });
+  } catch (error) {
+    console.error("Manual follow-up automation run failed:", error.message);
+    return res.status(error.status || 500).json({ error: "Could not run follow-up automation" });
+  }
+});
+
 cron.schedule("*/5 * * * *", () => {
   withLease("pendingQueue", 4 * 60 * 1000, async () => {
     const imported = await processPendingQueue();
     if (imported) console.log(`⏱ pending WhatsApp queue: ${imported} lead(s) assigned`);
   }).catch((error) => console.error("Pending queue cron error:", error.message));
+  withLease("followUpAutomation", 4 * 60 * 1000, async () => {
+    const summary = await runFollowUpAutomation(db);
+    if (summary.reminders || summary.escalations) console.log("⏱ follow-up automation:", summary);
+  }).catch((error) => console.error("Follow-up automation cron error:", error.message));
 });
 
 async function notifyOrgAdmins(orgId, text) {
@@ -1120,7 +1145,7 @@ app.post("/api/subscription/run-lifecycle", requireAuth, async (req, res) => {
   }
 });
 
-app.get("/", (req, res) => res.type("text").send("CodeSkate backend is running. Multi-tenant mode is enabled."));
+app.get("/", (req, res) => res.type("text").send("Codeskate CRM backend is running. Multi-tenant mode is enabled."));
 
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on port ${PORT}`);

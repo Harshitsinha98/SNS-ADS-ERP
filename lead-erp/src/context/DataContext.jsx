@@ -18,6 +18,11 @@ export const useData = () => useContext(DataContext);
 const DEFAULT_SETTINGS = {
   statuses: ["New", "Ringing", "Meeting Fixed", "Negotiation", "Follow-up", "Closed-Won", "Lost"],
   autoAssign: "round-robin",
+  followUpAutomation: {
+    enabled: true,
+    reminderMinutesBefore: 30,
+    overdueEscalationMinutes: 60,
+  },
 };
 
 // ============================================================
@@ -85,10 +90,11 @@ export function DataProvider({ children }) {
   const [goals, setGoals] = useState({});
   const [financials, setFinancials] = useState({});
   const [followUpTasks, setFollowUpTasks] = useState([]);
+  const [whatsappTemplates, setWhatsappTemplates] = useState([]);
 
   useEffect(() => {
     if (!user || !user.activeOrgId) {
-      setLeads([]); setMembers([]); setPendingInvites([]); setNotifications([]); setActivity([]); setGoals({}); setFinancials({}); setFollowUpTasks([]);
+      setLeads([]); setMembers([]); setPendingInvites([]); setNotifications([]); setActivity([]); setGoals({}); setFinancials({}); setFollowUpTasks([]); setWhatsappTemplates([]);
       return;
     }
 
@@ -203,6 +209,16 @@ export function DataProvider({ children }) {
     );
 
     // ============================================================
+    // WHATSAPP TEMPLATES - synced and authored only by the backend. Active
+    // members can select Meta-approved templates without seeing credentials.
+    // ============================================================
+    const unsubWhatsAppTemplates = onSnapshot(
+      orgCollection(orgId, "whatsappTemplates"),
+      (snap) => setWhatsappTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (err) => console.error("WhatsApp templates listener error:", err)
+    );
+
+    // ============================================================
     // FINANCIALS - admin only, use collectionGroup but filter by orgId client-side
     // ============================================================
     let unsubFinancials = () => {};
@@ -234,6 +250,7 @@ export function DataProvider({ children }) {
       unsubActivity(); 
       unsubGoals(); 
       unsubFollowUpTasks();
+      unsubWhatsAppTemplates();
       unsubFinancials(); 
     };
   }, [user]);
@@ -563,10 +580,13 @@ export function DataProvider({ children }) {
   };
 
   const setSettingsValue = async (s) => {
-    if (!user?.activeOrgId) return;
-    try { 
-      await setDoc(orgDoc(user.activeOrgId, "settings", "config"), s, { merge: true }); 
-    } catch (e) { console.error("Set settings error:", e); }
+    if (!user?.activeOrgId) throw new Error("No active organization selected");
+    try {
+      await setDoc(orgDoc(user.activeOrgId, "settings", "config"), s, { merge: true });
+    } catch (e) {
+      console.error("Set settings error:", e);
+      throw e;
+    }
   };
 
   // ============================================================
@@ -585,7 +605,7 @@ export function DataProvider({ children }) {
 
   return (
     <DataContext.Provider value={{
-      leads, users, settings, notifications, activity, goals, financials, followUpTasks,
+      leads, users, settings, notifications, activity, goals, financials, followUpTasks, whatsappTemplates,
       setSettings: setSettingsValue, updateLead, addNote, addWorknote,
       updateLeadStatus, updatePriority, updateFollowUpDate, updateLeadRevenue,
       reassignLead, reassignAllLeads, blacklistLead,

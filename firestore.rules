@@ -134,6 +134,13 @@ service cloud.firestore {
     }
     match /followUpTaskEvents/{eventId} { allow read, write: if false; }
 
+    // Template definitions contain no provider credential. Active members can
+    // select only server-synced Meta templates; all writes and sends are backend-only.
+    match /whatsappTemplates/{templateId} {
+      allow read: if isActiveMember(orgId);
+      allow write: if false;
+    }
+
     // WhatsApp connection state is backend-authored. Other settings remain
       // tenant-admin editable through their existing UI.
       match /settings/whatsapp {

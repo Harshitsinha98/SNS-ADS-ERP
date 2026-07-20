@@ -7,7 +7,7 @@ import { TRIAL_DAYS, mergePlansWithConfig } from "../../data/plans";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
 
 const SALES_WHATSAPP_NUMBER = (import.meta.env.VITE_SALES_WHATSAPP_NUMBER || "919653043939").replace(/\D/g, "");
-const salesWhatsAppUrl = `https://wa.me/${SALES_WHATSAPP_NUMBER}?text=${encodeURIComponent("Hi CodeSkate team, I need help with a custom CRM plan.")}`;
+const salesWhatsAppUrl = `https://wa.me/${SALES_WHATSAPP_NUMBER}?text=${encodeURIComponent("Hi Codeskate CRM team, I need help with a custom CRM plan.")}`;
 
 const buildFaqs = (trialDays) => [
   {
@@ -28,7 +28,7 @@ const buildFaqs = (trialDays) => [
   },
   {
     q: "Is my data secure and isolated?",
-    a: "Yes. CodeSkate is fully multi-tenant with strict database-level isolation. Your organization's data is never accessible to any other tenant.",
+    a: "Yes. Codeskate CRM is fully multi-tenant with strict database-level isolation. Your organization's data is never accessible to any other tenant.",
   },
 ];
 
@@ -276,7 +276,7 @@ export default function Pricing() {
                 Start closing more deals today
               </h2>
               <p className="text-cream-100/90 mb-8 max-w-lg mx-auto">
-                Try CodeSkate free for {TRIAL_DAYS} days. No credit card, no commitment.
+                Try Codeskate CRM free for {TRIAL_DAYS} days. No credit card, no commitment.
               </p>
               <button
                 onClick={() => navigate("/signup")}

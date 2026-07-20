@@ -111,7 +111,7 @@ export default function Login() {
           <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 overflow-hidden">
             <div className="h-1.5 bg-gradient-orange" />
             <div className="p-7 sm:p-9">
-              <h1 className="font-display font-bold text-2xl text-ink mb-1 text-center">Sign in to CodeSkate</h1>
+              <h1 className="font-display font-bold text-2xl text-ink mb-1 text-center">Sign in to Codeskate CRM</h1>
               <p className="text-sm text-ink-soft mb-7 text-center">Which role are you signing in as?</p>
               <div className="space-y-3">
                 <button onClick={() => setPortal("admin")}

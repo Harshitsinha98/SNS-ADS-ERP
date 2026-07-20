@@ -563,7 +563,7 @@ export default function createLeadIntakeRouter(db, {
         orgId,
         input: {
           ...normalizeWebhookPayload(req.body || {}),
-          sourceDetail: "CodeSkate hosted form",
+          sourceDetail: "Codeskate CRM hosted form",
         },
         source: "Website",
         origin: "hosted_form",

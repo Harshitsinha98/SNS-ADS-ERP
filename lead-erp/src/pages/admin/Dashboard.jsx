@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import Layout from "../../components/Layout";
 import StatCard from "../../components/StatCard";
 import StatusPie from "../../components/charts/PieChart";
@@ -41,6 +42,10 @@ export default function Dashboard() {
         : sum;
     }, 0);
   const averageWonDeal = converted ? wonValue / converted : 0;
+  const wonLeads = active.filter((lead) => lead.status === "Closed-Won");
+  const wonWithRevenue = wonLeads.filter((lead) => Number(revenueOf(lead)) > 0);
+  const wonMissingRevenue = wonLeads.filter((lead) => Number(revenueOf(lead)) <= 0);
+  const revenueCoverage = converted ? Math.round((wonWithRevenue.length / converted) * 100) : 0;
 
   const openValue = active
     .filter((l) => !["Closed-Won", "Lost"].includes(l.status))
@@ -120,6 +125,14 @@ export default function Dashboard() {
           icon={Layers}
         />
       </div>
+
+      <section className="mb-6 rounded-2xl border border-success-200 bg-gradient-to-r from-success-50 via-white to-emerald-50 p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div><p className="eyebrow text-success-700">Connected deal revenue</p><h2 className="mt-1 text-xl font-bold text-ink">₹ values flow from each won lead into this dashboard</h2><p className="mt-1 text-sm text-ink-soft">Revenue is stored in a separate admin-only lead record and powers won revenue, monthly revenue, pipeline value, team performance, and source reporting.</p></div>
+          <div className="grid grid-cols-2 gap-2 sm:flex"><RevenueMetric label="Captured" value={`${revenueCoverage}%`} /><RevenueMetric label="Won deals tracked" value={`${wonWithRevenue.length}/${converted}`} /><RevenueMetric label="Needs value" value={wonMissingRevenue.length} danger /></div>
+        </div>
+        {wonMissingRevenue.length > 0 && <div className="mt-4 flex flex-wrap gap-2"><span className="text-xs font-medium text-success-800">Add revenue to these won deals:</span>{wonMissingRevenue.slice(0, 4).map((lead) => <Link key={lead.id} to={`/admin/leads/${lead.id}`} className="rounded-full border border-success-200 bg-white px-3 py-1 text-xs font-medium text-success-800 hover:bg-success-100">{lead.name || "Lead"}</Link>)}{wonMissingRevenue.length > 4 && <span className="rounded-full bg-white px-3 py-1 text-xs text-success-800">+{wonMissingRevenue.length - 4} more</span>}</div>}
+      </section>
 
       {/* Lead Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -301,4 +314,9 @@ export default function Dashboard() {
       </div>
     </Layout>
   );
+}
+
+
+function RevenueMetric({ label, value, danger = false }) {
+  return <div className={`rounded-xl border px-3 py-2 text-center ${danger ? "border-warning-200 bg-warning-50 text-warning-800" : "border-success-200 bg-white text-success-800"}`}><p className="text-[10px] font-semibold uppercase tracking-wide">{label}</p><p className="num mt-1 text-lg font-bold">{value}</p></div>;
 }

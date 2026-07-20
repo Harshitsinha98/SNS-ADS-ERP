@@ -9,6 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { fmtDate, fmtDuration, toWaNumber } from "../../utils/helpers";
 import { Phone, PhoneOff, MessageCircle } from "lucide-react";
 import FollowUpTaskControls from "../../components/FollowUpTaskControls";
+import WhatsAppConversation from "../../components/WhatsAppConversation";
 
 export default function LeadAction() {
   const { id } = useParams();
@@ -121,6 +122,7 @@ export default function LeadAction() {
           <button onClick={quickWhatsApp} className="w-full flex items-center justify-center gap-2 bg-success-50 text-success-700 border border-success-200 rounded-md p-2.5 text-sm font-medium mt-2 hover:bg-success-100 transition-colors">
             <MessageCircle size={15} /> Open WhatsApp
           </button>
+          <div className="mt-4"><WhatsAppConversation lead={lead} showConversation={false} /></div>
         </div>
 
         <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
