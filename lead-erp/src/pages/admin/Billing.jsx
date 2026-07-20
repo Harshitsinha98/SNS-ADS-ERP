@@ -69,6 +69,16 @@ export default function Billing() {
       if (!ok) throw new Error("Razorpay checkout failed to load.");
       if (autopay) {
         const sub = await createSubscription({ orgId: b.org.id, planId: plan.id, cycle });
+
+        // Razorpay's hosted subscription page has the merchant account's
+        // recurring payment configuration available (UPI Autopay, cards and
+        // eMandate). Use it when Razorpay returns one; retain embedded
+        // Checkout as a compatible fallback.
+        if (sub.hostedUrl) {
+          window.location.assign(sub.hostedUrl);
+          return "redirect";
+        }
+
         await new Promise((resolve, reject) => {
           const rzp = new window.Razorpay({
             key: sub.keyId, subscription_id: sub.subscriptionId, name: "CodeSkate",

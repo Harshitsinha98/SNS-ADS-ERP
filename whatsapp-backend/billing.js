@@ -962,7 +962,15 @@ export default function createBillingRouter(db) {
         status: "created",
         createdAt: nowIso(),
       });
-      res.json({ subscriptionId: subscription.id, keyId: process.env.RAZORPAY_KEY_ID, planName: plan.name });
+      // Razorpay's hosted subscription link uses the account's enabled
+      // recurring payment configuration. Prefer it for Autopay setup, while
+      // retaining the subscription ID as a fallback for embedded Checkout.
+      res.json({
+        subscriptionId: subscription.id,
+        hostedUrl: subscription.short_url || null,
+        keyId: process.env.RAZORPAY_KEY_ID,
+        planName: plan.name,
+      });
     } catch (error) {
       console.error("subscription/create:", error.message);
       res.status(error.status || 500).json({ error: error.message || "Could not create subscription" });
