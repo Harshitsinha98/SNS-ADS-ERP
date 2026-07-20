@@ -97,7 +97,9 @@ service cloud.firestore {
 
         match /notes/{noteId} {
           allow read: if isAdmin(orgId)
-            || (isLeadAssignee(orgId, leadId) && resource.data.visibility == 'team');
+            || (isLeadAssignee(orgId, leadId)
+              && resource.data.visibility == 'team'
+              && resource.data.type == 'worknote');
           allow create: if (
               isAdmin(orgId)
               && request.resource.data.authorId == request.auth.uid
@@ -113,11 +115,10 @@ service cloud.firestore {
           allow read, write: if isAdmin(orgId);
         }
 
-        // Provider transcripts are backend-authored. An admin can read any
-        // tenant conversation; employees can read only conversations assigned
-        // to them, matching lead visibility.
+        // Provider transcripts are sensitive customer communications and remain
+        // visible only to workspace administrators.
         match /messages/{messageId} {
-          allow read: if isAdmin(orgId) || isLeadAssignee(orgId, leadId);
+          allow read: if isAdmin(orgId);
           allow write: if false;
         }
       }

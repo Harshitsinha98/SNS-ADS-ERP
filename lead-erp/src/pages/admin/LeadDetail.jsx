@@ -38,7 +38,7 @@ export default function LeadDetail() {
   const [notes, setNotes] = useState([]);
   const [financial, setFinancial] = useState(null);
   const [noteText, setNoteText] = useState("");
-  const [isPrivate, setIsPrivate] = useState(user?.role === 'admin');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [revenueInput, setRevenueInput] = useState("");
 
   const [callActive, setCallActive] = useState(false);

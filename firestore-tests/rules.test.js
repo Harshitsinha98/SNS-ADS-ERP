@@ -419,6 +419,7 @@ describe('Notes subcollection access', () => {
       .collection('leads').doc('lead_1')
       .collection('notes').doc('note_1')
       .set({
+        type: 'worknote',
         text: 'Team note',
         visibility: 'team',
         authorName: 'Admin',

@@ -209,10 +209,10 @@ function LeadRow({ lead, settings, onCall, onWhatsApp, onStatus }) {
         <StatusLamp status={lead.status} />
       </div>
       <div className="flex items-center gap-2 mt-2 flex-wrap">
-        <button onClick={() => onCall(lead)} className="flex items-center gap-1 text-xs bg-ok-soft text-ok px-2 py-1 rounded">
+        <button onClick={() => onCall(lead)} className="flex items-center gap-1 text-xs bg-success-50 text-success-700 border border-success-200 px-2 py-1 rounded hover:bg-success-100 transition-colors">
           <Phone size={11} /> Call
         </button>
-        <button onClick={() => onWhatsApp(lead)} className="flex items-center gap-1 text-xs bg-info-soft text-info px-2 py-1 rounded">
+        <button onClick={() => onWhatsApp(lead)} className="flex items-center gap-1 text-xs bg-success-50 text-success-700 border border-success-200 px-2 py-1 rounded hover:bg-success-100 transition-colors">
           <MessageCircle size={11} /> WhatsApp
         </button>
         <select value={lead.status} onChange={(e) => onStatus(lead.id, e.target.value)}

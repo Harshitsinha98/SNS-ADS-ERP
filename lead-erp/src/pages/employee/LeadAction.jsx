@@ -14,6 +14,8 @@ export default function LeadAction() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { leads, settings, updateLeadStatus, updateFollowUpDate, addNote, addWorknote } = useData();
+  const orgId = user?.activeOrgId;
+  const currentUserId = user?.uid || user?.id;
   const lead = leads.find((l) => l.id === id);
 
   const [notes, setNotes] = useState([]);
@@ -28,16 +30,17 @@ export default function LeadAction() {
   const [worknote, setWorknote] = useState("");
 
   useEffect(() => {
-    if (!id) return;
-    const q = query(
-      collection(db, "leads", id, "notes"),
-      where("visibility", "!=", "admin_only")
+    if (!id || !orgId) return undefined;
+    const worknotesQuery = query(
+      collection(db, "organizations", orgId, "leads", id, "notes"),
+      where("visibility", "==", "team"),
+      where("type", "==", "worknote")
     );
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(worknotesQuery, (snap) => {
       setNotes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    }, (err) => console.error("Notes listener error:", err));
+    }, (err) => console.error("Team worknotes listener error:", err));
     return unsub;
-  }, [id]);
+  }, [id, orgId]);
 
   useEffect(() => {
     if (!callActive) return;
@@ -45,7 +48,7 @@ export default function LeadAction() {
     return () => clearInterval(t);
   }, [callActive, callStart]);
 
-  if (!lead || lead.assignedTo !== user.id)
+  if (!lead || lead.assignedTo !== currentUserId)
     return <Layout title="Lead"><p className="text-danger">Access denied or lead not found.</p></Layout>;
 
   const startCall = () => {
@@ -64,7 +67,7 @@ export default function LeadAction() {
   const saveCallLog = () => {
     addNote(lead.id, worknote || "Call completed — no notes added.", "call", {
       duration: pendingDuration,
-      authorId: user.id || user.uid,
+      authorId: currentUserId,
       authorName: user.name,
       authorRole: user.role,
       visibility: "team",
@@ -92,7 +95,7 @@ export default function LeadAction() {
   const quickWhatsApp = () => {
     addNote(lead.id, "Opened WhatsApp chat from lead page", "whatsapp", {
       authorName: user.name,
-      authorId: user.id || user.uid,
+      authorId: currentUserId,
       authorRole: user.role,
       visibility: "team",
     });
@@ -114,16 +117,16 @@ export default function LeadAction() {
           <p className="text-sm mb-4"><span className="text-ink/40">Requirement</span> · {lead.requirement}</p>
 
           {!callActive ? (
-            <button onClick={startCall} className="w-full flex items-center justify-center gap-2 bg-ok text-white rounded-md p-2.5 text-sm font-medium">
+            <button onClick={startCall} className="w-full flex items-center justify-center gap-2 bg-success-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-success-700 transition-colors">
               <Phone size={15} /> Start call
             </button>
           ) : (
-            <button onClick={endCall} className="w-full flex items-center justify-center gap-2 bg-danger text-white rounded-md p-2.5 text-sm font-medium animate-pulse">
+            <button onClick={endCall} className="w-full flex items-center justify-center gap-2 bg-danger-600 text-white rounded-md p-2.5 text-sm font-medium animate-pulse">
               <PhoneOff size={15} /> End call · {fmtDuration(elapsed)}
             </button>
           )}
-          <button onClick={quickWhatsApp} className="w-full flex items-center justify-center gap-2 bg-info-soft text-info rounded-md p-2.5 text-sm font-medium mt-2">
-            <MessageCircle size={15} /> WhatsApp
+          <button onClick={quickWhatsApp} className="w-full flex items-center justify-center gap-2 bg-success-50 text-success-700 border border-success-200 rounded-md p-2.5 text-sm font-medium mt-2 hover:bg-success-100 transition-colors">
+            <MessageCircle size={15} /> Open WhatsApp
           </button>
         </div>
 
@@ -144,11 +147,11 @@ export default function LeadAction() {
           <p className="eyebrow mt-5 mb-2">Add work note</p>
           <textarea className="w-full border border-paper-line rounded-md p-2 text-sm mb-2" rows="3"
             placeholder="Log conversation summary…" value={note} onChange={(e) => setNote(e.target.value)} />
-          <button onClick={saveNote} className="w-full bg-paper border border-paper-line rounded-md p-2 text-sm">Save note</button>
+          <button onClick={saveNote} className="w-full bg-cream-100 text-ink border border-cream-300 rounded-md p-2 text-sm hover:bg-cream-200 transition-colors">Save note</button>
         </div>
 
         <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
-          <p className="eyebrow mb-3">Follow-up history</p>
+          <p className="eyebrow mb-3">Team work notes</p>
           <Timeline entries={notes} />
         </div>
       </div>
@@ -157,7 +160,7 @@ export default function LeadAction() {
         <div className="fixed inset-0 bg-ink/50 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-sm">
             <p className="eyebrow mb-1">Call ended</p>
-            <p className="text-sm text-ink/50 mb-4">Duration: <span className="num font-semibold text-ok">{fmtDuration(pendingDuration)}</span></p>
+            <p className="text-sm text-ink-soft mb-4">Duration: <span className="num font-semibold text-success-700">{fmtDuration(pendingDuration)}</span></p>
             <textarea className="w-full border border-paper-line rounded-md p-2 text-sm mb-3" rows="4"
               placeholder="What happened on this call?" value={worknote} onChange={(e) => setWorknote(e.target.value)} autoFocus />
             <button onClick={saveCallLog} className="w-full bg-ink text-white rounded-md p-2.5 text-sm font-medium">Save call log</button>
