@@ -89,11 +89,16 @@ service cloud.firestore {
       allow create, update, delete: if false;
 
       match /leads/{leadId} {
-        allow read: if isAdmin(orgId) || isLeadAssignee(orgId, leadId);
+        // Use `resource` here so Firestore can authorize the employee's
+        // `where('assignedTo', '==', request.auth.uid)` collection query.
+        allow read: if isAdmin(orgId)
+          || (isActiveMember(orgId) && resource.data.assignedTo == request.auth.uid);
         // Backend creates and counts every lead so quotas cannot be bypassed.
         allow create, delete: if false;
         allow update: if (isAdmin(orgId) && adminLeadFieldsOnly())
-          || (isLeadAssignee(orgId, leadId) && employeeLeadFieldsOnly());
+          || (isActiveMember(orgId)
+            && resource.data.assignedTo == request.auth.uid
+            && employeeLeadFieldsOnly());
 
         match /notes/{noteId} {
           allow read: if isAdmin(orgId)
