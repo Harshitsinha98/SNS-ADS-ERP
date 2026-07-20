@@ -252,15 +252,41 @@ export default function WhatsApp() {
             {saving ? <><Loader2 size={16} className="animate-spin" /> Connecting…</> : <><Plug size={16} /> Connect with Meta <ArrowRight size={16} /></>}
           </button>
         </div>
-        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
-          <h3 className="font-display font-semibold text-lg text-ink mb-2">How replies work</h3>
-          <ol className="text-sm text-ink-soft space-y-3 list-decimal pl-5">
-            <li>A customer messages this connected WhatsApp number.</li>
-            <li>CodeSkate creates or updates the lead in this workspace.</li>
-            <li>Open the lead record and use the WhatsApp reply panel.</li>
+        <aside className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
+          <h3 className="font-display font-semibold text-lg text-ink mb-1">WhatsApp setup guide</h3>
+          <p className="text-sm text-ink-soft mb-5">Follow these steps to connect this workspace's own WhatsApp Business number securely.</p>
+
+          <ol className="space-y-4">
+            <li className="flex gap-3">
+              <span className="w-6 h-6 shrink-0 rounded-full bg-cream-200 text-ink text-xs font-bold flex items-center justify-center">1</span>
+              <div className="text-sm text-ink-soft leading-5"><strong className="text-ink">Prepare your Meta account.</strong><br />Sign in with the Facebook/Meta account that owns your Business Portfolio. Keep your business details, public website, and access to the phone's SMS or call verification ready.</div>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 shrink-0 rounded-full bg-cream-200 text-ink text-xs font-bold flex items-center justify-center">2</span>
+              <div className="text-sm text-ink-soft leading-5"><strong className="text-ink">Choose the right Meta option.</strong><br />Create or select the correct WhatsApp Business Account. If you want to keep using an existing WhatsApp Business mobile app, choose Meta's <em>Connect a WhatsApp Business app</em> option when it is available.</div>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 shrink-0 rounded-full bg-cream-200 text-ink text-xs font-bold flex items-center justify-center">3</span>
+              <div className="text-sm text-ink-soft leading-5"><strong className="text-ink">Enter a six-digit registration PIN.</strong><br />For a new number, choose a PIN and keep it safe. For an existing Cloud API number, enter its WhatsApp two-step PIN. This is <strong className="text-ink">not</strong> an SMS OTP and is never stored by CodeSkate.</div>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 shrink-0 rounded-full bg-cream-200 text-ink text-xs font-bold flex items-center justify-center">4</span>
+              <div className="text-sm text-ink-soft leading-5"><strong className="text-ink">Connect and verify the phone number.</strong><br />Click <em>Connect with Meta</em>, complete Meta's permissions and phone verification, then wait until this page shows <strong className="text-ink">Connected</strong>.</div>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 shrink-0 rounded-full bg-cream-200 text-ink text-xs font-bold flex items-center justify-center">5</span>
+              <div className="text-sm text-ink-soft leading-5"><strong className="text-ink">Test incoming leads and replies.</strong><br />Send a message from a different WhatsApp number to the connected business number. A lead should appear in Lead Hub; reply from that lead within 24 hours.</div>
+            </li>
           </ol>
-          <p className="text-xs text-ink-muted mt-5 flex items-start gap-1.5"><Info size={13} className="mt-0.5 shrink-0" /> Free-form replies are available for 24 hours after the customer's latest message. Outside that window, Meta requires an approved template.</p>
-        </div>
+
+          <div className="mt-5 rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 leading-5 flex gap-2">
+            <Info size={15} className="shrink-0 mt-0.5" />
+            <span><strong>Mobile app note:</strong> a Cloud API-only number may no longer be usable in the WhatsApp Business mobile app. This does not affect CRM lead routing. Do not delete or re-register the number while it is connected here.</span>
+          </div>
+          <div className="mt-3 rounded-xl bg-cream-100 p-3 text-xs text-ink-muted leading-5">
+            <strong className="text-ink">Need help?</strong> If a connected number does not receive new leads, use <em>Repair Meta webhook delivery</em> above, then send a fresh test message. Never share Meta app secrets, access tokens, verification codes, or your registration PIN.
+          </div>
+        </aside>
       </div>
     </Layout>
   );
