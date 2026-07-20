@@ -187,6 +187,8 @@ service cloud.firestore {
     match /websiteLeadKeys/{id} { allow read, write: if false; }
     match /websiteLeadIntegrations/{id} { allow read, write: if false; }
     match /websiteLeadRateLimits/{id} { allow read, write: if false; }
+    match /adLeadConnections/{id} { allow read, write: if false; }
+    match /adLeadRateLimits/{id} { allow read, write: if false; }
     match /paymentIntents/{id} { allow read, write: if false; }
     match /billingEvents/{id} { allow read, write: if false; }
     match /razorpayWebhookEvents/{id} { allow read, write: if false; }

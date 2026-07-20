@@ -13,6 +13,7 @@ import {
   CreditCard,
   MessageCircle,
   Globe2,
+  Megaphone,
   CalendarCheck2,
   Workflow,
 } from "lucide-react";
@@ -25,6 +26,7 @@ const adminLinks = [
   { to: "/admin/employees", label: "Team", icon: Users },
   { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },
+  { to: "/admin/ad-leads", label: "Meta & Google Ads", icon: Megaphone },
   { to: "/admin/billing", label: "Billing", icon: CreditCard },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];

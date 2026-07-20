@@ -17,6 +17,7 @@ import WebsiteLeadIntegration from "./pages/admin/WebsiteLeadIntegration";
 import WebsiteLeadForm from "./pages/public/WebsiteLeadForm";
 import FollowUpQueue from "./pages/admin/FollowUpQueue";
 import Automation from "./pages/admin/Automation";
+import AdLeadIntegrations from "./pages/admin/AdLeadIntegrations";
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
 import Workspace from "./pages/employee/Workspace";
 import LeadAction from "./pages/employee/LeadAction";
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/admin/website-lead-integration" element={<ProtectedRoute role="admin"><WebsiteLeadIntegration /></ProtectedRoute>} />
         <Route path="/admin/follow-ups" element={<ProtectedRoute role="admin"><FollowUpQueue /></ProtectedRoute>} />
         <Route path="/admin/automation" element={<ProtectedRoute role="admin"><Automation /></ProtectedRoute>} />
+        <Route path="/admin/ad-leads" element={<ProtectedRoute role="admin"><AdLeadIntegrations /></ProtectedRoute>} />
 
         {/* --- PLATFORM OWNER PORTAL (self-contained owner login inside the page;
                 only +919653043939 can enter). Accessible at /owner or /platform. --- */}

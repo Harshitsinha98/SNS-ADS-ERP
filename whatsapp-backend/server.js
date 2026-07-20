@@ -12,6 +12,7 @@ import createBillingRouter from "./billing.js";
 import createLeadIntakeRouter from "./leadIntake.js";
 import createFollowUpTasksRouter from "./followUpTasks.js";
 import createWhatsAppTemplatesRouter from "./whatsappTemplates.js";
+import { createAdLeadAdminRouter, createAdLeadWebhookRouter } from "./adLeadIntegrations.js";
 import { runFollowUpAutomation } from "./followUpAutomation.js";
 import { getMergedPlans } from "./plans.js";
 
@@ -87,6 +88,18 @@ app.use("/api/leads", createLeadIntakeRouter(db, {
   requireHttpsPublicUrls: isProductionDeployment,
 }));
 app.use("/api/follow-ups", createFollowUpTasksRouter(db));
+app.use("/api/ad-leads", createAdLeadAdminRouter(db, {
+  publicBackendUrl,
+  metaGraphRequest,
+  metaAppId: process.env.META_APP_ID || "",
+  metaAppSecret: process.env.META_APP_SECRET || "",
+  metaVerifyToken: process.env.META_LEAD_WEBHOOK_VERIFY_TOKEN || "",
+}));
+app.use("/webhook/ad-leads", createAdLeadWebhookRouter(db, {
+  metaGraphRequest,
+  metaAppSecret: process.env.META_APP_SECRET || "",
+  metaVerifyToken: process.env.META_LEAD_WEBHOOK_VERIFY_TOKEN || "",
+}));
 app.use("/api/whatsapp/templates", createWhatsAppTemplatesRouter(db, {
   metaGraphRequest,
   decryptWhatsAppToken,
