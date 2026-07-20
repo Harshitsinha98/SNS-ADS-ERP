@@ -3,9 +3,10 @@
 // which getMergedPlans() layers on top of these defaults.
 
 export const PLANS = {
-  starter: { id: "starter", name: "Starter", monthlyPrice: 999, yearlyPrice: 9999, includedSeats: 3, leadsLimit: 1000, trial: true },
-  growth: { id: "growth", name: "Growth", monthlyPrice: 2499, yearlyPrice: 24999, includedSeats: 10, leadsLimit: 10000 },
-  enterprise: { id: "enterprise", name: "Enterprise", monthlyPrice: 4999, yearlyPrice: 49999, includedSeats: 50, leadsLimit: 1000000 },
+  starter: { id: "starter", name: "Starter", monthlyPrice: 599, yearlyPrice: 5999, includedSeats: 3, leadsLimit: 1000, trial: true },
+  growth: { id: "growth", name: "Growth", monthlyPrice: 1499, yearlyPrice: 14999, includedSeats: 10, leadsLimit: 10000 },
+  // Keep the stable ID so existing subscriptions and platform overrides remain valid.
+  enterprise: { id: "enterprise", name: "Scale", monthlyPrice: 3499, yearlyPrice: 34999, includedSeats: 25, leadsLimit: 50000 },
 };
 
 // Merge platform-owner overrides (platformConfig/global.plans) on top of defaults.

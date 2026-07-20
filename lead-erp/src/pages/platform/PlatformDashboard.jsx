@@ -67,6 +67,7 @@ export default function PlatformDashboard() {
     plans.forEach((p) => {
       draft[p.id] = {
         monthlyPrice: p.monthlyPrice,
+        yearlyPrice: p.yearlyPrice,
         includedSeats: p.includedSeats,
         leadsLimit: p.leadsLimit,
       };
@@ -252,6 +253,7 @@ export default function PlatformDashboard() {
                 <tr className="text-left text-ink-muted border-b border-cream-300">
                   <th className="py-2 font-medium">Plan</th>
                   <th className="font-medium">Monthly price (₹)</th>
+                  <th className="font-medium">Annual price (₹)</th>
                   <th className="font-medium">Seats</th>
                   <th className="font-medium">Leads / month</th>
                 </tr>
@@ -264,6 +266,11 @@ export default function PlatformDashboard() {
                       <input type="number" className="w-28 border border-cream-400/70 rounded-lg px-2 py-1.5"
                         value={plansDraft[p.id]?.monthlyPrice ?? p.monthlyPrice}
                         onChange={(e) => setPlansDraft((d) => ({ ...d, [p.id]: { ...d[p.id], monthlyPrice: Number(e.target.value) } }))} />
+                    </td>
+                    <td>
+                      <input type="number" className="w-28 border border-cream-400/70 rounded-lg px-2 py-1.5"
+                        value={plansDraft[p.id]?.yearlyPrice ?? p.yearlyPrice}
+                        onChange={(e) => setPlansDraft((d) => ({ ...d, [p.id]: { ...d[p.id], yearlyPrice: Number(e.target.value) } }))} />
                     </td>
                     <td>
                       <input type="number" className="w-20 border border-cream-400/70 rounded-lg px-2 py-1.5"
