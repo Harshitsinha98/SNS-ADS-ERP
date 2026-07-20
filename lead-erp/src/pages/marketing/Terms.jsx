@@ -42,7 +42,7 @@ export default function Terms() {
       <p>We may update these terms to reflect changes to the service, law, or business operations. Continued use after an updated version takes effect means you accept the revised terms. You may stop using the service at any time. We may suspend or terminate access when necessary to protect the platform, comply with law, or address a material breach of these terms.</p>
 
       <h2>11. Contact</h2>
-      <p>For questions about these terms, contact <a href="mailto:customer@codeskate.app">customer@codeskate.app</a>.</p>
+      <p>For questions about these terms, contact <a href="mailto:hello@codeskate.com">hello@codeskate.com</a>.</p>
     </LegalPageLayout>
   );
 }

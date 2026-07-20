@@ -45,7 +45,7 @@ export default function Privacy() {
       <p>We may update this policy when our product, legal obligations, or data practices change. We will publish the revised version on this page and update the “Last updated” date.</p>
 
       <h2>10. Contact</h2>
-      <p>For privacy questions or data requests, contact us at <a href="mailto:customer@codeskate.app">customer@codeskate.app</a>.</p>
+      <p>For privacy questions or data requests, contact us at <a href="mailto:hello@codeskate.com">hello@codeskate.com</a>.</p>
     </LegalPageLayout>
   );
 }
