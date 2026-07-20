@@ -7,11 +7,11 @@ import { daysSince, fmtMoney, fmtDate } from "../../utils/helpers";
 import {
   IndianRupee,
   Layers,
-  TrendingUp,
-  Flame,
   AlertTriangle,
   ArrowUpRight,
   Sparkles,
+  CalendarDays,
+  CircleDollarSign,
 } from "lucide-react";
 
 export default function Dashboard() {
@@ -22,13 +22,25 @@ export default function Dashboard() {
   const converted = active.filter((l) => l.status === "Closed-Won").length;
   const lost = active.filter((l) => l.status === "Lost").length;
   const activeLeads = total - converted - lost;
-  const convRate = total ? ((converted / total) * 100).toFixed(1) : 0;
 
   const revenueOf = (lead) => financials[lead.id]?.revenue || 0;
 
   const wonValue = active
     .filter((l) => l.status === "Closed-Won")
     .reduce((sum, l) => sum + revenueOf(l), 0);
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const revenueThisMonth = active
+    .filter((l) => l.status === "Closed-Won")
+    .reduce((sum, lead) => {
+      const revenueUpdatedAt = financials[lead.id]?.revenueUpdatedAt;
+      return revenueUpdatedAt && new Date(revenueUpdatedAt) >= monthStart
+        ? sum + revenueOf(lead)
+        : sum;
+    }, 0);
+  const averageWonDeal = converted ? wonValue / converted : 0;
 
   const openValue = active
     .filter((l) => !["Closed-Won", "Lost"].includes(l.status))
@@ -38,10 +50,6 @@ export default function Dashboard() {
     (l) =>
       !["Closed-Won", "Lost"].includes(l.status) && daysSince(l.lastUpdated) >= 3
   );
-  const hotLeads = active.filter(
-    (l) =>
-      l.priority === "Hot" && !["Closed-Won", "Lost"].includes(l.status)
-  );
 
   const statusData = [...new Set(active.map((l) => l.status))].map((s) => ({
     name: s,
@@ -50,12 +58,19 @@ export default function Dashboard() {
 
   const leaderboard = users
     .filter((u) => u.role === "employee")
-    .map((u) => ({
-      name: u.name,
-      value: active.filter(
-        (l) => l.assignedTo === u.id && l.status === "Closed-Won"
-      ).length,
-    }))
+    .map((u) => {
+      const assigned = active.filter((lead) => lead.assignedTo === u.id);
+      const wonLeads = assigned.filter((lead) => lead.status === "Closed-Won");
+      return {
+        name: u.name || "Unassigned",
+        value: wonLeads.reduce((sum, lead) => sum + revenueOf(lead), 0),
+        wins: wonLeads.length,
+        pipeline: assigned
+          .filter((lead) => !["Closed-Won", "Lost"].includes(lead.status))
+          .reduce((sum, lead) => sum + revenueOf(lead), 0),
+        conversion: assigned.length ? ((wonLeads.length / assigned.length) * 100).toFixed(1) : "0.0",
+      };
+    })
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
@@ -87,22 +102,22 @@ export default function Dashboard() {
           icon={IndianRupee}
         />
         <StatCard
+          label="Revenue This Month"
+          value={fmtMoney(revenueThisMonth)}
+          tone="signal"
+          icon={CalendarDays}
+        />
+        <StatCard
+          label="Average Won Deal"
+          value={fmtMoney(averageWonDeal)}
+          tone="info"
+          icon={CircleDollarSign}
+        />
+        <StatCard
           label="Pipeline Value"
           value={fmtMoney(openValue)}
-          tone="info"
-          icon={Layers}
-        />
-        <StatCard
-          label="Conversion Rate"
-          value={`${convRate}%`}
-          tone="signal"
-          icon={TrendingUp}
-        />
-        <StatCard
-          label="Hot Leads"
-          value={hotLeads.length}
           tone="danger"
-          icon={Flame}
+          icon={Layers}
         />
       </div>
 
@@ -166,10 +181,43 @@ export default function Dashboard() {
         </div>
         <div className="bg-white rounded-xl shadow-card border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800">Top Performers</h3>
+            <h3 className="font-semibold text-gray-800">Revenue by Employee</h3>
             <Sparkles className="w-4 h-4 text-accent-500" />
           </div>
           <ConvBar data={leaderboard} />
+        </div>
+      </div>
+
+      {/* Employee Revenue Table */}
+      <div className="bg-white rounded-xl shadow-card border border-gray-100 p-6 mb-6 overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold text-gray-800">Employee Revenue Performance</h3>
+            <p className="text-xs text-gray-500 mt-1">Won revenue, open pipeline and conversion from assigned leads.</p>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[620px]">
+            <thead><tr className="border-b border-gray-100">
+              <th className="text-left py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">Employee</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">Won deals</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">Won revenue</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">Pipeline</th>
+              <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">Conversion</th>
+            </tr></thead>
+            <tbody>
+              {leaderboard.map((employee) => (
+                <tr key={employee.name} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                  <td className="py-3 px-4 font-medium text-gray-800">{employee.name}</td>
+                  <td className="py-3 px-4 text-right font-mono text-success-600">{employee.wins}</td>
+                  <td className="py-3 px-4 text-right font-mono font-medium text-gray-800">{fmtMoney(employee.value)}</td>
+                  <td className="py-3 px-4 text-right font-mono text-gray-600">{fmtMoney(employee.pipeline)}</td>
+                  <td className="py-3 px-4 text-right font-mono text-gray-600">{employee.conversion}%</td>
+                </tr>
+              ))}
+              {leaderboard.length === 0 && <tr><td colSpan="5" className="py-6 text-center text-gray-400">Add and assign employees to see revenue performance.</td></tr>}
+            </tbody>
+          </table>
         </div>
       </div>
 

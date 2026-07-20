@@ -7,7 +7,7 @@ import { db } from "../firebase";
 import { useAuth } from "./AuthContext";
 import {
   inviteTeamMember, setTeamMemberStatus, setTeamMemberRole, schedulePlanDowngrade, cancelPlanDowngrade,
-  importBulkLeads, reassignBulkLeads, triggerWhatsAppSync as requestWhatsAppSync,
+  importBulkLeads, createManualLead, rotateWebsiteLeadIntakeKey, reassignBulkLeads, triggerWhatsAppSync as requestWhatsAppSync,
 } from "../utils/billingApi";
 
 const DataContext = createContext();
@@ -420,6 +420,16 @@ export function DataProvider({ children }) {
     }
   };
 
+  const addManualLead = async (lead) => {
+    if (!user?.activeOrgId) throw new Error("No active organization selected");
+    return createManualLead({ orgId: user.activeOrgId, ...lead });
+  };
+
+  const createWebsiteLeadIntakeKey = async () => {
+    if (!user?.activeOrgId) throw new Error("No active organization selected");
+    return rotateWebsiteLeadIntakeKey({ orgId: user.activeOrgId });
+  };
+
   // ============================================================
   // USER MANAGEMENT - memberships-based
   // ============================================================
@@ -575,7 +585,8 @@ export function DataProvider({ children }) {
       setSettings: setSettingsValue, updateLead, addNote, addWorknote,
       updateLeadStatus, updatePriority, updateFollowUpDate, updateLeadRevenue,
       reassignLead, reassignAllLeads, blacklistLead,
-      addBulkLeads, addUser, updateUser, deactivateUser, activateUser, pushNotif, markRead, logActivity, setMyGoal,
+      addBulkLeads, addManualLead, createWebsiteLeadIntakeKey,
+      addUser, updateUser, deactivateUser, activateUser, pushNotif, markRead, logActivity, setMyGoal,
       triggerWhatsAppSync, changePlan, scheduleDowngrade, cancelDowngrade,
     }}>
       {children}

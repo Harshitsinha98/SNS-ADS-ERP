@@ -103,6 +103,8 @@ export const setTeamMemberRole = (body) => authedPost("/api/billing/team/member-
 export const schedulePlanDowngrade = (body) => authedPost("/api/billing/subscription/schedule-downgrade", body);
 export const cancelPlanDowngrade = (body) => authedPost("/api/billing/subscription/cancel-downgrade", body);
 export const importBulkLeads = (body) => authedPost("/api/billing/leads/bulk-import", body);
+export const createManualLead = (body) => authedPost("/api/leads/manual", body);
+export const rotateWebsiteLeadIntakeKey = (body) => authedPost("/api/leads/website-key", body);
 export const reassignBulkLeads = (body) => authedPost("/api/billing/leads/reassign-bulk", body);
 export const platformOrgAction = (body) => authedPost("/api/billing/platform/org-action", body);
 export const triggerWhatsAppSync = (body) => authedPost("/api/whatsapp/sync-now", body);

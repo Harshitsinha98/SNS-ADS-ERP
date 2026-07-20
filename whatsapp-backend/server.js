@@ -9,6 +9,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getNextEmployeeRoundRobin, getNextEmployeeByWorkload } from "./utils/assignLead.js";
 import createBillingRouter from "./billing.js";
+import createLeadIntakeRouter from "./leadIntake.js";
 import { getMergedPlans } from "./plans.js";
 
 function loadServiceAccount() {
@@ -65,6 +66,9 @@ app.use("/webhook", express.raw({ type: "application/json" }));
 app.use("/api/billing/webhook", express.raw({ type: "*/*" }));
 app.use(express.json({ limit: "1mb" }));
 app.use("/api/billing", createBillingRouter(db));
+app.use("/api/leads", createLeadIntakeRouter(db, {
+  publicBackendUrl: process.env.PUBLIC_BACKEND_URL || `http://localhost:${PORT}`,
+}));
 
 if (!process.env.WHATSAPP_APP_SECRET) {
   console.warn("⚠️ WHATSAPP_APP_SECRET is not set. Meta webhook ingestion will reject requests until it is configured.");
