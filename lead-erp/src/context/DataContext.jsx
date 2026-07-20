@@ -352,7 +352,7 @@ export function DataProvider({ children }) {
   };
 
   const updateLeadRevenue = async (id, revenue, currentUser) => {
-    if (!user?.activeOrgId) return;
+    if (!user?.activeOrgId) throw new Error("No active organization selected");
     try {
       await setDoc(doc(db, "organizations", user.activeOrgId, "leads", id, "private", "data"), {
         revenue: Number(revenue) || 0,
@@ -360,7 +360,11 @@ export function DataProvider({ children }) {
         revenueUpdatedAt: new Date().toISOString(),
       }, { merge: true });
       logActivity(`Revenue updated on lead ${id} → ₹${revenue} by ${currentUser?.displayName || currentUser?.name || "Unknown"}`);
-    } catch (e) { console.error("Error updating revenue:", e); }
+      return true;
+    } catch (e) {
+      console.error("Error updating revenue:", e);
+      throw e;
+    }
   };
 
   const reassignLead = async (id, employeeId, employeeName, currentUser) => {

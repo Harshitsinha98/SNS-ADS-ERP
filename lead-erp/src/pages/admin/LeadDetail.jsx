@@ -34,12 +34,15 @@ export default function LeadDetail() {
   } = useData();
 
   const orgId = user?.activeOrgId;
+  const isOrgAdmin = user?.activeOrgRole === "admin" || user?.activeOrgRole === "owner";
   const lead = leads.find((l) => l.id === id);
   const [notes, setNotes] = useState([]);
   const [financial, setFinancial] = useState(null);
   const [noteText, setNoteText] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [revenueInput, setRevenueInput] = useState("");
+  const [revenueSaving, setRevenueSaving] = useState(false);
+  const [revenueMessage, setRevenueMessage] = useState("");
 
   const [callActive, setCallActive] = useState(false);
   const [callStart, setCallStart] = useState(null);
@@ -57,12 +60,12 @@ export default function LeadDetail() {
   }, [id, orgId]);
 
   useEffect(() => {
-    if (!id || !orgId || user?.role !== "admin") { setFinancial(null); return undefined; }
+    if (!id || !orgId || !isOrgAdmin) { setFinancial(null); return undefined; }
     const unsub = onSnapshot(doc(db, "organizations", orgId, "leads", id, "private", "data"), (snap) => {
       setFinancial(snap.exists() ? snap.data() : null);
     }, (err) => console.error("Financial listener error:", err));
     return unsub;
-  }, [id, orgId, user?.role]);
+  }, [id, orgId, isOrgAdmin]);
 
   useEffect(() => {
     if (!callActive) return;
@@ -77,16 +80,29 @@ export default function LeadDetail() {
 
   const handleAddWorknote = () => {
     if (!noteText.trim()) return;
-    const visibility = (user.role === 'admin' && isPrivate) ? 'admin_only' : 'team';
+    const visibility = isOrgAdmin && isPrivate ? 'admin_only' : 'team';
     addWorknote(lead.id, noteText, user, { visibility });
     setNoteText("");
   };
 
-  const handleRevenueSave = () => {
-    if (revenueInput && !isNaN(revenueInput)) {
-      updateLeadRevenue(lead.id, revenueInput, user);
-      alert("Revenue saved securely.");
+  const handleRevenueSave = async () => {
+    const revenue = Number(revenueInput);
+    if (!revenueInput.trim() || !Number.isFinite(revenue) || revenue < 0) {
+      setRevenueMessage("Enter a valid revenue amount of ₹0 or more.");
+      return;
+    }
+
+    setRevenueSaving(true);
+    setRevenueMessage("");
+    try {
+      await updateLeadRevenue(lead.id, revenue, user);
       setRevenueInput("");
+      setRevenueMessage("Revenue saved securely.");
+    } catch (error) {
+      console.error("Revenue save error:", error);
+      setRevenueMessage("Revenue could not be saved. Please try again.");
+    } finally {
+      setRevenueSaving(false);
     }
   };
 
@@ -104,7 +120,7 @@ export default function LeadDetail() {
   };
 
   const saveCallLog = () => {
-    const visibility = (user.role === 'admin' && isPrivate) ? 'admin_only' : 'team';
+    const visibility = isOrgAdmin && isPrivate ? 'admin_only' : 'team';
     addNote(lead.id, noteText || "Call completed — no notes added.", "call", {
       duration: pendingDuration,
       authorName: user.name,
@@ -150,7 +166,7 @@ export default function LeadDetail() {
                   className="w-full border rounded p-2 mt-1" />
               </div>
 
-              {user.role === "admin" && (
+              {isOrgAdmin && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500">Assigned To</label>
                   <select value={lead.assignedTo || ""} onChange={(e) => {
@@ -176,13 +192,17 @@ export default function LeadDetail() {
               )}
             </div>
 
-            {user.role === 'admin' && (
+            {isOrgAdmin && (
               <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
                 <label className="text-xs font-semibold text-green-700 flex items-center gap-1"><CheckCircle size={14} /> Deal Revenue (₹)</label>
                 <div className="flex gap-2 mt-2">
-                  <input type="number" value={revenueInput} onChange={(e) => setRevenueInput(e.target.value)} className="w-full border border-green-300 rounded p-2" placeholder={financial?.revenue ? `Current: ₹${financial.revenue}` : "e.g. 50000"} />
-                  <button onClick={handleRevenueSave} className="bg-green-600 text-white px-4 rounded hover:bg-green-700 font-medium">Save</button>
+                  <input type="number" min="0" step="1" value={revenueInput} onChange={(e) => setRevenueInput(e.target.value)} className="w-full border border-green-300 rounded p-2" placeholder={financial?.revenue != null ? `Current: ₹${Number(financial.revenue).toLocaleString("en-IN")}` : "e.g. 50000"} />
+                  <button onClick={handleRevenueSave} disabled={revenueSaving} className="bg-green-600 text-white px-4 rounded hover:bg-green-700 disabled:opacity-60 font-medium">
+                    {revenueSaving ? "Saving…" : "Save"}
+                  </button>
                 </div>
+                {financial?.revenue != null && <p className="text-xs font-medium text-green-800 mt-2">Saved revenue: ₹{Number(financial.revenue).toLocaleString("en-IN")}</p>}
+                {revenueMessage && <p className="text-xs text-green-700 mt-2" role="status">{revenueMessage}</p>}
                 <p className="text-[10px] text-green-600 mt-1">Separate admin-only record. Employees have zero DB-level access.</p>
               </div>
             )}
@@ -194,7 +214,7 @@ export default function LeadDetail() {
             <h3 className="font-semibold mb-3">Add Worknote</h3>
             <textarea value={noteText} onChange={(e) => setNoteText(e.target.value)} rows="3" className="w-full border rounded p-3 text-sm" placeholder="What did the client say? Next steps?"></textarea>
 
-            {user.role === 'admin' && (
+            {isOrgAdmin && (
               <div className="flex items-center gap-2 mt-3 mb-1">
                 <input type="checkbox" id="privateNote" checked={isPrivate} onChange={(e) => setIsPrivate(e.target.checked)} className="cursor-pointer" />
                 <label htmlFor="privateNote" className="text-xs font-medium text-gray-600 cursor-pointer">Keep this note private (Admin Only)</label>

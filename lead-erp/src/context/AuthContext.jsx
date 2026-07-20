@@ -98,10 +98,15 @@ export function AuthProvider({ children }) {
         );
 
         // Step 6: Build user object with org context
+        const displayName = userSnap.exists()
+          ? (userSnap.data().displayName || activeMembership.displayName || phone || "there")
+          : (activeMembership.displayName || phone || "there");
         const userData = {
           uid: uid,
           phone: phone,
-          displayName: userSnap.exists() ? userSnap.data().displayName : null,
+          displayName,
+          // `name` is retained for legacy employee/admin components.
+          name: displayName,
           
           // Active organization context
           activeOrgId: activeMembership.orgId,

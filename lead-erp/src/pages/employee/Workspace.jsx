@@ -15,6 +15,7 @@ export default function Workspace() {
 
   const [goalInput, setGoalInput] = useState("");
   const [editingGoal, setEditingGoal] = useState(false);
+  const employeeName = user?.displayName || user?.name || "there";
 
   const myLeads = leads.filter((l) => l.assignedTo === user.id && !l.blacklisted);
   const isClosed = (l) => ["Closed-Won", "Lost"].includes(l.status);
@@ -46,20 +47,20 @@ export default function Workspace() {
 
   const quickCall = (lead) => {
     addNote(lead.id, "Quick-call initiated from dashboard", "call", {
-      authorId: user.id, authorName: user.name, authorRole: user.role, visibility: "team",
+      authorId: user.id, authorName: employeeName, authorRole: user.role, visibility: "team",
     });
     window.location.href = `tel:${lead.phone}`;
   };
   const quickWhatsApp = (lead) => {
     addNote(lead.id, "WhatsApp opened from dashboard", "whatsapp", {
-      authorId: user.id, authorName: user.name, authorRole: user.role, visibility: "team",
+      authorId: user.id, authorName: employeeName, authorRole: user.role, visibility: "team",
     });
     window.open(`https://wa.me/${toWaNumber(lead.phone)}`, "_blank");
   };
   const quickStatus = (id, status) => updateLeadStatus(id, status, user);
 
   return (
-    <Layout title={`Welcome, ${user.name}`}>
+    <Layout title={`Welcome, ${employeeName}`}>
       {myNotifs.length > 0 && (
         <div className="bg-info-soft border border-info/20 rounded-lg p-4 mb-5 flex flex-col sm:flex-row sm:justify-between gap-3">
           <div>
