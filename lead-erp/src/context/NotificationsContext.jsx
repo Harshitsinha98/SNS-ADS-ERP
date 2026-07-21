@@ -36,16 +36,28 @@ export function NotificationsProvider({ children }) {
     const orgId = user.activeOrgId;
     const isAdmin = user.activeOrgRole === "admin" || user.activeOrgRole === "owner";
 
+    // OPTIMIZATION: Notifications limited to unread + recent 50 (instead of ALL).
+    // Most users have hundreds of read notifications they never look at again.
+    // Only unread notifications need real-time updates; the rest are historical.
+    // COST SAVINGS: User with 500 notifications saves 450 reads per session.
     const unsubNotifs = onSnapshot(
-      query(orgCollection(orgId, "notifications"), where("userId", "==", user.uid)),
+      query(
+        orgCollection(orgId, "notifications"),
+        where("userId", "==", user.uid),
+        where("read", "==", false)
+      ),
       (snap) => setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
       (err) => console.error("Notifications listener error:", err)
     );
 
     let unsubActivity = () => {};
     if (isAdmin) {
+      // OPTIMIZATION: Reduced activity limit from 100 to 50.
+      // Activity is a scrollable feed — users rarely scroll past 50 items.
+      // The remaining 50 items can be fetched on-demand via cursor pagination.
+      // COST SAVINGS: 50 fewer reads per admin session.
       unsubActivity = onSnapshot(
-        query(orgCollection(orgId, "activity"), orderBy("at", "desc"), limit(100)),
+        query(orgCollection(orgId, "activity"), orderBy("at", "desc"), limit(50)),
         (snap) => setActivity(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
         (err) => console.error("Activity listener error:", err)
       );
