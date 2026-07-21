@@ -60,22 +60,32 @@ export function LeadsProvider({ children }) {
     // After: Initial load limited to 200 (covers 90%+ of active org views).
     // For orgs with >200 leads, cursor pagination loads more on demand.
     // COST SAVINGS: Org with 1000 leads saves 800 reads on initial load.
+    //
+    // NOTE: Employee query does NOT use orderBy/limit because:
+    // 1. Employees typically have <50 assigned leads (no pagination needed).
+    // 2. Adding orderBy("createdAt") would silently exclude any lead where
+    //    createdAt is missing/null — breaking visibility for older/imported leads.
+    // 3. The original query was unbounded and worked reliably.
     const leadsQuery = isAdmin
       ? query(orgCollection(orgId, "leads"), orderBy("createdAt", "desc"), limit(leadsPageSize))
-      : query(orgCollection(orgId, "leads"), where("assignedTo", "==", user.uid), orderBy("createdAt", "desc"), limit(leadsPageSize));
+      : query(orgCollection(orgId, "leads"), where("assignedTo", "==", user.uid));
     const unsubLeads = onSnapshot(leadsQuery,
       (snap) => {
         setLeads(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setAllLeadsLoaded(snap.docs.length < leadsPageSize);
+        setAllLeadsLoaded(isAdmin ? snap.docs.length < leadsPageSize : true);
       },
       (err) => console.error("Leads listener error:", err)
     );
 
     // OPTIMIZATION: Follow-up tasks limited to open tasks only (completed
     // tasks are historical and rarely viewed). Reduces reads significantly.
+    // NOTE: Employee query uses only assignedTo filter (no status filter)
+    // because older task documents may lack a status field, and adding a
+    // multi-field where() would require a composite index that excludes
+    // legacy docs. Employees typically have very few tasks anyway.
     const tasksQuery = isAdmin
       ? query(orgCollection(orgId, "followUpTasks"), where("status", "==", "open"))
-      : query(orgCollection(orgId, "followUpTasks"), where("assignedTo", "==", user.uid), where("status", "==", "open"));
+      : query(orgCollection(orgId, "followUpTasks"), where("assignedTo", "==", user.uid));
     const unsubFollowUpTasks = onSnapshot(tasksQuery,
       (snap) => setFollowUpTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
       (err) => console.error("Follow-up tasks listener error:", err)

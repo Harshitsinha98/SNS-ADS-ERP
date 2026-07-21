@@ -19,8 +19,22 @@ import WebsiteLeadIntegration from "./pages/admin/WebsiteLeadIntegration";
 import WebsiteLeadForm from "./pages/public/WebsiteLeadForm";
 import FollowUpQueue from "./pages/admin/FollowUpQueue";
 import Automation from "./pages/admin/Automation";
+import Workflows from "./pages/admin/Workflows";
+import WorkflowBuilder from "./pages/admin/WorkflowBuilder";
 import AdLeadIntegrations from "./pages/admin/AdLeadIntegrations";
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
+import ExecutiveDashboard from "./pages/platform/ExecutiveDashboard";
+import OrganizationsPage from "./pages/platform/OrganizationsPage";
+import BillingPage from "./pages/platform/BillingPage";
+import CustomerSuccessPage from "./pages/platform/CustomerSuccessPage";
+import AnalyticsPage from "./pages/platform/AnalyticsPage";
+import InfrastructurePage from "./pages/platform/InfrastructurePage";
+import WhatsAppOpsPage from "./pages/platform/WhatsAppOpsPage";
+import AiUsagePage from "./pages/platform/AiUsagePage";
+import AuditLogsPage from "./pages/platform/AuditLogsPage";
+import FeatureFlagsPage from "./pages/platform/FeatureFlagsPage";
+import SettingsPage from "./pages/platform/SettingsPage";
+import SupportPage from "./pages/platform/SupportPage";
 import Workspace from "./pages/employee/Workspace";
 import LeadAction from "./pages/employee/LeadAction";
 import Tasks from "./pages/employee/Tasks";
@@ -64,12 +78,27 @@ export default function App() {
         <Route path="/admin/website-lead-integration" element={<ProtectedRoute role="admin"><WebsiteLeadIntegration /></ProtectedRoute>} />
         <Route path="/admin/follow-ups" element={<ProtectedRoute role="admin"><FollowUpQueue /></ProtectedRoute>} />
         <Route path="/admin/automation" element={<ProtectedRoute role="admin"><Automation /></ProtectedRoute>} />
+        <Route path="/admin/workflows" element={<ProtectedRoute role="admin"><Workflows /></ProtectedRoute>} />
+        <Route path="/admin/workflows/:workflowId" element={<ProtectedRoute role="admin"><WorkflowBuilder /></ProtectedRoute>} />
         <Route path="/admin/ad-leads" element={<ProtectedRoute role="admin"><AdLeadIntegrations /></ProtectedRoute>} />
 
-        {/* --- PLATFORM OWNER PORTAL (self-contained owner login inside the page;
-                only +919653043939 can enter). Accessible at /owner or /platform. --- */}
+        {/* --- PLATFORM OWNER CONSOLE (self-contained auth inside each page;
+                only +919653043939 can enter). Accessible at /platform/*. --- */}
+        <Route path="/platform" element={<ExecutiveDashboard />} />
+        <Route path="/platform/organizations" element={<OrganizationsPage />} />
+        <Route path="/platform/organizations/:orgId" element={<OrganizationsPage />} />
+        <Route path="/platform/billing" element={<BillingPage />} />
+        <Route path="/platform/customer-success" element={<CustomerSuccessPage />} />
+        <Route path="/platform/analytics" element={<AnalyticsPage />} />
+        <Route path="/platform/infrastructure" element={<InfrastructurePage />} />
+        <Route path="/platform/whatsapp" element={<WhatsAppOpsPage />} />
+        <Route path="/platform/ai-usage" element={<AiUsagePage />} />
+        <Route path="/platform/audit-logs" element={<AuditLogsPage />} />
+        <Route path="/platform/feature-flags" element={<FeatureFlagsPage />} />
+        <Route path="/platform/settings" element={<SettingsPage />} />
+        <Route path="/platform/support" element={<SupportPage />} />
+        {/* Legacy /owner route → redirect to new console */}
         <Route path="/owner" element={<PlatformDashboard />} />
-        <Route path="/platform" element={<PlatformDashboard />} />
 
         {/* --- EMPLOYEE SECTION --- */}
         <Route path="/app" element={<ProtectedRoute role="employee"><Workspace /></ProtectedRoute>} />

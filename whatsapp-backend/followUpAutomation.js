@@ -1,4 +1,5 @@
 import { FieldPath } from "firebase-admin/firestore";
+import { emitWorkflowTrigger } from "./src/services/workflow/workflowEngine.js";
 
 const MAX_AUTOMATION_MINUTES = 24 * 60;
 const MIN_REMINDER_MINUTES = 5;
@@ -309,9 +310,25 @@ export async function runFollowUpAutomation(db, { orgId = null, reenrollPaused =
   };
   for (const task of candidates.docs) {
     summary.scanned += 1;
-    const result = await processTask(db, task.ref, task.data(), adminCache);
+    const taskData = task.data();
+    const result = await processTask(db, task.ref, taskData, adminCache);
     if (result === "reminder") summary.reminders += 1;
-    if (result === "escalation") summary.escalations += 1;
+    if (result === "escalation") {
+      summary.escalations += 1;
+      // reminder_missed trigger: fired once, exactly when the overdue-escalation
+      // branch commits (never on the earlier pre-due reminder). Uses
+      // taskData.orgId (denormalized on every followUpTasks doc) so this
+      // works identically for both the per-org and cross-org collectionGroup
+      // cron passes.
+      const escalatedAt = nowIso();
+      emitWorkflowTrigger(db, {
+        orgId: taskData.orgId,
+        triggerType: "reminder_missed",
+        entityType: "followUpTask",
+        entity: { id: task.id, ...taskData, overdueEscalatedFor: taskData.dueAt, overdueEscalatedAt: escalatedAt, orgId: taskData.orgId },
+        dedupeToken: `${task.id}_${taskData.dueAt}`,
+      }).catch(() => {});
+    }
   }
   return summary;
 }
