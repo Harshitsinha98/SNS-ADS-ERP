@@ -13,10 +13,14 @@ export default function MyLeads() {
   const [activeTab, setActiveTab] = useState("All");
 
   useEffect(() => {
-    const q = query(collection(db, "leads"), where("assignedTo", "==", user.uid));
+    if (!user?.activeOrgId) return;
+    const q = query(
+      collection(db, "organizations", user.activeOrgId, "leads"),
+      where("assignedTo", "==", user.uid)
+    );
     const unsub = onSnapshot(q, snap => setLeads(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     return unsub;
-  }, [user.uid]);
+  }, [user.uid, user.activeOrgId]);
 
   const filtered = leads.filter(l => activeTab === "All" || getLeadCategory(l) === activeTab);
 
