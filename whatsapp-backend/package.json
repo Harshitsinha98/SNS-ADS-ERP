@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
+    "start": "node src/server.js",
+    "start:legacy": "node server.js",
+    "dev": "node --watch src/server.js",
+    "dev:legacy": "node --watch server.js",
     "reset": "node scripts/reset.js"
   },
   "dependencies": {
@@ -13,10 +15,14 @@
     "express": "^4.22.2",
     "firebase-admin": "^14.0.0",
     "node-cron": "^4.4.1",
-    "razorpay": "^2.9.4"
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "razorpay": "^2.9.4",
+    "uuid": "^14.0.1",
+    "zod": "^4.4.3"
   },
   "description": "",
-  "main": "server.js",
+  "main": "src/server.js",
   "keywords": [],
   "author": "",
   "license": "ISC"
