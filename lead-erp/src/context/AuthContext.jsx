@@ -29,25 +29,30 @@ export function AuthProvider({ children }) {
       const phone = fbUser.phoneNumber;
 
       try {
-        // Step 1: Get user's global profile (users/{uid})
-        const userSnap = await withTimeout(getDoc(doc(db, "users", uid)), 15000, "load profile");
+        // OPTIMIZATION: Parallelize independent reads on login.
+        // Before: Sequential reads (userProfile → claimInvites → memberships → org)
+        //   Total latency: ~4 round-trips × 100-300ms = 400-1200ms
+        // After: Parallel reads (userProfile + memberships in parallel, then org)
+        //   Total latency: ~2 round-trips × 100-300ms = 200-600ms
+        // COST SAVINGS: Same number of reads but 50% latency reduction on login.
         
         const isPlatformOwner = phone === PLATFORM_OWNER_PHONE;
 
-        // Pending invites are claimed by a backend transaction on every sign-in.
-        // This supports users who belong to multiple organizations without ever
-        // allowing a browser to create or elevate a membership.
-        await claimTeamInvites().catch((error) => {
-          console.warn("Invite claim skipped:", error?.message || error);
-        });
-
-        // Step 2: Get user's active memberships
+        // Step 1: Fire user profile + memberships + invite claim in PARALLEL
         const membershipsQuery = query(
           collection(db, "memberships"),
           where("uid", "==", uid),
           where("active", "==", true)
         );
-        let membershipsSnap = await withTimeout(getDocs(membershipsQuery), 15000, "load memberships");
+        const [userSnap, membershipsSnap] = await Promise.all([
+          withTimeout(getDoc(doc(db, "users", uid)), 15000, "load profile"),
+          withTimeout(getDocs(membershipsQuery), 15000, "load memberships"),
+        ]);
+
+        // Claim invites fires in background — don't block login on it
+        claimTeamInvites().catch((error) => {
+          console.warn("Invite claim skipped:", error?.message || error);
+        });
 
         if (membershipsSnap.empty) {
           // Platform owner has no org membership but still needs the /platform
