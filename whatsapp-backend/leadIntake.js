@@ -2,6 +2,7 @@ import crypto from "crypto";
 import express from "express";
 import { getAuth } from "firebase-admin/auth";
 import { getNextEmployeeByWorkload, getNextEmployeeRoundRobin } from "./utils/assignLead.js";
+import { emitWorkflowTrigger } from "./src/services/workflow/workflowEngine.js";
 
 const nowIso = () => new Date().toISOString();
 const safeEqual = (left, right) => {
@@ -275,6 +276,30 @@ export async function createLeadFromIntake({ db, orgId, input, source, origin, a
       source: lead.source,
     });
     await batch.commit();
+
+    // Fire-and-await-but-never-throw: workflow evaluation must never fail
+    // lead creation itself (emitWorkflowTrigger already swallows its own
+    // errors internally, but the await here is intentional so a
+    // synchronously-testable webhook response still reflects any
+    // immediately-executed workflow action, e.g. a reassignment).
+    const createdLead = {
+      id: leadRef.id,
+      ...lead,
+      status: "New",
+      assignedTo: employee.id,
+      assignedToName: employee.name || employee.displayName || null,
+      createdAt,
+      lastUpdated: createdAt,
+      orgId,
+    };
+    emitWorkflowTrigger(db, {
+      orgId,
+      triggerType: "lead_created",
+      entityType: "lead",
+      entity: createdLead,
+      dedupeToken: createdAt,
+    }).catch(() => {});
+
     return { ok: true, duplicate: false, leadId: leadRef.id, assignedTo: employee.id, assignedToName: employee.name || employee.displayName || null };
   } catch (error) {
     await releaseLeadCapacity(db, orgId).catch(() => {});

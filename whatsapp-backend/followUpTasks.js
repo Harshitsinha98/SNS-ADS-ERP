@@ -1,5 +1,6 @@
 import express from "express";
 import { getAuth } from "firebase-admin/auth";
+import { emitWorkflowTrigger } from "./src/services/workflow/workflowEngine.js";
 
 const TASK_TYPES = new Set(["Call", "WhatsApp", "Meeting", "Email", "Other"]);
 const TASK_OUTCOMES = new Set(["Connected", "No answer", "Follow-up required", "Meeting fixed", "Closed-won", "Lost"]);
@@ -380,9 +381,20 @@ export default function createFollowUpTasksRouter(db) {
             taskId: taskTransferred ? taskRef.id : null,
           });
         }
-        return { assignedTo, assignedToName, taskTransferred };
+        return { assignedTo, assignedToName, taskTransferred, previousLead: lead };
       });
-      return res.json({ ok: true, ...result });
+      // lead_updated trigger: fired after commit so workflow-driven actions
+      // (e.g. a rule that further reassigns based on the new employee's
+      // city) observe the already-persisted state, not a mid-transaction view.
+      emitWorkflowTrigger(db, {
+        orgId,
+        triggerType: "lead_updated",
+        entityType: "lead",
+        entity: { id: leadId, ...result.previousLead, assignedTo: result.assignedTo, assignedToName: result.assignedToName, lastUpdated: reassignedAt, orgId },
+        previousEntity: { id: leadId, ...result.previousLead, orgId },
+        dedupeToken: reassignedAt,
+      }).catch(() => {});
+      return res.json({ ok: true, assignedTo: result.assignedTo, assignedToName: result.assignedToName, taskTransferred: result.taskTransferred });
     } catch (error) {
       return res.status(error.status || 500).json({ error: error.message || "Could not reassign lead" });
     }
@@ -467,9 +479,20 @@ export default function createFollowUpTasksRouter(db) {
           taskId: resolvesTask ? taskRef.id : null,
           source: "follow_up",
         });
-        return { status: leadStatus, blacklisted: nextBlacklisted, taskCompleted: resolvesTask };
+        return { status: leadStatus, blacklisted: nextBlacklisted, taskCompleted: resolvesTask, previousLead: lead };
       });
-      return res.json({ ok: true, ...result });
+      // lead_updated trigger: e.g. "when Status changes to Closed-Won, send
+      // a WhatsApp thank-you template" relies on changed_to comparing
+      // previousEntity.status against the new value below.
+      emitWorkflowTrigger(db, {
+        orgId,
+        triggerType: "lead_updated",
+        entityType: "lead",
+        entity: { id: leadId, ...result.previousLead, status: result.status, blacklisted: result.blacklisted, lastUpdated: changedAt, orgId },
+        previousEntity: { id: leadId, ...result.previousLead, orgId },
+        dedupeToken: changedAt,
+      }).catch(() => {});
+      return res.json({ ok: true, status: result.status, blacklisted: result.blacklisted, taskCompleted: result.taskCompleted });
     } catch (error) {
       return res.status(error.status || 500).json({ error: error.message || "Could not update lead status" });
     }

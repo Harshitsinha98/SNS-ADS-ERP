@@ -17,6 +17,7 @@ import { nowIso, safeDocId, orgCollection } from "./helpers.js";
 import { reserveLeadCapacity, releaseLeadCapacity } from "./org.js";
 import { withLease } from "./lease.js";
 import { logger } from "../middleware/logger.js";
+import { emitWorkflowTrigger } from "./workflow/workflowEngine.js";
 
 // ─── Pending Queue ──────────────────────────────────────────────────
 
@@ -79,6 +80,15 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
         lastWhatsAppInboundAtMs: latestTimestampMs,
       });
     });
+    // whatsapp_message_received on an EXISTING lead — e.g. a rule that
+    // reopens/reassigns a cold lead the moment it messages back.
+    emitWorkflowTrigger(db, {
+      orgId,
+      triggerType: "whatsapp_message_received",
+      entityType: "whatsappMessage",
+      entity: { leadId: leadRef.id, phone, requirement, messageType, orgId },
+      dedupeToken: providerMessageId,
+    }).catch(() => {});
     return { status: "duplicate", leadId: leadRef.id };
   }
 
@@ -155,6 +165,24 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
       orgId,
     });
     await batch.commit();
+
+    // Two triggers legitimately fire from this single event: the lead
+    // itself was just created (lead_created — same call site convention as
+    // leadIntake.js), AND a WhatsApp message was received (whatsapp_message_received).
+    // Both are awaited-but-swallowed so neither can fail this lead's creation.
+    const createdLead = {
+      id: leadRef.id, name: name || "WhatsApp Lead", phone, email: "", source: "WhatsApp",
+      requirement: requirement || "", status: "New", assignedTo, assignedToName,
+      blacklisted: false, priority: "Warm", createdAt, lastUpdated: createdAt, orgId,
+    };
+    emitWorkflowTrigger(db, {
+      orgId, triggerType: "lead_created", entityType: "lead", entity: createdLead, dedupeToken: createdAt,
+    }).catch(() => {});
+    emitWorkflowTrigger(db, {
+      orgId, triggerType: "whatsapp_message_received", entityType: "whatsappMessage",
+      entity: { leadId: leadRef.id, phone, requirement, messageType, orgId }, dedupeToken: providerMessageId,
+    }).catch(() => {});
+
     return { status: "created", leadId: leadRef.id };
   } catch (error) {
     await releaseLeadCapacity(orgId).catch(() => {});

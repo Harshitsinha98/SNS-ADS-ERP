@@ -16,6 +16,7 @@ import {
   Megaphone,
   CalendarCheck2,
   Workflow,
+  GitBranch,
 } from "lucide-react";
 
 const adminLinks = [
@@ -23,6 +24,7 @@ const adminLinks = [
   { to: "/admin/leads", label: "Lead Hub", icon: Inbox },
   { to: "/admin/follow-ups", label: "Follow-ups", icon: CalendarCheck2 },
   { to: "/admin/automation", label: "Automation", icon: Workflow },
+  { to: "/admin/workflows", label: "Workflows", icon: GitBranch },
   { to: "/admin/employees", label: "Team", icon: Users },
   { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },

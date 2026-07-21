@@ -179,6 +179,63 @@ service cloud.firestore {
       // Queue documents and all billing/invoice data are backend-only.
       match /pending_leads/{pendingId} { allow read, write: if false; }
       match /invoices/{invoiceId} { allow read: if isAdmin(orgId); allow write: if false; }
+
+      // ── Workflow Automation Engine ──
+      // Workflow logic (conditions/actions) is Zod-validated and versioned by
+      // the backend only. Admins can read the head + version history to power
+      // the UI Builder, but every create/edit/publish/rollback goes through
+      // the API (workflow.controller.js) so validation can never be bypassed
+      // by a direct client write.
+      match /workflows/{workflowId} {
+        allow read: if isAdmin(orgId) || isPlatformAdmin();
+        allow write: if false;
+
+        match /versions/{version} {
+          allow read: if isAdmin(orgId) || isPlatformAdmin();
+          allow write: if false;
+        }
+      }
+
+      // Execution audit log — admins can review what a workflow did, but the
+      // log itself is exclusively backend-authored (see workflowEngine.js).
+      match /workflowRuns/{runId} {
+        allow read: if isAdmin(orgId) || isPlatformAdmin();
+        allow write: if false;
+      }
+
+      // Idempotency claim documents (mirrors whatsappMessageEvents /
+      // systemLocks) — purely internal engine state, never client-visible.
+      match /workflowTriggerState/{key} { allow read, write: if false; }
+
+      // Tickets follow the same visibility shape as leads: admins see every
+      // ticket, an employee sees only tickets assigned to them. All writes
+      // are backend-only (ticketService.js) so status transitions always
+      // stay consistent with the workflow engine's ticket_closed trigger.
+      match /tickets/{ticketId} {
+        allow read: if isAdmin(orgId)
+          || (isActiveMember(orgId) && resource.data.assignedTo == request.auth.uid);
+        allow write: if false;
+      }
+
+      // Tags/Products are lightweight admin-configured reference data that
+      // power the Workflow Builder's condition-value pickers — same
+      // trust level as goals/meta (admin-editable directly, no dedicated
+      // backend validation route needed for such low-risk reference data).
+      match /tags/{tagId} {
+        allow read: if isActiveMember(orgId);
+        allow write: if isAdmin(orgId);
+      }
+      match /products/{productId} {
+        allow read: if isActiveMember(orgId);
+        allow write: if isAdmin(orgId);
+      }
+
+      // Outbound emails are recorded by the Email action for audit visibility
+      // even when no real provider is configured yet (see emailService.js).
+      match /emailOutbox/{emailId} {
+        allow read: if isAdmin(orgId);
+        allow write: if false;
+      }
     }
 
     // Website-integration credentials, public-form settings, and shared rate
@@ -202,5 +259,19 @@ service cloud.firestore {
     match /signupSessionRecoveries/{id} { allow read, write: if false; }
     match /leadImports/{id} { allow read, write: if false; }
     match /razorpayPlans/{id} { allow read, write: if false; }
+
+    // ── Platform Owner Console collections ──
+    match /platformAnalytics/{docId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+    match /platformAuditLogs/{logId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+    match /platformFeatureFlags/{flagId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
   }
 }

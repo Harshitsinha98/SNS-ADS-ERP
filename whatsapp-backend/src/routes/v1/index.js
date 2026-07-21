@@ -17,6 +17,8 @@ import { Router } from "express";
 import { createWhatsAppRoutes } from "./whatsapp.routes.js";
 import { createSubscriptionRoutes, createFollowUpAutomationRoutes } from "./subscription.routes.js";
 import { createHealthRoutes } from "./health.routes.js";
+import { createWorkflowRoutes, createTicketRoutes } from "./workflow.routes.js";
+import { createPlatformRoutes } from "./platform.routes.js";
 
 export function createV1Router() {
   const router = Router();
@@ -32,6 +34,15 @@ export function createV1Router() {
 
   // Follow-up automation (org admin)
   router.use("/follow-ups", createFollowUpAutomationRoutes());
+
+  // Workflow Automation Engine (org admin) — CRUD/versioning/execution
+  router.use("/workflows", createWorkflowRoutes());
+
+  // Tickets (org admin) — minimal model backing the ticket_closed trigger
+  router.use("/tickets", createTicketRoutes());
+
+  // Platform Owner Console — cross-tenant operations (platform admin only)
+  router.use("/platform", createPlatformRoutes());
 
   return router;
 }
