@@ -119,6 +119,7 @@ export async function provisionWorkspace(db, { uid, phone, orgName, fullName, pl
     const periodEnd = Date.now() + periodDays * DAY_MS;
     tx.create(orgRef, {
       name: orgName, slug: slugify(orgName), createdAt, createdBy: uid, ownerPhone: phone || null,
+      lastActivityAt: createdAt, lastActivityAtMs: Date.now(),
       planId: plan.id, planName: plan.name, seatsUsed: 1, seatsLimit: plan.includedSeats,
       leadsUsed: 0, leadsLimit: plan.leadsLimit, subscriptionStatus: "active",
       trialEndsAt: null, trialEndsAtMs: 0, billingCycle: cycle, currentPeriodEndMs: periodEnd,
@@ -126,7 +127,17 @@ export async function provisionWorkspace(db, { uid, phone, orgName, fullName, pl
     });
     tx.set(userRef, { phone: phone || null, displayName: fullName, defaultOrgId: orgRef.id, createdAt, lastLoginAt: createdAt }, { merge: true });
     tx.create(membershipRef, { uid, orgId: orgRef.id, role: "owner", displayName: fullName, phone: phone || null, active: true, invitedBy: uid, joinedAt: createdAt, lastActiveAt: createdAt });
-    tx.create(eventRef, { eventId, orgId: orgRef.id, gateway: paymentMeta.gateway, paymentReference: paymentMeta.paymentId || paymentMeta.mihpayid || null, appliedAt: createdAt, result: { orgId: orgRef.id, planName: plan.name } });
+    tx.create(eventRef, {
+      eventId,
+      orgId: orgRef.id,
+      gateway: paymentMeta.gateway,
+      paymentReference: paymentMeta.paymentId || paymentMeta.mihpayid || null,
+      amount,
+      currency: "INR",
+      cycle,
+      appliedAt: createdAt,
+      result: { orgId: orgRef.id, planName: plan.name },
+    });
     tx.set(orgRef.collection("settings").doc("config"), { statuses: DEFAULT_STATUSES, autoAssign: "round-robin" });
     tx.set(orgRef.collection("meta").doc("leadAssignment"), { lastIndex: 0 });
     tx.set(orgRef.collection("activity").doc(`workspace_${safeDocId(eventId)}`), { text: `💳 ${fullName} created ${orgName} on the ${plan.name} plan (${cycle}, paid via ${paymentMeta.gateway})`, at: createdAt, orgId: orgRef.id });

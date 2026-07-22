@@ -106,12 +106,38 @@ export async function connectWhatsApp(req, res) {
       await Promise.all([
         credentialRef.set({ connectionState: "connected" }, { merge: true }),
         settingsRef.set({ connected: true, connectionState: "connected", connectedAt }, { merge: true }),
+        db.collection("whatsappConnectionHealth").doc(orgId).set({
+          orgId,
+          status: "healthy",
+          updatedAt: connectedAt,
+          lastSuccessAt: connectedAt,
+          lastError: null,
+        }, { merge: true }),
       ]);
+      // Operational telemetry only: failure to write this activity must never
+      // invalidate an already-successful provider connection.
+      await Promise.all([
+        orgCollection(db, orgId, "activity").add({
+          text: "WhatsApp Business connected",
+          at: connectedAt,
+          orgId,
+        }),
+        db.collection("organizations").doc(orgId).set({
+          lastActivityAt: connectedAt,
+          lastActivityAtMs: Date.now(),
+        }, { merge: true }),
+      ]).catch((activityError) => (req.log || console).warn("WhatsApp activity telemetry failed:", activityError.message));
     } catch (subscriptionError) {
       if (subscriptionError.deliveryUnknown) {
         await Promise.all([
           credentialRef.set({ connectionState: "reconciling", subscriptionReconcileAt: nowIso() }, { merge: true }),
           settingsRef.set({ connected: false, connectionState: "reconciling", connectionErrorAt: nowIso() }, { merge: true }),
+          db.collection("whatsappConnectionHealth").doc(orgId).set({
+            orgId,
+            status: "reconciling",
+            updatedAt: nowIso(),
+            lastError: subscriptionError.message,
+          }, { merge: true }),
         ]).catch((recordError) => (req.log || console).error("WhatsApp subscription reconciliation record failed:", recordError.message));
         throw subscriptionError;
       }
@@ -131,6 +157,14 @@ export async function connectWhatsApp(req, res) {
           connectionErrorAt: nowIso(),
         }, { merge: true });
       }).catch((rollbackError) => (req.log || console).error("WhatsApp connection rollback failed:", rollbackError.message));
+      await db.collection("whatsappConnectionHealth").doc(orgId).set({
+        orgId,
+        status: "failed",
+        updatedAt: nowIso(),
+        lastError: subscriptionError.message,
+      }, { merge: true }).catch((healthError) =>
+        (req.log || console).warn("WhatsApp connection health telemetry failed:", healthError.message)
+      );
       throw subscriptionError;
     }
     return res.json({ ok: true, connection: { connected: true, phoneNumberId, wabaId, connectedAt } });
