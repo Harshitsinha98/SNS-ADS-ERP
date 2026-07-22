@@ -10,7 +10,7 @@
 import { Router } from "express";
 import { requireAuth, requirePlatformAdmin } from "../../middleware/index.js";
 import {
-  getPlatformStats, getRevenueTimeline,
+  getPlatformStats, getRevenueTimeline, getMissionControl,
   listOrganizations, getOrganizationDetail, performOrgAction,
   getBillingOverview,
   getCustomerSuccess,
@@ -31,6 +31,7 @@ export function createPlatformRoutes() {
   // Executive Dashboard
   router.get("/stats", getPlatformStats);
   router.get("/revenue", getRevenueTimeline);
+  router.get("/mission-control", getMissionControl);
 
   // Organization Management
   router.get("/organizations", listOrganizations);

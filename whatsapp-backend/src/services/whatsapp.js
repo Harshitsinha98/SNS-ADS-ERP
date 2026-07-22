@@ -164,6 +164,11 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
       at: createdAt,
       orgId,
     });
+    // Small projection used by the Mission Control inactivity aggregate.
+    batch.set(db.collection("organizations").doc(orgId), {
+      lastActivityAt: createdAt,
+      lastActivityAtMs: Date.now(),
+    }, { merge: true });
     await batch.commit();
 
     // Two triggers legitimately fire from this single event: the lead

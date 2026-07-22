@@ -33,6 +33,20 @@ export async function getRevenueTimeline(req, res) {
   }
 }
 
+/**
+ * Mission Control uses a single cached aggregate document in the steady state.
+ * Reconciliation is handled by the backend, so the browser never scans payment
+ * intents, WhatsApp credentials, or all organizations for alert counts.
+ */
+export async function getMissionControl(req, res) {
+  try {
+    const missionControl = await analytics.getMissionControlMetrics();
+    return res.json({ ok: true, missionControl });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Could not load Mission Control" });
+  }
+}
+
 // ── Organization Management ──
 
 export async function listOrganizations(req, res) {

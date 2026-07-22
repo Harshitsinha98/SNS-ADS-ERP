@@ -52,9 +52,23 @@ export async function applyPlan(db, orgId, plan, cycle, meta, eventId, extra = {
       cancelAtPeriodEnd: false,
       renewalRemindedFor: null,
       lastPayment: { ...meta, amount, cycle, at: nowIso() },
+      // Compact organization-level projection for Mission Control. This avoids
+      // collection-group scans when detecting inactive customers.
+      lastActivityAt: nowIso(),
+      lastActivityAtMs: now,
       ...extra,
     });
-    tx.create(eventRef, { eventId, orgId, gateway: meta.gateway, paymentReference: meta.paymentId || meta.mihpayid || meta.subscriptionId || null, appliedAt: nowIso(), result });
+    tx.create(eventRef, {
+      eventId,
+      orgId,
+      gateway: meta.gateway,
+      paymentReference: meta.paymentId || meta.mihpayid || meta.subscriptionId || null,
+      amount,
+      currency: "INR",
+      cycle,
+      appliedAt: nowIso(),
+      result,
+    });
     tx.set(invoiceRef, { amount, currency: "INR", plan: plan.name, cycle, gateway: meta.gateway, reference: meta.paymentId || meta.mihpayid || meta.subscriptionId || null, status: "paid", at: nowIso(), orgId });
     tx.set(activityRef, { text: `💳 Payment received — ${plan.name} plan (${cycle}) via ${meta.gateway}. Valid until ${new Date(newPeriodEndMs).toLocaleDateString("en-IN")}`, at: nowIso(), orgId });
     return { alreadyApplied: false, ...result };

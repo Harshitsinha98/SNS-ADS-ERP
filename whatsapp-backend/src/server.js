@@ -23,29 +23,77 @@ import { processPendingQueue } from "./services/whatsapp.js";
 import { runSubscriptionLifecycle } from "./services/subscriptionLifecycle.js";
 import { runFollowUpAutomation } from "../followUpAutomation.js";
 import { db } from "./bootstrap/firebase.js";
+import { recordCronJobHealth, recomputeMissionControlMetrics } from "./services/platformAnalytics.js";
 
 // ── Cron Jobs ──────────────────────────────────────────────────────
 
+/**
+ * Record job state independently of job execution. A skipped run means another
+ * instance owns the distributed lease, so it must not overwrite the shared
+ * health state or create a false platform alert.
+ */
+function runMonitoredCron(jobName, work) {
+  work()
+    .then((result) => {
+      if (result !== null) {
+        recordCronJobHealth(jobName, "healthy").catch((healthError) =>
+          logger.error({ err: healthError, jobName }, "Could not record cron job success")
+        );
+      }
+      return result;
+    })
+    .catch(async (error) => {
+      await recordCronJobHealth(jobName, "failed", error).catch((healthError) =>
+        logger.error({ err: healthError, jobName }, "Could not record cron job failure")
+      );
+      logger.error({ err: error, jobName }, "Scheduled job failed");
+    });
+}
+
+function recordCronStart(jobName) {
+  return recordCronJobHealth(jobName, "running").catch((healthError) =>
+    logger.error({ err: healthError, jobName }, "Could not record cron job start")
+  );
+}
+
 // Every 5 minutes: drain pending WhatsApp queue + follow-up automation
 cron.schedule("*/5 * * * *", () => {
-  withLease("pendingQueue", 4 * 60 * 1000, async () => {
+  runMonitoredCron("pendingQueue", () => withLease("pendingQueue", 4 * 60 * 1000, async () => {
+    await recordCronStart("pendingQueue");
     const imported = await processPendingQueue();
     if (imported) logger.info({ imported }, "Pending WhatsApp queue drained");
-  }).catch((error) => logger.error({ err: error }, "Pending queue cron error"));
+    return imported;
+  }));
 
-  withLease("followUpAutomation", 4 * 60 * 1000, async () => {
+  runMonitoredCron("followUpAutomation", () => withLease("followUpAutomation", 4 * 60 * 1000, async () => {
+    await recordCronStart("followUpAutomation");
     const summary = await runFollowUpAutomation(db);
     if (summary.reminders || summary.escalations) {
       logger.info(summary, "Follow-up automation completed");
     }
-  }).catch((error) => logger.error({ err: error }, "Follow-up automation cron error"));
+    return summary;
+  }));
 });
 
 // Daily at 6 AM IST: subscription lifecycle (renewals, expiry)
 cron.schedule("0 6 * * *", () => {
-  withLease("subscriptionLifecycle", 30 * 60 * 1000, runSubscriptionLifecycle)
-    .catch((error) => logger.error({ err: error }, "Subscription lifecycle cron error"));
+  runMonitoredCron("subscriptionLifecycle", () =>
+    withLease("subscriptionLifecycle", 30 * 60 * 1000, async () => {
+      await recordCronStart("subscriptionLifecycle");
+      return runSubscriptionLifecycle();
+    })
+  );
 }, { timezone: "Asia/Kolkata" });
+
+// Every 15 minutes: update the O(1) aggregate read used by Mission Control.
+cron.schedule("*/15 * * * *", () => {
+  runMonitoredCron("missionControlReconciliation", () =>
+    withLease("missionControlReconciliation", 14 * 60 * 1000, async () => {
+      await recordCronStart("missionControlReconciliation");
+      return recomputeMissionControlMetrics();
+    })
+  );
+});
 
 // ── Start Listener ─────────────────────────────────────────────────
 

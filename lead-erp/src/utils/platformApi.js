@@ -49,9 +49,11 @@ async function platformPatch(path, body) {
   return data;
 }
 
-// ── Executive Dashboard ──
+// ── Executive Dashboard / Mission Control ──
 export const getPlatformStats = () => platformGet("/api/v1/platform/stats");
 export const getRevenueTimeline = (range = "30d") => platformGet(`/api/v1/platform/revenue?range=${range}`);
+// Action Center is a server-side aggregate; never calculate cross-tenant alerts in the browser.
+export const getMissionControl = () => platformGet("/api/v1/platform/mission-control");
 
 // ── Organization Management ──
 export const listOrganizations = (params = {}) => {
