@@ -297,10 +297,12 @@ export default function Signup() {
       </div>
 
       {/* RIGHT form */}
-      <div className="flex-1 flex items-center justify-center p-5 sm:p-8 relative">
-        <div className="absolute inset-0 pattern-dots opacity-40 pointer-events-none lg:hidden" />
+      <div className="flex-1 flex items-center justify-center p-5 sm:p-8 lg:p-12 relative">
+        <div className="absolute inset-0 bg-gradient-to-br from-cream-100 via-white to-orange-50/30 pointer-events-none" />
+        <div className="absolute top-10 right-10 w-64 h-64 bg-orange-100/40 rounded-full blur-3xl pointer-events-none hidden lg:block" />
+        <div className="absolute bottom-10 left-10 w-48 h-48 bg-purple-100/20 rounded-full blur-3xl pointer-events-none hidden lg:block" />
         <div id="recaptcha-container" />
-        <div className="relative w-full max-w-md">
+        <div className="relative w-full max-w-[26rem]">
           <div className="lg:hidden flex justify-center mb-8"><Link to="/"><Logo /></Link></div>
 
           {step === "done" ? (
@@ -323,28 +325,27 @@ export default function Signup() {
               </div>
             </div>
           ) : (
-            <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 overflow-hidden">
+            <div className="bg-white rounded-3xl shadow-xl shadow-cream-300/30 border border-cream-200/80 overflow-hidden">
               {/* Progress bar with glow */}
               <div className="relative">
                 <div className="flex">
-                  <div className="h-1.5 flex-1 bg-gradient-orange" />
-                  <div className={`h-1.5 flex-1 transition-colors duration-500 ${step === "otp" || step === "checkout" ? "bg-gradient-orange" : "bg-cream-200"}`} />
-                  <div className={`h-1.5 flex-1 transition-colors duration-500 ${step === "checkout" ? "bg-gradient-orange" : "bg-cream-200"}`} />
+                  <div className="h-1 flex-1 bg-gradient-orange" />
+                  <div className={`h-1 flex-1 transition-colors duration-500 ${step === "otp" || step === "checkout" ? "bg-gradient-orange" : "bg-cream-100"}`} />
+                  <div className={`h-1 flex-1 transition-colors duration-500 ${step === "checkout" ? "bg-gradient-orange" : "bg-cream-100"}`} />
                 </div>
-                <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-orange/20 blur-sm" />
               </div>
 
               {/* Step indicators */}
-              <div className="flex items-center justify-between px-9 pt-5 pb-0">
-                {["Details", "Verify", "Activate"].map((label, i) => {
+              <div className="flex items-center justify-between px-9 pt-6 pb-0">
+                {["Your details", "Verification", "Activate"].map((label, i) => {
                   const isActive = (i === 0 && step === "details") || (i === 1 && step === "otp") || (i === 2 && step === "checkout");
                   const isDone = (i === 0 && step !== "details") || (i === 1 && step === "checkout");
                   return (
-                    <div key={label} className="flex items-center gap-1.5">
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${isDone ? "bg-emerald-100 text-emerald-600" : isActive ? "bg-orange-100 text-orange-600 ring-2 ring-orange-200" : "bg-cream-100 text-ink-muted"}`}>
-                        {isDone ? <Check size={10} strokeWidth={3} /> : i + 1}
+                    <div key={label} className="flex items-center gap-2">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 ${isDone ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200" : isActive ? "bg-orange-500 text-white shadow-sm shadow-orange-200" : "bg-cream-100 text-ink-muted"}`}>
+                        {isDone ? <Check size={12} strokeWidth={3} /> : i + 1}
                       </span>
-                      <span className={`text-[11px] font-medium ${isActive ? "text-orange-600" : isDone ? "text-emerald-600" : "text-ink-muted"}`}>{label}</span>
+                      <span className={`text-xs font-medium hidden sm:inline ${isActive ? "text-ink" : isDone ? "text-emerald-600" : "text-ink-muted"}`}>{label}</span>
                     </div>
                   );
                 })}
@@ -357,12 +358,11 @@ export default function Signup() {
 
                 {step === "details" && (
                   <>
-                    <p className="eyebrow mb-2">Step 1 of 3</p>
-                    <h1 className="font-display font-bold text-2xl text-ink mb-1">Create your workspace</h1>
-                    <p className="text-sm text-ink-soft mb-6">Enter your details — verification is the next step.</p>
-                    <form onSubmit={submitDetails} className="space-y-4">
-                      <Field icon={User} label="Your name" value={fullName} onChange={setFullName} placeholder="Rohan Mehta" disabled={loading} />
-                      <Field icon={Building2} label="Organization name" value={orgName} onChange={setOrgName} placeholder="EduLeap Technologies" disabled={loading} />
+                    <h1 className="font-display font-bold text-2xl text-ink mb-1">Get started for free</h1>
+                    <p className="text-sm text-ink-soft mb-7">Takes less than 2 minutes. No credit card needed.</p>
+                    <form onSubmit={submitDetails} className="space-y-5">
+                      <Field icon={User} label="Your name" value={fullName} onChange={setFullName} placeholder="e.g. Rohan Mehta" disabled={loading} />
+                      <Field icon={Building2} label="Organization name" value={orgName} onChange={setOrgName} placeholder="e.g. Meridian Properties" disabled={loading} />
                       <div>
                         <label className="block text-sm font-medium text-ink mb-1.5">Mobile number</label>
                         <div className="relative">
@@ -373,7 +373,7 @@ export default function Signup() {
                             onBlur={() => checkExistingPhone()}
                             maxLength={10} disabled={loading || checkingAccount} />
                         </div>
-                        {checkingAccount && <p className="mt-1.5 text-xs text-ink-muted">Checking your number…</p>}
+                        {checkingAccount && <p className="mt-1.5 text-xs text-ink-muted flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Checking availability...</p>}
                         {existingAccount && (
                           <p className="mt-1.5 text-xs text-orange-700">
                             This number is already registered. <button type="button" onClick={() => navigate("/login")} className="font-semibold underline">Log in instead</button>.
@@ -381,23 +381,24 @@ export default function Signup() {
                         )}
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-ink mb-1.5">Choose your plan</label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <label className="block text-sm font-medium text-ink mb-2">Choose your plan</label>
+                        <div className="grid grid-cols-3 gap-2.5">
                           {plans.map((p) => (
                             <button key={p.id} type="button" onClick={() => setPlanId(p.id)}
-                              className={`rounded-xl border px-2 py-2.5 text-center transition-all ${planId === p.id ? "border-orange-400 bg-orange-50 ring-2 ring-orange-100" : "border-cream-300 hover:border-orange-300"}`}>
-                              <span className={`block text-xs font-bold ${planId === p.id ? "text-orange-700" : "text-ink"}`}>{p.name}</span>
-                              <span className="block text-[10px] text-ink-muted mt-0.5">₹{p.monthlyPrice.toLocaleString("en-IN")}/mo</span>
-                              <span className={`block text-[9px] mt-0.5 font-medium ${p.trial ? "text-success-600" : "text-ink-muted"}`}>{p.trial ? "Free trial" : "Paid"}</span>
+                              className={`relative rounded-xl border px-3 py-3 text-center transition-all duration-200 ${planId === p.id ? "border-orange-400 bg-orange-50/70 shadow-sm shadow-orange-100" : "border-cream-200 hover:border-orange-200 hover:bg-cream-50"}`}>
+                              {p.popular && <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full">POPULAR</span>}
+                              <span className={`block text-sm font-bold ${planId === p.id ? "text-orange-700" : "text-ink"}`}>{p.name}</span>
+                              <span className="block text-[11px] text-ink-muted mt-0.5">₹{p.monthlyPrice.toLocaleString("en-IN")}/mo</span>
+                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-ink-muted/60"}`}>{p.trial ? "7-day free trial" : "Paid plan"}</span>
                             </button>
                           ))}
                         </div>
                       </div>
-                      <button type="submit" disabled={loading || checkingAccount || existingAccount} className="btn btn-primary w-full py-3.5 text-base">
-                        {loading || checkingAccount ? <><Loader2 size={18} className="animate-spin" /> Checking…</> : existingAccount ? <>Account already registered</> : <>Continue <ArrowRight size={18} /></>}
+                      <button type="submit" disabled={loading || checkingAccount || existingAccount} className="btn btn-primary w-full py-3.5 text-base mt-2">
+                        {loading || checkingAccount ? <><Loader2 size={18} className="animate-spin" /> Please wait...</> : existingAccount ? <>Account exists — log in instead</> : <>Continue <ArrowRight size={18} /></>}
                       </button>
                     </form>
-                    <p className="text-center text-sm text-ink-muted mt-5">
+                    <p className="text-center text-sm text-ink-muted mt-6">
                       Already have an account? <Link to="/login" className="text-orange-600 font-semibold hover:underline">Sign in</Link>
                     </p>
                   </>
@@ -420,16 +421,20 @@ export default function Signup() {
 
                 {step === "otp" && (
                   <>
-                    <button onClick={() => { setStep("details"); setOtp(""); setErr(""); }} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-orange-600 mb-5"><ArrowLeft size={16} /> Back</button>
-                    <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4"><ShieldCheck className="text-orange-600" size={24} /></div>
-                    <p className="eyebrow mb-2">Step 2 of 3</p>
+                    <button onClick={() => { setStep("details"); setOtp(""); setErr(""); }} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-orange-600 mb-6 transition-colors"><ArrowLeft size={16} /> Back</button>
+                    <div className="w-14 h-14 bg-gradient-to-br from-orange-100 to-orange-50 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
+                      <ShieldCheck className="text-orange-600" size={26} />
+                    </div>
                     <h1 className="font-display font-bold text-2xl text-ink mb-1">Verify your number</h1>
-                    <p className="text-sm text-ink-soft mb-6">Code sent to <span className="font-semibold text-ink">+91{phone}</span></p>
-                    <form onSubmit={submitOtp} className="space-y-4">
-                      <input className="input text-center text-2xl tracking-[0.5em] font-mono" placeholder="000000" value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} maxLength={6} autoFocus disabled={loading} />
+                    <p className="text-sm text-ink-soft mb-7">We sent a 6-digit code to <span className="font-semibold text-ink">+91 {phone.slice(0,5)} {phone.slice(5)}</span></p>
+                    <form onSubmit={submitOtp} className="space-y-5">
+                      <div>
+                        <input className="input text-center text-2xl tracking-[0.6em] font-mono h-14 bg-cream-50/50 border-cream-200 focus:border-orange-300 focus:bg-white" placeholder="------" value={otp}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} maxLength={6} autoFocus disabled={loading} />
+                        <p className="text-xs text-ink-muted mt-2 text-center">Didn't receive it? Check your messages or wait 30 seconds.</p>
+                      </div>
                       <button type="submit" disabled={loading} className="btn btn-primary w-full py-3.5 text-base">
-                        {loading ? <><Loader2 size={18} className="animate-spin" /> Verifying…</> : <>Verify & continue <ArrowRight size={18} /></>}
+                        {loading ? <><Loader2 size={18} className="animate-spin" /> Verifying...</> : <>Verify & continue <ArrowRight size={18} /></>}
                       </button>
                     </form>
                   </>
@@ -437,37 +442,37 @@ export default function Signup() {
 
                 {step === "checkout" && (
                   <>
-                    <button onClick={() => { setStep("otp"); setErr(""); }} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-orange-600 mb-5"><ArrowLeft size={16} /> Back</button>
-                    <p className="eyebrow mb-2">Step 3 of 3 · Checkout</p>
-                    <h1 className="font-display font-bold text-2xl text-ink mb-4">Confirm your plan</h1>
+                    <button onClick={() => { setStep("otp"); setErr(""); }} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-orange-600 mb-6 transition-colors"><ArrowLeft size={16} /> Back</button>
+                    <h1 className="font-display font-bold text-2xl text-ink mb-1">Almost there!</h1>
+                    <p className="text-sm text-ink-soft mb-6">Confirm your plan and you'll be inside your new workspace in seconds.</p>
 
                     {/* Plan summary card */}
-                    <div className={`rounded-2xl border p-5 mb-5 ${plan.popular ? "border-orange-300 bg-orange-50/40" : "border-cream-300 bg-cream-50"}`}>
+                    <div className={`rounded-2xl border p-5 mb-6 transition-all ${plan.popular ? "border-orange-200 bg-gradient-to-br from-orange-50/60 to-cream-50 shadow-sm shadow-orange-100/50" : "border-cream-200 bg-cream-50/50"}`}>
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-display font-bold text-lg text-ink">{plan.name}</h3>
-                            {plan.popular && <span className="badge badge-primary">Popular</span>}
+                            {plan.popular && <span className="text-[9px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full">POPULAR</span>}
                           </div>
-                          <p className="text-xs text-ink-muted">{plan.tagline}</p>
+                          <p className="text-xs text-ink-muted mt-0.5">{plan.tagline}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-display font-bold text-2xl text-ink">₹{price.toLocaleString("en-IN")}</p>
-                          <p className="text-xs text-ink-muted">/{cycle === "monthly" ? "month" : "year"}</p>
+                          <p className="text-[11px] text-ink-muted">per {cycle === "monthly" ? "month" : "year"}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-ink-soft border-t border-cream-300/60 pt-3">
-                        <span className="flex items-center gap-1.5"><Users size={14} className="text-orange-500" /> {plan.includedSeats} seats</span>
-                        <span className="flex items-center gap-1.5"><Inbox size={14} className="text-orange-500" /> {plan.leadsLimit >= 1000000 ? "Unlimited" : plan.leadsLimit.toLocaleString("en-IN")} leads</span>
+                      <div className="flex items-center gap-4 text-sm text-ink-soft border-t border-cream-200/80 pt-3">
+                        <span className="flex items-center gap-1.5"><Users size={13} className="text-orange-500" /> {plan.includedSeats} seats</span>
+                        <span className="flex items-center gap-1.5"><Inbox size={13} className="text-orange-500" /> {plan.leadsLimit >= 1000000 ? "Unlimited" : plan.leadsLimit.toLocaleString("en-IN")} leads</span>
                       </div>
                     </div>
 
                     {/* billing cycle toggle */}
-                    <div className="flex items-center justify-between mb-5">
-                      <span className="text-sm font-medium text-ink">Billing</span>
-                      <div className="inline-flex bg-cream-200 rounded-full p-1 text-sm">
-                        <button onClick={() => setCycle("monthly")} className={`px-4 py-1.5 rounded-full font-medium ${cycle === "monthly" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>Monthly</button>
-                        <button onClick={() => setCycle("yearly")} className={`px-4 py-1.5 rounded-full font-medium ${cycle === "yearly" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>Yearly</button>
+                    <div className="flex items-center justify-between mb-5 bg-cream-50/50 rounded-xl p-3 border border-cream-100">
+                      <span className="text-sm font-medium text-ink">Billing cycle</span>
+                      <div className="inline-flex bg-white rounded-full p-0.5 text-sm border border-cream-200 shadow-sm">
+                        <button onClick={() => setCycle("monthly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "monthly" ? "bg-orange-500 text-white shadow-sm" : "text-ink-muted hover:text-ink"}`}>Monthly</button>
+                        <button onClick={() => setCycle("yearly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "yearly" ? "bg-orange-500 text-white shadow-sm" : "text-ink-muted hover:text-ink"}`}>Yearly <span className="text-[9px] font-bold ml-0.5">-20%</span></button>
                       </div>
                     </div>
 
@@ -538,9 +543,9 @@ function Field({ icon: Icon, label, value, onChange, placeholder, disabled }) {
   return (
     <div>
       <label className="block text-sm font-medium text-ink mb-1.5">{label}</label>
-      <div className="relative">
-        <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" size={18} />
-        <input className="input pl-11" placeholder={placeholder} value={value}
+      <div className="relative group">
+        <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted/70 group-focus-within:text-orange-500 transition-colors" size={18} />
+        <input className="input pl-11 bg-cream-50/30 border-cream-200 focus:border-orange-300 focus:bg-white focus:shadow-sm focus:shadow-orange-100/50 transition-all" placeholder={placeholder} value={value}
           onChange={(e) => onChange(e.target.value)} disabled={disabled} />
       </div>
     </div>
