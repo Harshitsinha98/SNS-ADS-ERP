@@ -52,6 +52,8 @@ export async function applyPlan(db, orgId, plan, cycle, meta, eventId, extra = {
       cancelAtPeriodEnd: false,
       renewalRemindedFor: null,
       lastPayment: { ...meta, amount, cycle, at: nowIso() },
+      lifetimeRevenue: Number(org.lifetimeRevenue || 0) + amount,
+      currentVersion: org.currentVersion || "1.0.0",
       // Compact organization-level projection for Mission Control. This avoids
       // collection-group scans when detecting inactive customers.
       lastActivityAt: nowIso(),

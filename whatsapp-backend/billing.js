@@ -229,6 +229,8 @@ export default function createBillingRouter(db) {
         cancelAtPeriodEnd: false,
         renewalRemindedFor: null,
         lastPayment: { ...meta, amount, cycle, at: nowIso() },
+        lifetimeRevenue: Number(org.lifetimeRevenue || 0) + amount,
+        currentVersion: org.currentVersion || "1.0.0",
         ...extra,
       });
       tx.create(eventRef, {
@@ -368,6 +370,8 @@ export default function createBillingRouter(db) {
         trialEndsAtMs: 0,
         billingCycle: cycle,
         currentPeriodEndMs: periodEnd,
+        lifetimeRevenue: amount,
+        currentVersion: "1.0.0",
         lastPayment: { ...paymentMeta, amount, cycle, at: createdAt },
       });
       tx.set(userRef, {

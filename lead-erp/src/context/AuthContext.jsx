@@ -54,7 +54,12 @@ export function AuthProvider({ children }) {
           console.warn("Invite claim skipped:", error?.message || error);
         });
 
-        if (membershipsSnap.empty) {
+        const activeMembershipDocs = membershipsSnap.docs.filter((membership) => {
+          const expiresAtMs = Number(membership.data().expiresAtMs || 0);
+          return !expiresAtMs || expiresAtMs > Date.now();
+        });
+
+        if (activeMembershipDocs.length === 0) {
           // Platform owner has no org membership but still needs the /platform
           // dashboard — don't force org setup on them.
           if (isPlatformOwner) {
@@ -72,7 +77,7 @@ export function AuthProvider({ children }) {
         const memberships = [];
         const orgIds = [];
         
-        for (const m of membershipsSnap.docs) {
+        for (const m of activeMembershipDocs) {
           const mData = m.data();
           memberships.push({
             orgId: mData.orgId,

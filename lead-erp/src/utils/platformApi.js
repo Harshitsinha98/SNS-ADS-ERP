@@ -61,10 +61,11 @@ export const listOrganizations = (params = {}) => {
   return platformGet(`/api/v1/platform/organizations?${qs}`);
 };
 export const getOrganizationDetail = (orgId) => platformGet(`/api/v1/platform/organizations/${orgId}`);
+export const exportOrganization = (orgId) => platformGet(`/api/v1/platform/organizations/${orgId}/export`);
 export const performOrgAction = (orgId, action, params = {}) =>
   platformPost(`/api/v1/platform/organizations/${orgId}/action`, { action, ...params });
-export const bulkOrgAction = (orgIds, action) =>
-  platformPost("/api/v1/platform/organizations/bulk-action", { orgIds, action });
+export const bulkOrgAction = (orgIds, action, params = {}) =>
+  platformPost("/api/v1/platform/organizations/bulk-action", { orgIds, action, ...params });
 
 // ── Subscription & Billing ──
 export const getBillingOverview = () => platformGet("/api/v1/platform/billing/overview");

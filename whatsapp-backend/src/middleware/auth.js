@@ -39,7 +39,8 @@ export async function isOrgAdmin(uid, orgId) {
   if (!uid || !orgId) return false;
   const member = await db.collection("memberships").doc(`${uid}_${orgId}`).get();
   const data = member.data();
-  return Boolean(member.exists && data.active && (data.role === "owner" || data.role === "admin"));
+  const active = Boolean(member.exists && data.active && (!data.expiresAtMs || Number(data.expiresAtMs) > Date.now()));
+  return Boolean(active && (data.role === "owner" || data.role === "admin"));
 }
 
 /**
@@ -48,7 +49,8 @@ export async function isOrgAdmin(uid, orgId) {
 export async function getActiveMembership(uid, orgId) {
   if (!uid || !orgId) return null;
   const member = await db.collection("memberships").doc(`${uid}_${orgId}`).get();
-  return member.exists && member.data().active ? member.data() : null;
+  const data = member.data();
+  return member.exists && data.active && (!data.expiresAtMs || Number(data.expiresAtMs) > Date.now()) ? data : null;
 }
 
 /**

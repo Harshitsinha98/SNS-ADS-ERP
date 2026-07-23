@@ -19,6 +19,7 @@ import { createSubscriptionRoutes, createFollowUpAutomationRoutes } from "./subs
 import { createHealthRoutes } from "./health.routes.js";
 import { createWorkflowRoutes, createTicketRoutes } from "./workflow.routes.js";
 import { createPlatformRoutes } from "./platform.routes.js";
+import { createAIRoutes } from "./ai.routes.js";
 
 export function createV1Router() {
   const router = Router();
@@ -40,6 +41,9 @@ export function createV1Router() {
 
   // Tickets (org admin) — minimal model backing the ticket_closed trigger
   router.use("/tickets", createTicketRoutes());
+
+  // AI Customer Care (org admin + platform admin)
+  router.use("/ai", createAIRoutes());
 
   // Platform Owner Console — cross-tenant operations (platform admin only)
   router.use("/platform", createPlatformRoutes());

@@ -33,6 +33,8 @@ const CONDITION_FIELD_RESOLVERS = {
   // (see OPERATOR_EVALUATORS.is_empty defaulting to true on undefined).
   organization: (entity) => entity.branchId ?? null,
   tags: (entity) => (Array.isArray(entity.tags) ? entity.tags : []),
+  // AI Customer Care: intent detected by AI classification
+  ai_intent: (entity) => entity.aiIntent ?? null,
 };
 
 export const CONDITION_TYPES = Object.freeze(Object.keys(CONDITION_FIELD_RESOLVERS));

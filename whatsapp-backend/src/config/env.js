@@ -71,3 +71,13 @@ export const turnstileConfig = {
 export const platformConfig = {
   ownerPhone: process.env.PLATFORM_OWNER_PHONE || "+919653043939",
 };
+
+export const aiConfig = {
+  openaiApiKey: process.env.OPENAI_API_KEY || "",
+  openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+  openaiBaseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+  defaultConfidenceThreshold: 0.7,
+  maxContextMessages: 10,
+  maxKnowledgeBaseTokens: 3000,
+  enabled: Boolean(process.env.OPENAI_API_KEY),
+};

@@ -17,6 +17,7 @@ import {
   CalendarCheck2,
   Workflow,
   GitBranch,
+  Brain,
 } from "lucide-react";
 
 const adminLinks = [
@@ -25,6 +26,7 @@ const adminLinks = [
   { to: "/admin/follow-ups", label: "Follow-ups", icon: CalendarCheck2 },
   { to: "/admin/automation", label: "Automation", icon: Workflow },
   { to: "/admin/workflows", label: "Workflows", icon: GitBranch },
+  { to: "/admin/ai-customer-care", label: "AI Customer Care", icon: Brain },
   { to: "/admin/employees", label: "Team", icon: Users },
   { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },

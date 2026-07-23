@@ -216,6 +216,61 @@
         { "fieldPath": "subscriptionStatus", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "organizations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "planId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "organizations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "country", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "organizations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "state", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "organizations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "subscriptionStatus", "order": "ASCENDING" },
+        { "fieldPath": "planId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "aiKnowledgeBase",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "active", "order": "ASCENDING" },
+        { "fieldPath": "priority", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "aiUsage",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "messages",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "source", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

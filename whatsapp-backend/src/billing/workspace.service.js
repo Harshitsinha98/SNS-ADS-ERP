@@ -123,6 +123,7 @@ export async function provisionWorkspace(db, { uid, phone, orgName, fullName, pl
       planId: plan.id, planName: plan.name, seatsUsed: 1, seatsLimit: plan.includedSeats,
       leadsUsed: 0, leadsLimit: plan.leadsLimit, subscriptionStatus: "active",
       trialEndsAt: null, trialEndsAtMs: 0, billingCycle: cycle, currentPeriodEndMs: periodEnd,
+      lifetimeRevenue: amount, currentVersion: "1.0.0",
       lastPayment: { ...paymentMeta, amount, cycle, at: createdAt },
     });
     tx.set(userRef, { phone: phone || null, displayName: fullName, defaultOrgId: orgRef.id, createdAt, lastLoginAt: createdAt }, { merge: true });

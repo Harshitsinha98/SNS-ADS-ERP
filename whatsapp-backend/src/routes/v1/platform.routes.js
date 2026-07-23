@@ -11,7 +11,7 @@ import { Router } from "express";
 import { requireAuth, requirePlatformAdmin } from "../../middleware/index.js";
 import {
   getPlatformStats, getRevenueTimeline, getMissionControl,
-  listOrganizations, getOrganizationDetail, performOrgAction,
+  listOrganizations, getOrganizationDetail, exportOrganization, performOrgAction, bulkOrganizationAction,
   getBillingOverview,
   getCustomerSuccess,
   getInfrastructureHealth,
@@ -20,6 +20,7 @@ import {
   listFeatureFlags, toggleFeatureFlag, createFeatureFlag,
   getPlatformSettings, updatePlatformSettings,
 } from "../../controllers/platform.controller.js";
+import { getPlatformAIStats } from "../../controllers/ai.controller.js";
 
 export function createPlatformRoutes() {
   const router = Router();
@@ -35,6 +36,8 @@ export function createPlatformRoutes() {
 
   // Organization Management
   router.get("/organizations", listOrganizations);
+  router.post("/organizations/bulk-action", bulkOrganizationAction);
+  router.get("/organizations/:orgId/export", exportOrganization);
   router.get("/organizations/:orgId", getOrganizationDetail);
   router.post("/organizations/:orgId/action", performOrgAction);
 
@@ -61,6 +64,9 @@ export function createPlatformRoutes() {
   // Platform Settings
   router.get("/settings", getPlatformSettings);
   router.patch("/settings", updatePlatformSettings);
+
+  // AI Usage & Cost (platform-wide)
+  router.get("/ai-usage", getPlatformAIStats);
 
   return router;
 }
