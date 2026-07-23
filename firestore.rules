@@ -9,7 +9,12 @@ service cloud.firestore {
     }
     function hasMembership(orgId) { return signedIn() && exists(memberPath(orgId)); }
     function membership(orgId) { return get(memberPath(orgId)).data; }
-    function isActiveMember(orgId) { return hasMembership(orgId) && membership(orgId).active == true; }
+    function isActiveMember(orgId) {
+      return hasMembership(orgId)
+        && membership(orgId).active == true
+        && (!membership(orgId).keys().hasAll(['expiresAtMs'])
+          || membership(orgId).expiresAtMs > request.time.toMillis());
+    }
     function hasRole(orgId, role) { return isActiveMember(orgId) && membership(orgId).role == role; }
     function isAdmin(orgId) { return hasRole(orgId, 'owner') || hasRole(orgId, 'admin'); }
     function isPlatformAdmin() {
@@ -259,6 +264,16 @@ service cloud.firestore {
     match /signupSessionRecoveries/{id} { allow read, write: if false; }
     match /leadImports/{id} { allow read, write: if false; }
     match /razorpayPlans/{id} { allow read, write: if false; }
+
+    // ── Collection Group queries ──
+    // Platform admin needs collectionGroup("activity") to aggregate events
+    // across ALL organizations. Firestore requires a {path=**} rule for
+    // collection-group queries; the nested /organizations/{orgId}/activity
+    // rule alone is insufficient for cross-tenant scans.
+    match /{path=**}/activity/{activityId} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
 
     // ── Platform Owner Console collections ──
     match /platformAnalytics/{docId} {
