@@ -66,6 +66,7 @@ function useLiveActivityFeed(enabled) {
   const [platformEvents, setPlatformEvents] = useState([]);
   const [readySources, setReadySources] = useState(0);
   const [error, setError] = useState(null);
+  const [liveConnected, setLiveConnected] = useState(false);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -74,6 +75,7 @@ function useLiveActivityFeed(enabled) {
     setPlatformEvents([]);
     setReadySources(0);
     setError(null);
+    setLiveConnected(false);
 
     let orgSourceReady = false;
     let platformSourceReady = false;
@@ -87,28 +89,38 @@ function useLiveActivityFeed(enabled) {
       }
       setReadySources((count) => Math.min(2, count + 1));
     };
-    const onError = (source) => (snapshotError) => {
-      console.warn("Platform activity feed listener error:", snapshotError?.code);
-      setError("Live activity is temporarily unavailable.");
-      sourceReady(source);
-    };
 
+    // The collectionGroup("activity") query may fail with permission-denied
+    // because Firestore collection-group security rules require matching ALL
+    // possible paths. The platformAuditLogs stream is the authoritative source
+    // for platform-wide events; if it connects successfully the feed is live.
     const unsubOrgActivity = onSnapshot(
       query(collectionGroup(db, "activity"), orderBy("at", "desc"), limit(FEED_LIMIT)),
       (snapshot) => {
         setOrgEvents(snapshot.docs.map((doc) => ({ id: `org:${doc.ref.parent.parent?.id || "unknown"}:${doc.id}`, source: "organization", ...doc.data() })));
+        setLiveConnected(true);
         sourceReady("organization");
       },
-      onError("organization")
+      (snapshotError) => {
+        // Gracefully degrade: org activity stream is non-critical when
+        // platformAuditLogs is healthy. Only log and mark source ready.
+        console.warn("Organization activity collection-group listener failed (non-critical):", snapshotError?.code);
+        sourceReady("organization");
+      }
     );
 
     const unsubPlatformActivity = onSnapshot(
       query(collection(db, "platformAuditLogs"), orderBy("at", "desc"), limit(FEED_LIMIT)),
       (snapshot) => {
         setPlatformEvents(snapshot.docs.map((doc) => ({ id: `platform:${doc.id}`, source: "platform", ...doc.data() })));
+        setLiveConnected(true);
         sourceReady("platform");
       },
-      onError("platform")
+      (snapshotError) => {
+        console.warn("Platform audit logs listener error:", snapshotError?.code);
+        setError("Live activity is temporarily unavailable.");
+        sourceReady("platform");
+      }
     );
 
     return () => {
@@ -121,19 +133,20 @@ function useLiveActivityFeed(enabled) {
     .sort((left, right) => toMillis(right.at) - toMillis(left.at))
     .slice(0, FEED_LIMIT), [orgEvents, platformEvents]);
 
-  return { events, loading: enabled && readySources < 2, error };
+  return { events, loading: enabled && readySources < 2, error, liveConnected };
 }
 
 export default function LiveActivityFeed({ isPlatformAdmin }) {
-  const { events, loading, error } = useLiveActivityFeed(isPlatformAdmin);
+  const { events, loading, error, liveConnected } = useLiveActivityFeed(isPlatformAdmin);
 
   return (
     <SectionCard
       title="Live Activity Feed"
       subtitle="The latest organization and platform events update automatically."
       actions={(
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
-          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" /> Live
+        <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${liveConnected ? "text-emerald-700" : "text-ink-muted"}`}>
+          <span className={`h-2 w-2 rounded-full ${liveConnected ? "bg-emerald-500 animate-pulse" : "bg-cream-300"}`} aria-hidden="true" />
+          {liveConnected ? "Live" : "Connecting…"}
         </span>
       )}
     >
@@ -174,7 +187,6 @@ export default function LiveActivityFeed({ isPlatformAdmin }) {
           })}
         </ol>
       )}
-      {error && events.length > 0 && <p className="mt-3 flex items-center gap-1.5 text-[11px] text-amber-700"><RefreshCw size={11} /> {error}</p>}
     </SectionCard>
   );
 }
