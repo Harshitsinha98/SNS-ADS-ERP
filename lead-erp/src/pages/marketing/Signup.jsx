@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   Building2, User, Phone, ArrowRight, ArrowLeft, Loader2, ShieldCheck,
   CheckCircle2, Sparkles, Check, CreditCard, Gift, Users, Inbox, Lock,
+  Zap, Brain, MessageSquare, Star, Shield, Clock, Rocket, TrendingUp,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { auth } from "../../firebase";
@@ -202,35 +203,96 @@ export default function Signup() {
 
   return (
     <div className="min-h-screen bg-cream-100 flex flex-col lg:flex-row">
-      {/* LEFT brand panel */}
-      <div className="relative lg:w-[42%] bg-ink texture-grain overflow-hidden hidden lg:flex flex-col justify-between p-10 xl:p-14">
-        <div className="absolute -top-16 -right-16 w-80 h-80 bg-orange-600/25 rounded-full blur-3xl animate-blob" />
-        <div className="absolute bottom-10 -left-16 w-72 h-72 bg-ember-500/20 rounded-full blur-3xl animate-blob" style={{ animationDelay: "3s" }} />
-        <div className="absolute inset-0 pattern-grid opacity-20" />
+      {/* LEFT brand panel — Premium showcase */}
+      <div className="relative lg:w-[45%] bg-ink texture-grain overflow-hidden hidden lg:flex flex-col justify-between p-10 xl:p-14">
+        {/* Animated background elements */}
+        <div className="absolute -top-20 -right-20 w-96 h-96 bg-orange-600/20 rounded-full blur-3xl animate-blob" />
+        <div className="absolute bottom-20 -left-20 w-80 h-80 bg-purple-500/15 rounded-full blur-3xl animate-blob" style={{ animationDelay: "3s" }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[30rem] h-[30rem] bg-ember-500/10 rounded-full blur-3xl animate-blob" style={{ animationDelay: "6s" }} />
+        <div className="absolute inset-0 pattern-grid opacity-15" />
+
+        {/* Logo */}
         <div className="relative"><Link to="/"><Logo size="lg" onDark /></Link></div>
-        <div className="relative">
-          <h2 className="font-display font-bold text-3xl xl:text-4xl text-white leading-tight mb-6">
-            Launch your sales<br />workspace in minutes
-          </h2>
-          <ul className="space-y-4">
+
+        {/* Main headline */}
+        <div className="relative space-y-8">
+          <div>
+            <div className="inline-flex items-center gap-2 bg-orange-500/15 border border-orange-400/30 rounded-full px-4 py-1.5 mb-5">
+              <Rocket size={13} className="text-orange-400" />
+              <span className="text-[11px] font-bold text-orange-300 uppercase tracking-wider">Join 180+ growing businesses</span>
+            </div>
+            <h2 className="font-display font-bold text-3xl xl:text-[2.5rem] text-white leading-tight mb-4">
+              Your AI-powered sales engine starts here
+            </h2>
+            <p className="text-cream-300/80 text-sm leading-relaxed max-w-sm">
+              Set up in 2 minutes. First lead captured in 10. First AI reply sent in under a minute. No technical skills required.
+            </p>
+          </div>
+
+          {/* Feature highlights with icons */}
+          <div className="grid grid-cols-2 gap-3">
             {[
-              "7-day free trial on Starter",
-              "Your own isolated, secure workspace",
-              "WhatsApp lead capture built-in",
-              "Invite your whole team instantly",
-            ].map((t) => (
-              <li key={t} className="flex items-center gap-3 text-cream-200">
-                <span className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0">
-                  <Check size={14} className="text-orange-400" strokeWidth={3} />
-                </span>{t}
-              </li>
+              { icon: Brain, label: "AI Auto-Reply", sub: "3-second responses" },
+              { icon: MessageSquare, label: "WhatsApp API", sub: "Built-in integration" },
+              { icon: Zap, label: "Workflow Engine", sub: "Automate everything" },
+              { icon: TrendingUp, label: "Live Analytics", sub: "Real-time pipeline" },
+            ].map((f) => (
+              <div key={f.label} className="bg-white/5 border border-white/10 rounded-xl p-3.5 backdrop-blur-sm hover:bg-white/10 transition-colors">
+                <f.icon size={16} className="text-orange-400 mb-1.5" />
+                <p className="text-xs font-semibold text-white">{f.label}</p>
+                <p className="text-[10px] text-cream-400/70">{f.sub}</p>
+              </div>
             ))}
-          </ul>
+          </div>
+
+          {/* Live stats */}
+          <div className="flex items-center gap-6">
+            <div className="text-center">
+              <p className="font-display font-bold text-2xl text-orange-400">12.4K+</p>
+              <p className="text-[10px] text-cream-400/70">AI replies today</p>
+            </div>
+            <div className="w-px h-10 bg-white/10" />
+            <div className="text-center">
+              <p className="font-display font-bold text-2xl text-emerald-400">70%</p>
+              <p className="text-[10px] text-cream-400/70">auto-resolved</p>
+            </div>
+            <div className="w-px h-10 bg-white/10" />
+            <div className="text-center">
+              <p className="font-display font-bold text-2xl text-purple-400">3s</p>
+              <p className="text-[10px] text-cream-400/70">response time</p>
+            </div>
+          </div>
         </div>
-        <div className="relative bg-white/5 border border-white/10 rounded-2xl p-5">
-          <div className="flex gap-1 mb-2">{[...Array(5)].map((_, i) => <Sparkles key={i} size={13} className="text-orange-400" fill="currentColor" />)}</div>
-          <p className="text-cream-200 text-sm leading-relaxed mb-3">"We captured our first WhatsApp lead within an hour of setup. Game changer."</p>
-          <p className="text-xs text-cream-400/70">— Rohan Mehta, Founder at EduLeap</p>
+
+        {/* Testimonial */}
+        <div className="relative bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-sm">
+          <div className="flex gap-0.5 mb-2.5">
+            {[...Array(5)].map((_, i) => <Star key={i} size={12} className="text-orange-400" fill="currentColor" />)}
+          </div>
+          <p className="text-cream-200 text-sm leading-relaxed mb-3">
+            "We replaced 3 employees with Codeskate AI and our conversion rate went up 3x. Best decision this year."
+          </p>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-xs font-bold text-orange-400">V</div>
+            <div>
+              <p className="text-xs font-semibold text-white">Vikram Saxena</p>
+              <p className="text-[10px] text-cream-400/60">Director, Meridian Properties</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Trust badges */}
+        <div className="relative flex items-center gap-4">
+          {[
+            { icon: Shield, text: "Bank-level security" },
+            { icon: Clock, text: "2-min setup" },
+            { icon: Lock, text: "Data encrypted" },
+          ].map((b) => (
+            <div key={b.text} className="flex items-center gap-1.5 text-[10px] text-cream-400/60">
+              <b.icon size={11} className="text-cream-500/50" />
+              <span>{b.text}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -242,21 +304,50 @@ export default function Signup() {
           <div className="lg:hidden flex justify-center mb-8"><Link to="/"><Logo /></Link></div>
 
           {step === "done" ? (
-            <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 p-10 text-center animate-fade-in">
-              <div className="w-20 h-20 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle2 className="w-11 h-11 text-success-600" />
+            <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 p-10 text-center animate-fade-in relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-b from-emerald-50/50 to-transparent pointer-events-none" />
+              <div className="relative">
+                <div className="w-20 h-20 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-100">
+                  <CheckCircle2 className="w-11 h-11 text-success-600" />
+                </div>
+                <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 mb-4">
+                  <Sparkles size={12} className="text-emerald-600" />
+                  <span className="text-[11px] font-bold text-emerald-700">Workspace Created Successfully</span>
+                </div>
+                <h1 className="font-display font-bold text-2xl text-ink mb-2">You're all set!</h1>
+                <p className="text-ink-soft mb-6"><span className="font-semibold text-ink">{orgName}</span> is ready. Taking you to your dashboard now...</p>
+                <div className="flex items-center justify-center gap-3">
+                  <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+                  <span className="text-sm text-ink-muted">Loading your workspace...</span>
+                </div>
               </div>
-              <h1 className="font-display font-bold text-2xl text-ink mb-2">Workspace ready! 🎉</h1>
-              <p className="text-ink-soft mb-6"><span className="font-semibold text-ink">{orgName}</span> is all set up. Taking you to your dashboard…</p>
-              <Loader2 className="w-6 h-6 animate-spin text-orange-500 mx-auto" />
             </div>
           ) : (
             <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 overflow-hidden">
-              {/* progress: 3 segments */}
-              <div className="flex">
-                <div className="h-1.5 flex-1 bg-gradient-orange" />
-                <div className={`h-1.5 flex-1 ${step === "otp" || step === "checkout" ? "bg-gradient-orange" : "bg-cream-200"}`} />
-                <div className={`h-1.5 flex-1 ${step === "checkout" ? "bg-gradient-orange" : "bg-cream-200"}`} />
+              {/* Progress bar with glow */}
+              <div className="relative">
+                <div className="flex">
+                  <div className="h-1.5 flex-1 bg-gradient-orange" />
+                  <div className={`h-1.5 flex-1 transition-colors duration-500 ${step === "otp" || step === "checkout" ? "bg-gradient-orange" : "bg-cream-200"}`} />
+                  <div className={`h-1.5 flex-1 transition-colors duration-500 ${step === "checkout" ? "bg-gradient-orange" : "bg-cream-200"}`} />
+                </div>
+                <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-orange/20 blur-sm" />
+              </div>
+
+              {/* Step indicators */}
+              <div className="flex items-center justify-between px-9 pt-5 pb-0">
+                {["Details", "Verify", "Activate"].map((label, i) => {
+                  const isActive = (i === 0 && step === "details") || (i === 1 && step === "otp") || (i === 2 && step === "checkout");
+                  const isDone = (i === 0 && step !== "details") || (i === 1 && step === "checkout");
+                  return (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${isDone ? "bg-emerald-100 text-emerald-600" : isActive ? "bg-orange-100 text-orange-600 ring-2 ring-orange-200" : "bg-cream-100 text-ink-muted"}`}>
+                        {isDone ? <Check size={10} strokeWidth={3} /> : i + 1}
+                      </span>
+                      <span className={`text-[11px] font-medium ${isActive ? "text-orange-600" : isDone ? "text-emerald-600" : "text-ink-muted"}`}>{label}</span>
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="p-7 sm:p-9">
@@ -422,7 +513,21 @@ export default function Signup() {
             </div>
           )}
 
-          <p className="text-center text-xs text-ink-muted mt-5">By continuing you agree to our Terms & Privacy Policy</p>
+          <p className="text-center text-xs text-ink-muted mt-5">By continuing you agree to our <Link to="/terms" className="underline hover:text-orange-600">Terms</Link> & <Link to="/privacy" className="underline hover:text-orange-600">Privacy Policy</Link></p>
+
+          {/* Mobile trust badges (hidden on desktop — shown on left panel) */}
+          <div className="lg:hidden flex items-center justify-center gap-4 mt-4">
+            {[
+              { icon: Shield, text: "Secure" },
+              { icon: Clock, text: "2-min setup" },
+              { icon: Lock, text: "Encrypted" },
+            ].map((b) => (
+              <div key={b.text} className="flex items-center gap-1 text-[10px] text-ink-muted">
+                <b.icon size={10} className="text-ink-muted/60" />
+                <span>{b.text}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
