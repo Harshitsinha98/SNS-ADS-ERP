@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import MarketingNav from "../../components/marketing/MarketingNav";
 import MarketingFooter from "../../components/marketing/MarketingFooter";
+import AIChatWidget from "../../components/marketing/AIChatWidget";
 import { TRIAL_DAYS } from "../../data/plans";
 
 
@@ -579,6 +580,7 @@ export default function Landing() {
       </section>
 
       <MarketingFooter />
+      <AIChatWidget />
     </div>
   );
 }
