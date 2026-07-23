@@ -241,6 +241,28 @@ service cloud.firestore {
         allow read: if isAdmin(orgId);
         allow write: if false;
       }
+
+      // ── AI Customer Care ──
+      // AI configuration is admin-readable for the settings UI. All writes
+      // go through the backend API (ai.controller.js) so validation and
+      // quota enforcement cannot be bypassed.
+      match /aiConfig/{configId} {
+        allow read: if isAdmin(orgId) || isPlatformAdmin();
+        allow write: if false;
+      }
+
+      // Knowledge base articles power the AI's RAG context. Admins can read
+      // for the management UI; writes are backend-only for content validation.
+      match /aiKnowledgeBase/{articleId} {
+        allow read: if isAdmin(orgId) || isPlatformAdmin();
+        allow write: if false;
+      }
+
+      // Daily AI usage aggregates — admin-visible for the analytics tab.
+      match /aiUsage/{dateId} {
+        allow read: if isAdmin(orgId) || isPlatformAdmin();
+        allow write: if false;
+      }
     }
 
     // Website-integration credentials, public-form settings, and shared rate

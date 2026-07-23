@@ -18,6 +18,7 @@ import { reserveLeadCapacity, releaseLeadCapacity } from "./org.js";
 import { withLease } from "./lease.js";
 import { logger } from "../middleware/logger.js";
 import { emitWorkflowTrigger } from "./workflow/workflowEngine.js";
+import { triggerAIResponse } from "./ai/aiWhatsAppBridge.js";
 
 // ─── Pending Queue ──────────────────────────────────────────────────
 
@@ -271,6 +272,20 @@ export async function processInboundMessage({ orgId, message, contact }) {
       messageTimestampMs: providerTimestampMs,
     });
     await ref.update({ status: "completed", completedAt: nowIso(), result });
+
+    // ── AI Customer Care: trigger AI response (fire-and-forget) ──
+    // Only triggers for text messages on successfully processed leads.
+    // AI decision (auto-reply vs escalate vs skip) is handled internally.
+    if ((result.status === "created" || result.status === "duplicate") && message.type === "text" && message.text?.body) {
+      triggerAIResponse({
+        orgId,
+        leadId: result.leadId,
+        phone: message.from,
+        customerName: contact?.profile?.name || null,
+        customerMessage: message.text.body,
+      }).catch((aiError) => logger.warn({ orgId, error: aiError.message }, "AI trigger fire-and-forget failed"));
+    }
+
     return result;
   } catch (error) {
     await ref.update({ status: "failed", failedAt: nowIso(), failure: error.message });

@@ -27,6 +27,8 @@
 import { getNextEmployeeRoundRobin, getNextEmployeeByWorkload } from "../../../utils/assignLead.js";
 import { nowIso, safeDocId, orgCollection } from "../helpers.js";
 import { sendWorkflowEmail } from "./emailService.js";
+import { processWithAI } from "../ai/aiService.js";
+import { triggerAIResponse } from "../ai/aiWhatsAppBridge.js";
 
 function actionError(message) {
   return { ok: false, error: message };
@@ -287,6 +289,39 @@ async function executeUpdateStatus(db, orgId, params, ctx) {
   return { ok: true, detail: { status: params.status } };
 }
 
+async function executeAIReply(db, orgId, params, ctx) {
+  const leadRef = entityLeadRef(db, orgId, ctx);
+  if (!leadRef) return actionError("No lead associated with this event for AI reply");
+  const leadSnap = await leadRef.get();
+  if (!leadSnap.exists) return actionError("Lead no longer exists");
+  const lead = leadSnap.data();
+  const phone = lead.phone;
+  if (!phone) return actionError("Lead has no phone number for AI reply");
+
+  // Get the latest message as context
+  const latestMessage = ctx.entity?.requirement || ctx.entity?.lastMessage || "";
+  if (!latestMessage) return actionError("No message content available for AI to respond to");
+
+  const result = await triggerAIResponse({
+    orgId,
+    leadId: leadRef.id,
+    phone,
+    customerName: lead.name || null,
+    customerMessage: latestMessage,
+  });
+
+  if (result.action === "auto_reply" && result.sent) {
+    return { ok: true, detail: { action: "auto_reply", intent: result.intent } };
+  }
+  if (result.action === "escalate") {
+    return { ok: true, detail: { action: "escalate", reason: result.reason } };
+  }
+  if (result.action === "disabled") {
+    return actionError("AI Customer Care is not enabled for this organization");
+  }
+  return { ok: true, detail: result };
+}
+
 // ─── Registry ───────────────────────────────────────────────────────
 
 export const ACTION_EXECUTORS = Object.freeze({
@@ -298,6 +333,7 @@ export const ACTION_EXECUTORS = Object.freeze({
   activity: executeActivity,
   escalation: executeEscalation,
   update_status: executeUpdateStatus,
+  ai_reply: executeAIReply,
 });
 
 export const ACTION_TYPES = Object.freeze(Object.keys(ACTION_EXECUTORS));
