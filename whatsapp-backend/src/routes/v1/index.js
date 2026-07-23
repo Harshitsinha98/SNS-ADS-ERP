@@ -20,12 +20,16 @@ import { createHealthRoutes } from "./health.routes.js";
 import { createWorkflowRoutes, createTicketRoutes } from "./workflow.routes.js";
 import { createPlatformRoutes } from "./platform.routes.js";
 import { createAIRoutes } from "./ai.routes.js";
+import { publicChatMessage } from "../../controllers/publicChat.controller.js";
 
 export function createV1Router() {
   const router = Router();
 
   // Health — no auth required
   router.use("/", createHealthRoutes());
+
+  // Public AI chat widget — no auth required (rate-limited by IP)
+  router.post("/public/chat", publicChatMessage);
 
   // WhatsApp management
   router.use("/whatsapp", createWhatsAppRoutes());

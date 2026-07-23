@@ -1,14 +1,15 @@
 /**
  * Floating AI Chat Widget for the marketing site.
  *
- * A sticky bottom-right button that expands into a mini chat window.
- * Visitors can ask questions about the product, pricing, features, etc.
- * Responses are generated client-side via the public test endpoint
- * (no auth required — uses a limited public knowledge base).
+ * Connected to OpenAI via /api/v1/public/chat endpoint.
+ * Supports any language — AI auto-detects and responds accordingly.
+ * Falls back to basic answers if the backend is unreachable.
  */
 
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Loader2, Bot, Sparkles } from "lucide-react";
+
+const BASE = import.meta.env.VITE_BACKEND_URL || "";
 
 const QUICK_QUESTIONS = [
   "What does Codeskate CRM do?",
@@ -17,55 +18,26 @@ const QUICK_QUESTIONS = [
   "Is there a free trial?",
 ];
 
-const KNOWLEDGE = {
-  "what does codeskate crm do": "Codeskate CRM is an AI-powered sales platform that captures leads from WhatsApp, auto-assigns them to your team, replies to customers instantly using AI, and tracks your entire pipeline — all in one place.",
-  "how does ai auto-reply work": "When a customer sends a WhatsApp message, our AI reads it, classifies the intent (pricing, booking, support, etc.), and generates a contextual reply using your uploaded knowledge base — all within 3 seconds. The customer can't tell it's AI.",
-  "what are the pricing plans": "We have 3 plans: Starter at ₹599/mo (3 users, 1,000 leads), Growth at ₹1,499/mo (10 users, 10,000 leads, AI included), and Scale at ₹3,499/mo (25 users, 50,000 leads, unlimited AI). All plans include a 7-day free trial.",
-  "is there a free trial": "Yes! Our Starter plan comes with a 7-day free trial. No credit card required. You can set up your workspace in under 2 minutes and start capturing leads immediately.",
-  "how much does it cost": "Plans start at just ₹599/month (₹20/day). Our most popular Growth plan is ₹1,499/month and includes AI auto-reply, workflow automation, and priority support.",
-  "what is whatsapp integration": "We connect directly to WhatsApp Business API. Every customer message lands in your CRM instantly as a lead. You can reply manually or let AI handle it — all from one dashboard.",
-  "can i try before buying": "Absolutely! Sign up for our Starter plan and get 7 days completely free. No credit card needed. If you love it, continue. If not, no charges.",
-  "how is this different from other crms": "Unlike other CRMs, Codeskate includes built-in AI auto-reply, WhatsApp Business integration, workflow automation, native call tracking, and auto-dialer — all in one platform. Others charge separately for each of these.",
-  "do you support multiple branches": "Yes! Our Multi-Org feature lets you manage multiple branches with completely isolated data from a single login. Each branch gets its own workspace, team, and leads.",
-  "what about data security": "We use bank-level encryption, role-based access control, and complete tenant data isolation. Your data is never shared between organizations. We're built on Google Cloud infrastructure.",
-};
-
-function findAnswer(message) {
-  const lower = message.toLowerCase().trim();
-  // Direct match
-  for (const [key, answer] of Object.entries(KNOWLEDGE)) {
-    if (lower.includes(key) || key.includes(lower)) return answer;
+async function getAIReply(message, history) {
+  try {
+    const res = await fetch(`${BASE}/api/v1/public/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, history }),
+    });
+    const data = await res.json();
+    if (data.reply) return data.reply;
+    if (data.error) return data.error;
+    return "I'm having trouble connecting. Please try again or email us at hello@codeskate.com.";
+  } catch {
+    return "I'm temporarily offline. Start a free trial at codeskate.com/signup or email hello@codeskate.com for help!";
   }
-  // Keyword matching
-  if (lower.includes("price") || lower.includes("cost") || lower.includes("plan")) {
-    return KNOWLEDGE["what are the pricing plans"];
-  }
-  if (lower.includes("trial") || lower.includes("free")) {
-    return KNOWLEDGE["is there a free trial"];
-  }
-  if (lower.includes("ai") || lower.includes("auto") || lower.includes("reply")) {
-    return KNOWLEDGE["how does ai auto-reply work"];
-  }
-  if (lower.includes("whatsapp")) {
-    return KNOWLEDGE["what is whatsapp integration"];
-  }
-  if (lower.includes("different") || lower.includes("compare") || lower.includes("other")) {
-    return KNOWLEDGE["how is this different from other crms"];
-  }
-  if (lower.includes("security") || lower.includes("safe") || lower.includes("data")) {
-    return KNOWLEDGE["what about data security"];
-  }
-  if (lower.includes("branch") || lower.includes("multi") || lower.includes("org")) {
-    return KNOWLEDGE["do you support multiple branches"];
-  }
-  // Fallback
-  return "Great question! I'd love to help you with that. For detailed information, you can start a free trial and explore the platform yourself, or reach out to our team at hello@codeskate.com. Is there anything specific about our features or pricing I can help with?";
 }
 
 export default function AIChatWidget() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { role: "assistant", text: "Hi there! I'm the Codeskate AI assistant. Ask me anything about our CRM, pricing, or features." },
+    { role: "assistant", text: "Hi! I'm the Codeskate AI assistant. Ask me anything about our CRM — pricing, features, integrations — in any language." },
   ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
@@ -75,19 +47,16 @@ export default function AIChatWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
-  const sendMessage = (text) => {
-    if (!text.trim()) return;
+  const sendMessage = async (text) => {
+    if (!text.trim() || typing) return;
     const userMsg = { role: "user", text: text.trim() };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setTyping(true);
 
-    // Simulate AI thinking (300-800ms for realism)
-    setTimeout(() => {
-      const answer = findAnswer(text);
-      setMessages((prev) => [...prev, { role: "assistant", text: answer }]);
-      setTyping(false);
-    }, 400 + Math.random() * 400);
+    const reply = await getAIReply(text.trim(), messages);
+    setMessages((prev) => [...prev, { role: "assistant", text: reply }]);
+    setTyping(false);
   };
 
   const handleSubmit = (e) => {
@@ -109,7 +78,7 @@ export default function AIChatWidget() {
               <p className="text-sm font-bold text-white">Codeskate AI</p>
               <p className="text-[11px] text-white/80 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
-                Online — replies instantly
+                Online — speaks every language
               </p>
             </div>
             <button onClick={() => setOpen(false)} className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center transition-colors">
@@ -163,7 +132,7 @@ export default function AIChatWidget() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about features, pricing..."
+              placeholder="Ask in any language..."
               className="flex-1 text-sm bg-cream-50 border border-cream-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100 transition-all"
               disabled={typing}
             />
