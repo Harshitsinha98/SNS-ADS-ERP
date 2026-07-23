@@ -28,46 +28,46 @@ const COMPETITORS_MISSING = [
 ];
 
 const AI_FEATURES = [
-  { icon: Brain, title: "AI Auto-Reply", desc: "Customer ka WhatsApp message aate hi 3 seconds me intelligent reply — 24/7, bina kisi employee ke.", badge: "LIVE" },
-  { icon: BookOpen, title: "Knowledge Base Training", desc: "Apni pricing, FAQs, policies upload karo — AI exactly wohi info dega jo tum chahte ho. Galat info kabhi nahi.", badge: "SMART" },
-  { icon: Target, title: "Intent Classification", desc: "AI har message ka intent samajhta hai — pricing, booking, complaint, support — aur accordingly respond karta hai.", badge: "AI" },
-  { icon: Headphones, title: "Smart Escalation", desc: "Complex query? AI automatically human agent ko handover karta hai with full context. Customer ko repeat nahi karna padta.", badge: "HYBRID" },
+  { icon: Brain, title: "AI Auto-Reply", desc: "Every WhatsApp message gets an intelligent reply within 3 seconds — 24/7, without any human intervention.", badge: "LIVE" },
+  { icon: BookOpen, title: "Knowledge Base Training", desc: "Upload your pricing, FAQs, and policies — AI delivers exactly the information you want. Never inaccurate.", badge: "SMART" },
+  { icon: Target, title: "Intent Classification", desc: "AI understands the intent behind every message — pricing, booking, complaint, support — and responds accordingly.", badge: "AI" },
+  { icon: Headphones, title: "Smart Escalation", desc: "Complex query? AI automatically hands over to a human agent with full context. Customers never have to repeat themselves.", badge: "HYBRID" },
 ];
 
 const POWER_FEATURES = [
-  { icon: MessageSquare, title: "WhatsApp Business API", desc: "Har enquiry instantly CRM me — koi lead kabhi miss nahi hoti." },
-  { icon: Workflow, title: "Smart Auto-Assignment", desc: "Round-robin ya workload-based — sahi lead sahi rep ko milti hai." },
-  { icon: Phone, title: "Native Call Tracking", desc: "Har call automatically log — employee ko kuch karna nahi padta." },
-  { icon: GitBranch, title: "Workflow Automation", desc: "If-this-then-that rules — assign, escalate, remind, message — sab automatic." },
-  { icon: Bell, title: "SLA Escalation", desc: "Idle lead? Manager ko auto-alert. Koi lead cold nahi hone denge." },
-  { icon: BarChart3, title: "Live Analytics", desc: "Pipeline, conversion, revenue — ek dashboard me sab dikhai deta hai." },
-  { icon: PhoneCall, title: "Auto-Dialer (Coming Soon)", desc: "System dial kare, employee baat kare. Manual dialing ki zaroorat nahi.", badge: "SOON" },
-  { icon: Lock, title: "Enterprise Security", desc: "Bank-level encryption, role-based access, complete data isolation." },
-  { icon: Building2, title: "Multi-Org Support", desc: "Multiple branches? Har ek ka data isolated, ek login se manage." },
+  { icon: MessageSquare, title: "WhatsApp Business API", desc: "Every enquiry lands in your CRM instantly — no lead ever slips through the cracks." },
+  { icon: Workflow, title: "Smart Auto-Assignment", desc: "Round-robin or workload-based distribution — the right lead reaches the right rep, every time." },
+  { icon: Phone, title: "Native Call Tracking", desc: "Every call is automatically logged — your team doesn't need to lift a finger." },
+  { icon: GitBranch, title: "Workflow Automation", desc: "If-this-then-that rules — assign, escalate, remind, message — all on autopilot." },
+  { icon: Bell, title: "SLA Escalation", desc: "Idle lead? Automatic manager alert. No lead goes cold on your watch." },
+  { icon: BarChart3, title: "Live Analytics", desc: "Pipeline, conversions, revenue — everything visible in a single command center." },
+  { icon: PhoneCall, title: "Auto-Dialer (Coming Soon)", desc: "System dials, your agent talks. No more manual dialing or wasted time.", badge: "SOON" },
+  { icon: Lock, title: "Enterprise Security", desc: "Bank-level encryption, role-based access, complete data isolation per tenant." },
+  { icon: Building2, title: "Multi-Org Support", desc: "Multiple branches? Each one gets isolated data, managed from a single login." },
 ];
 
 
 const TESTIMONIALS = [
   {
-    quote: "Pehle 3 employees sirf WhatsApp reply karte the. Ab AI handle karta hai — ₹40,000/month saved. Regret hai ki pehle kyun nahi liya.",
+    quote: "We used to have 3 employees just for WhatsApp replies. Now AI handles it all — saving us ₹40,000 every month. I regret not starting sooner.",
     name: "Vikram Saxena",
     role: "Director, Meridian Properties",
     metric: "₹40K/mo saved",
   },
   {
-    quote: "Raat 11 baje bhi customer ko instant reply milta hai. Pehle subah tak lead cold ho jaati thi. Ab conversion 3x ho gaya.",
+    quote: "Customers get instant replies even at 11 PM. Previously, leads would go cold by morning. Now our conversions are up 3x.",
     name: "Ananya Reddy",
     role: "Sales Head, BrightHomes",
     metric: "3x conversions",
   },
   {
-    quote: "Auto-assignment + follow-up automation ne meri team ki productivity double kar di. Ab koi lead idle nahi rehti.",
+    quote: "Auto-assignment plus follow-up automation doubled my team's productivity. No lead sits idle anymore.",
     name: "Rohan Mehta",
     role: "Founder, EduLeap Academy",
     metric: "2x productivity",
   },
   {
-    quote: "Humne 5 different tools use kiye the — CRM, WhatsApp tool, calling, automation. Ab sab ek jagah hai. Simple.",
+    quote: "We were using 5 different tools — CRM, WhatsApp platform, calling, automation, analytics. Now it's all in one place. Simple.",
     name: "Priya Nair",
     role: "Ops Manager, UrbanFit",
     metric: "5 tools replaced",
@@ -139,19 +139,19 @@ export default function Landing() {
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
             </span>
             <span className="text-xs font-bold text-red-700">
-              Abhi bhi manually reply kar rahe ho? Har minute ek lead cold ho rahi hai.
+              Still replying manually? Every minute, another lead goes cold.
             </span>
           </div>
 
           <h1 className="font-display font-bold text-4xl sm:text-6xl lg:text-7xl leading-[1.05] text-ink mb-6 animate-slide-up">
-            Tumhara competitor <span className="text-gradient">AI</span> use kar raha hai.
+            Your competitors are using <span className="text-gradient">AI</span>.
             <br />
-            <span className="text-gradient">Tum kab shuru karoge?</span>
+            <span className="text-gradient">When will you start?</span>
           </h1>
 
           <p className="text-lg sm:text-xl text-ink-soft max-w-2xl mx-auto mb-5 leading-relaxed animate-slide-up-delay">
-            Codeskate CRM — India ka pehla AI-powered sales platform jo <strong>3 seconds</strong> me WhatsApp reply karta hai,
-            leads auto-assign karta hai, aur tumhare liye <strong>24/7 kaam karta hai</strong> — bina kisi extra employee ke.
+            Codeskate CRM — India's first AI-powered sales platform that replies to WhatsApp messages in <strong>3 seconds</strong>,
+            auto-assigns leads, and works for you <strong>24/7</strong> — without a single extra employee.
           </p>
 
           {/* Social proof line */}
@@ -167,11 +167,11 @@ export default function Landing() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-6 animate-slide-up-delay">
             <button onClick={() => navigate("/signup")} className="btn btn-primary text-base px-8 py-4 w-full sm:w-auto shadow-glow">
               <Rocket size={18} />
-              Shuru Karo — {TRIAL_DAYS} Din Free
+              Get Started — {TRIAL_DAYS} Days Free
               <ArrowRight size={18} />
             </button>
             <button onClick={() => navigate("/pricing")} className="btn btn-secondary text-base px-7 py-3.5 w-full sm:w-auto">
-              Pricing Dekho
+              View Pricing
             </button>
           </div>
 
@@ -208,10 +208,10 @@ export default function Landing() {
               <span className="text-xs font-bold text-red-700">Reality Check</span>
             </div>
             <h2 className="font-display font-bold text-3xl sm:text-4xl text-ink mb-4">
-              Har din bina AI ke = <span className="text-red-600">paise barbaad</span>
+              Every day without AI = <span className="text-red-600">money lost</span>
             </h2>
             <p className="text-lg text-ink-soft max-w-2xl mx-auto">
-              Ye numbers jhooth nahi bolte. Jab tak tum manually kaam kar rahe ho, tumhare competitors aage nikal rahe hain.
+              These numbers don't lie. While you're doing things manually, your competitors are pulling ahead.
             </p>
           </div>
 
@@ -241,7 +241,7 @@ export default function Landing() {
           <div className="text-center mt-10">
             <button onClick={() => navigate("/signup")} className="btn btn-primary text-base px-8 py-3.5">
               <Zap size={18} />
-              Ye Problems Aaj Hi Solve Karo
+              Fix These Problems Today
               <ArrowRight size={18} />
             </button>
           </div>
@@ -259,11 +259,11 @@ export default function Landing() {
               <span className="text-xs font-bold text-purple-700">AI-Powered — India's First</span>
             </div>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-ink mb-5">
-              AI jo tumhare liye <span className="text-gradient">baat karta hai</span>
+              AI that <span className="text-gradient">talks for you</span>
             </h2>
             <p className="text-lg text-ink-soft">
-              Customer ne WhatsApp pe message kiya → <strong>3 seconds</strong> me AI ne intelligent reply de diya.
-              Employee ko pata bhi nahi chala. Customer ko laga human reply kar raha hai. <strong>Magic.</strong>
+              Customer sends a WhatsApp message → <strong>3 seconds</strong> later, AI delivers an intelligent reply.
+              Your team doesn't even notice. The customer thinks a human responded. <strong>Pure magic.</strong>
             </p>
           </div>
 
@@ -308,7 +308,7 @@ export default function Landing() {
               <div className="space-y-3 max-w-lg">
                 <div className="flex justify-end">
                   <div className="bg-emerald-600/20 border border-emerald-500/30 rounded-2xl rounded-tr-md px-4 py-2.5 max-w-xs">
-                    <p className="text-sm text-cream-100">Hi, 2BHK ka price kya hai Sector 150 me?</p>
+                    <p className="text-sm text-cream-100">Hi, what's the price for a 2BHK in Sector 150?</p>
                     <p className="text-[10px] text-cream-400 mt-1 text-right">Customer — 12:01 PM</p>
                   </div>
                 </div>
@@ -318,14 +318,14 @@ export default function Landing() {
                       <Brain size={10} className="text-purple-400" />
                       <span className="text-[10px] font-bold text-purple-400">AI Reply — 3 sec</span>
                     </div>
-                    <p className="text-sm text-cream-100">Namaste! Sector 150 me humare 2BHK flats ₹45 Lakh se start hain. EMI ₹25,000/month se available hai. Kya aap site visit schedule karna chahenge?</p>
+                    <p className="text-sm text-cream-100">Hello! Our 2BHK apartments in Sector 150 start at ₹45 Lakhs. EMI options available from ₹25,000/month. Would you like to schedule a site visit?</p>
                     <p className="text-[10px] text-cream-400 mt-1">AI Customer Care — 12:01 PM</p>
                   </div>
                 </div>
               </div>
               <p className="text-xs text-cream-500 mt-4 flex items-center gap-1.5">
                 <BadgeCheck size={12} className="text-emerald-400" />
-                Customer ko pata nahi chalta AI reply kar raha hai — natural conversation
+                Customers can't tell it's AI — completely natural conversation
               </p>
             </div>
           </div>
@@ -339,10 +339,10 @@ export default function Landing() {
           <div className="text-center max-w-2xl mx-auto mb-16">
             <p className="eyebrow mb-3">86+ Features, One Platform</p>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-ink mb-4">
-              Sab kuch jo chahiye — <span className="text-gradient">ek jagah</span>
+              Everything you need — <span className="text-gradient">one platform</span>
             </h2>
             <p className="text-lg text-ink-soft">
-              CRM + WhatsApp + AI + Automation + Call Center — 5 tools ki jagah 1. Simple. Powerful. Affordable.
+              CRM + WhatsApp + AI + Automation + Call Center — 5 tools replaced by 1. Simple. Powerful. Affordable.
             </p>
           </div>
 
@@ -371,9 +371,9 @@ export default function Landing() {
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
             <h2 className="font-display font-bold text-3xl sm:text-4xl text-ink mb-4">
-              Doosre CRMs me ye <span className="text-red-500">nahi milega</span>
+              What other CRMs <span className="text-red-500">can't offer</span>
             </h2>
-            <p className="text-lg text-ink-soft">Sirf Codeskate CRM me — sab ek platform pe.</p>
+            <p className="text-lg text-ink-soft">Only on Codeskate CRM — everything on a single platform.</p>
           </div>
 
           <div className="bg-white rounded-3xl border border-cream-300/60 overflow-hidden shadow-card">
@@ -404,10 +404,10 @@ export default function Landing() {
           <div className="text-center max-w-2xl mx-auto mb-14">
             <p className="eyebrow mb-3">Simple pricing</p>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-ink mb-4">
-              Ek employee se <span className="text-gradient">sasta</span>
+              Cheaper than <span className="text-gradient">one employee</span>
             </h2>
             <p className="text-lg text-ink-soft">
-              ₹599/month se shuru — matlab <strong>₹20/din</strong> me poora AI-powered CRM. Ek chai se bhi sasta.
+              Starting at ₹599/month — that's <strong>₹20/day</strong> for an entire AI-powered CRM. Less than your daily coffee.
             </p>
           </div>
 
@@ -454,8 +454,8 @@ export default function Landing() {
           </div>
 
           <p className="text-center text-sm text-ink-muted mt-8">
-            Sab plans me {TRIAL_DAYS}-day free trial included. No credit card required.
-            <br />Yearly billing pe <strong>20% discount</strong>.
+            All plans include a {TRIAL_DAYS}-day free trial. No credit card required.
+            <br />Save <strong>20%</strong> with yearly billing.
           </p>
         </div>
       </section>
@@ -467,7 +467,7 @@ export default function Landing() {
           <div className="text-center max-w-2xl mx-auto mb-14">
             <p className="eyebrow mb-3">Results that speak</p>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-ink">
-              Log <span className="text-gradient">regret</span> kar rahe hain ki pehle kyun nahi liya
+              Teams <span className="text-gradient">regret</span> not starting sooner
             </h2>
           </div>
           <div className="grid sm:grid-cols-2 gap-6">
@@ -503,15 +503,15 @@ export default function Landing() {
           <div className="text-center max-w-2xl mx-auto mb-14">
             <p className="eyebrow mb-3">2 minute setup</p>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-ink mb-4">
-              Itna <span className="text-gradient">simple</span> hai ki samjhane ki zaroorat nahi
+              So <span className="text-gradient">simple</span>, it needs no explanation
             </h2>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 relative">
             {[
-              { n: "01", title: "Sign up karo", desc: "Phone number se 30 second me workspace ready. Koi paperwork nahi, koi call nahi." },
-              { n: "02", title: "WhatsApp connect karo", desc: "Ek click me WhatsApp Business connect. AI enable karo aur knowledge base fill karo." },
-              { n: "03", title: "Deals close karo", desc: "Leads auto-aayengi, AI reply karega, team follow-up karegi. Tum sirf growth dekho." },
+              { n: "01", title: "Sign up", desc: "Create your workspace in 30 seconds with just a phone number. No paperwork, no sales call." },
+              { n: "02", title: "Connect WhatsApp", desc: "One-click WhatsApp Business integration. Enable AI and fill your knowledge base." },
+              { n: "03", title: "Close deals", desc: "Leads flow in automatically, AI replies instantly, your team follows up. You just watch the growth." },
             ].map((s, i) => (
               <div key={s.n} className="relative">
                 <div className="bg-white rounded-2xl border border-cream-300/60 p-8 shadow-card h-full">
@@ -545,14 +545,14 @@ export default function Landing() {
               </div>
 
               <h2 className="font-display font-bold text-3xl sm:text-5xl text-white mb-5">
-                Tumhara agla customer abhi message kar raha hai.
+                Your next customer is messaging right now.
                 <br />
-                <span className="text-orange-200">Kaun reply karega?</span>
+                <span className="text-orange-200">Who's going to reply?</span>
               </h2>
               <p className="text-lg text-cream-100/90 max-w-xl mx-auto mb-9">
-                Tum? (30 min baad, jab wo already competitor se baat kar chuka hoga)
+                You? (30 minutes later, when they've already talked to your competitor)
                 <br />
-                Ya <strong>tumhara AI?</strong> (3 seconds me, perfect reply, 24/7)
+                Or <strong>your AI?</strong> (3 seconds, perfect reply, 24/7)
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <button
@@ -560,18 +560,18 @@ export default function Landing() {
                   className="btn bg-white text-ember-700 hover:bg-cream-100 text-base px-8 py-4 w-full sm:w-auto font-bold shadow-lg"
                 >
                   <Rocket size={18} />
-                  Abhi Shuru Karo — Free
+                  Start Now — It's Free
                   <ArrowRight size={18} />
                 </button>
                 <button
                   onClick={() => navigate("/pricing")}
                   className="btn bg-white/15 text-white border border-white/30 hover:bg-white/25 text-base px-8 py-3.5 w-full sm:w-auto"
                 >
-                  Plans Compare Karo
+                  Compare Plans
                 </button>
               </div>
               <p className="text-sm text-cream-200/70 mt-6">
-                {TRIAL_DAYS} din free. No credit card. 2 minute setup. Cancel anytime.
+                {TRIAL_DAYS}-day free trial. No credit card. 2 minute setup. Cancel anytime.
               </p>
             </div>
           </div>
