@@ -19,7 +19,7 @@ export function createCors() {
       if (!origin || allowedOrigins.has(origin)) return callback(null, true);
       return callback(new Error("Origin is not allowed"));
     },
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   });
 }
