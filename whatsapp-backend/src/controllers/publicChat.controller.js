@@ -98,17 +98,37 @@ RULES:
 - End responses with a soft CTA when appropriate (e.g., "Would you like to try it free?").
 - Keep responses under 150 words for chat readability.`;
 
-// ─── OpenAI Call ─────────────────────────────────────────────────────
+// ─── Homepage Chat LLM Call (uses OpenAI/GPT specifically) ──────────
 
-async function callOpenAI(messages) {
-  const response = await fetch(`${aiConfig.openaiBaseUrl}/chat/completions`, {
+async function callHomepageLLM(messages) {
+  // Homepage always uses the configured homepage provider (default: OpenAI)
+  const provider = aiConfig.homepageChatProvider;
+  let apiKey, baseUrl, model;
+
+  if (provider === "gemini" && aiConfig.geminiApiKey) {
+    apiKey = aiConfig.geminiApiKey;
+    baseUrl = aiConfig.geminiBaseUrl;
+    model = aiConfig.geminiModel;
+  } else if (aiConfig.openaiApiKey) {
+    apiKey = aiConfig.openaiApiKey;
+    baseUrl = aiConfig.openaiBaseUrl;
+    model = aiConfig.openaiModel;
+  } else if (aiConfig.geminiApiKey) {
+    apiKey = aiConfig.geminiApiKey;
+    baseUrl = aiConfig.geminiBaseUrl;
+    model = aiConfig.geminiModel;
+  } else {
+    throw new Error("No AI provider configured");
+  }
+
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${aiConfig.openaiApiKey}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: aiConfig.openaiModel,
+      model,
       messages,
       temperature: 0.4,
       max_tokens: 300,
@@ -172,9 +192,9 @@ export async function publicChatMessage(req, res) {
     // Add current message
     conversationMessages.push({ role: "user", content: message.trim() });
 
-    const reply = await callOpenAI(conversationMessages);
+    const reply = await callHomepageLLM(conversationMessages);
 
-    return res.json({ reply, source: "openai" });
+    return res.json({ reply, source: aiConfig.homepageChatProvider });
   } catch (error) {
     logger.error({ error: error.message }, "Public chat AI failed");
     // Return a graceful fallback

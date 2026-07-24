@@ -73,11 +73,23 @@ export const platformConfig = {
 };
 
 export const aiConfig = {
+  // ── Homepage Chat Widget (OpenAI — paid, professional tone) ──
   openaiApiKey: process.env.OPENAI_API_KEY || "",
-  openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
+  openaiModel: process.env.OPENAI_MODEL || "gpt-4.1-nano",
   openaiBaseUrl: process.env.OPENAI_BASE_URL || "https://api.openai.com/v1",
+
+  // ── AI Customer Care / WhatsApp (Gemini — free tier, friendly tone) ──
+  geminiApiKey: process.env.GEMINI_API_KEY || "",
+  geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+  geminiBaseUrl: process.env.GEMINI_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai",
+
+  // General settings
   defaultConfidenceThreshold: 0.7,
   maxContextMessages: 10,
   maxKnowledgeBaseTokens: 3000,
-  enabled: Boolean(process.env.OPENAI_API_KEY),
+
+  // Feature flags
+  enabled: Boolean(process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY),
+  customerCareProvider: process.env.AI_CUSTOMER_CARE_PROVIDER || "gemini", // "openai" or "gemini"
+  homepageChatProvider: process.env.AI_HOMEPAGE_CHAT_PROVIDER || "openai", // "openai" or "gemini"
 };

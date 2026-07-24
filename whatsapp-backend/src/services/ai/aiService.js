@@ -22,19 +22,55 @@ import { logger } from "../../middleware/logger.js";
 // ─── LLM Transport ──────────────────────────────────────────────────
 
 /**
- * Make a chat completion request to the configured LLM provider.
+ * Resolve provider credentials based on the requested provider.
+ * Supports "openai" and "gemini" with automatic fallback.
+ */
+function resolveProvider(provider) {
+  if (provider === "gemini" && aiConfig.geminiApiKey) {
+    return {
+      apiKey: aiConfig.geminiApiKey,
+      baseUrl: aiConfig.geminiBaseUrl,
+      model: aiConfig.geminiModel,
+    };
+  }
+  if (provider === "openai" && aiConfig.openaiApiKey) {
+    return {
+      apiKey: aiConfig.openaiApiKey,
+      baseUrl: aiConfig.openaiBaseUrl,
+      model: aiConfig.openaiModel,
+    };
+  }
+  // Fallback: use whichever is available
+  if (aiConfig.geminiApiKey) {
+    return { apiKey: aiConfig.geminiApiKey, baseUrl: aiConfig.geminiBaseUrl, model: aiConfig.geminiModel };
+  }
+  if (aiConfig.openaiApiKey) {
+    return { apiKey: aiConfig.openaiApiKey, baseUrl: aiConfig.openaiBaseUrl, model: aiConfig.openaiModel };
+  }
+  return null;
+}
+
+/**
+ * Make a chat completion request to the specified LLM provider.
  * Returns { content, usage: { promptTokens, completionTokens, totalTokens } }
+ *
+ * @param {Array} messages - Chat messages array
+ * @param {Object} options - { model, temperature, maxTokens, responseFormat, provider }
  */
 async function callLLM(messages, options = {}) {
-  const model = options.model || aiConfig.openaiModel;
+  const providerName = options.provider || aiConfig.customerCareProvider;
+  const credentials = resolveProvider(providerName);
+  if (!credentials) throw new Error("No AI provider configured (set OPENAI_API_KEY or GEMINI_API_KEY)");
+
+  const model = options.model || credentials.model;
   const temperature = options.temperature ?? 0.3;
   const maxTokens = options.maxTokens || 500;
 
-  const response = await fetch(`${aiConfig.openaiBaseUrl}/chat/completions`, {
+  const response = await fetch(`${credentials.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${aiConfig.openaiApiKey}`,
+      Authorization: `Bearer ${credentials.apiKey}`,
     },
     body: JSON.stringify({
       model,
