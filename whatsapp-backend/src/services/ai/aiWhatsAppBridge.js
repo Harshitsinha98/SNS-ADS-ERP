@@ -68,11 +68,25 @@ async function sendAIWhatsAppReply({ orgId, leadId, phone, text }) {
       recipient,
       status: "sent",
       providerMessageId: result?.messages?.[0]?.id || null,
+      at: nowIso(),
+      atMs: Date.now(),
       sentAt: nowIso(),
       sentAtMs: Date.now(),
       senderName: "AI Customer Care",
       source: "ai_customer_care",
     });
+
+    // Write a note to the lead's notes collection (shows in Activity Stream)
+    await orgCollection(db, orgId, "leads").doc(leadId)
+      .collection("notes").doc().set({
+        type: "whatsapp",
+        text: `AI replied: ${text.slice(0, 200)}${text.length > 200 ? "..." : ""}`,
+        authorId: "system",
+        authorName: "AI Customer Care",
+        visibility: "admin_only",
+        sourceMessageId: clientMessageId,
+        at: nowIso(),
+      });
 
     // Record outbound dispatch for status reconciliation
     await db.collection("whatsappOutboundDispatches").doc(clientMessageId).set({
