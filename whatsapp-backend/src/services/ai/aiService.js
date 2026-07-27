@@ -211,6 +211,29 @@ async function generateResponse({ message, orgConfig, knowledgeBase, conversatio
   const businessName = orgConfig.businessName || "our team";
   const language = classification.language || "en";
 
+  // Build catalogue instructions based on mode
+  let catalogueInstructions = "";
+  if (orgConfig.catalogueMode === "whatsapp_catalogue" && orgConfig.catalogueLink) {
+    catalogueInstructions = `
+CATALOGUE:
+When the customer asks about products, services, catalogue, or wants to see items:
+- Share this catalogue link: ${orgConfig.catalogueLink}
+- Say something like: "You can browse our complete collection with photos and prices here: ${orgConfig.catalogueLink}"
+- After sharing the link, ask if they want help with something specific or have a budget in mind.`;
+  } else if (orgConfig.catalogueMode === "website" && orgConfig.websiteUrl) {
+    const categoryLinks = Array.isArray(orgConfig.categoryPages) && orgConfig.categoryPages.length > 0
+      ? orgConfig.categoryPages.map((p) => `- ${p.name}: ${orgConfig.websiteUrl}${p.url}`).join("\n")
+      : "";
+    catalogueInstructions = `
+CATALOGUE (Website):
+When the customer asks about products, services, or wants to browse:
+- Main website: ${orgConfig.websiteUrl}
+${categoryLinks ? `- Category pages:\n${categoryLinks}` : ""}
+- Share the most relevant category link based on what they're asking about.
+- If unsure which category, share the main website link.
+- Always mention a brief description of what they'll find at that link.`;
+  }
+
   const systemPrompt = `You are an AI customer care assistant for "${businessName}".
 
 YOUR ROLE:
@@ -225,6 +248,7 @@ TONE: ${tone}
 ${tone === "formal" ? "Use professional language, avoid slang." : ""}
 ${tone === "friendly" ? "Be warm and approachable, use casual but professional language." : ""}
 ${tone === "sales" ? "Be enthusiastic, highlight benefits, guide toward conversion." : ""}
+${catalogueInstructions}
 
 KNOWLEDGE BASE:
 ${knowledgeBase || "No specific knowledge base configured. Provide general helpful responses."}

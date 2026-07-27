@@ -123,6 +123,69 @@ function SettingsTab({ config, setConfig, saving, onSave }) {
         </div>
       </div>
 
+      <div className="card p-6 space-y-4">
+        <h3 className="font-semibold text-ink">Product / Service Catalogue</h3>
+        <p className="text-sm text-ink-muted">Choose how AI shares your products or services with customers</p>
+        <div className="space-y-3">
+          {[
+            { value: "none", label: "None", desc: "AI won't share catalogue links" },
+            { value: "whatsapp_catalogue", label: "WhatsApp Catalogue", desc: "Share your WhatsApp Business catalogue link" },
+            { value: "website", label: "Website / Pages", desc: "Share your website or specific category page links" },
+          ].map((opt) => (
+            <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${config.catalogueMode === opt.value ? "border-orange-300 bg-orange-50/50" : "border-cream-200 hover:border-cream-300"}`}>
+              <input type="radio" name="catalogueMode" value={opt.value} checked={config.catalogueMode === opt.value}
+                onChange={() => setConfig((c) => ({ ...c, catalogueMode: opt.value }))}
+                className="mt-0.5 text-orange-500" />
+              <div>
+                <p className="text-sm font-medium text-ink">{opt.label}</p>
+                <p className="text-xs text-ink-muted">{opt.desc}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        {config.catalogueMode === "whatsapp_catalogue" && (
+          <div className="ml-6 mt-2">
+            <label className="text-sm font-medium text-ink-soft">WhatsApp Catalogue Link</label>
+            <input type="url" value={config.catalogueLink || ""}
+              onChange={(e) => setConfig((c) => ({ ...c, catalogueLink: e.target.value }))}
+              className="mt-1 w-full rounded-lg border border-cream-200 px-3 py-2 text-sm"
+              placeholder="https://wa.me/c/919XXXXXXXXX" />
+            <p className="text-xs text-ink-muted mt-1">Get this from WhatsApp Business → Settings → Catalogue → Share link</p>
+          </div>
+        )}
+
+        {config.catalogueMode === "website" && (
+          <div className="ml-6 mt-2 space-y-3">
+            <div>
+              <label className="text-sm font-medium text-ink-soft">Website URL</label>
+              <input type="url" value={config.websiteUrl || ""}
+                onChange={(e) => setConfig((c) => ({ ...c, websiteUrl: e.target.value }))}
+                className="mt-1 w-full rounded-lg border border-cream-200 px-3 py-2 text-sm"
+                placeholder="https://yourwebsite.com" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-ink-soft">Category Pages (optional)</label>
+              <p className="text-xs text-ink-muted mb-2">Add specific pages so AI can share the right link based on what customer asks</p>
+              {(config.categoryPages || []).map((page, i) => (
+                <div key={i} className="flex gap-2 mb-2">
+                  <input type="text" value={page.name} placeholder="Category name"
+                    onChange={(e) => { const pages = [...(config.categoryPages || [])]; pages[i] = { ...pages[i], name: e.target.value }; setConfig((c) => ({ ...c, categoryPages: pages })); }}
+                    className="flex-1 rounded-lg border border-cream-200 px-3 py-2 text-sm" />
+                  <input type="text" value={page.url} placeholder="/collections/earrings"
+                    onChange={(e) => { const pages = [...(config.categoryPages || [])]; pages[i] = { ...pages[i], url: e.target.value }; setConfig((c) => ({ ...c, categoryPages: pages })); }}
+                    className="flex-1 rounded-lg border border-cream-200 px-3 py-2 text-sm" />
+                  <button type="button" onClick={() => { const pages = [...(config.categoryPages || [])]; pages.splice(i, 1); setConfig((c) => ({ ...c, categoryPages: pages })); }}
+                    className="px-2 text-red-500 hover:bg-red-50 rounded">×</button>
+                </div>
+              ))}
+              <button type="button" onClick={() => setConfig((c) => ({ ...c, categoryPages: [...(c.categoryPages || []), { name: "", url: "" }] }))}
+                className="text-sm text-orange-600 font-medium hover:underline">+ Add category page</button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <button onClick={onSave} disabled={saving}
         className="btn-primary flex items-center gap-2">
         {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}

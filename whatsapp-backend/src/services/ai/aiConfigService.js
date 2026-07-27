@@ -35,6 +35,11 @@ const DEFAULT_AI_CONFIG = {
   welcomeMessage: "",
   fallbackMessage: "I'll connect you with a team member who can help you better. Please wait a moment.",
   autoReplyEnabled: true,
+  // Catalogue settings
+  catalogueMode: "none", // none | whatsapp_catalogue | website | product_db
+  catalogueLink: "", // WhatsApp catalogue link (wa.me/c/...)
+  websiteUrl: "", // Business website URL
+  categoryPages: [], // [{name: "Earrings", url: "/collections/earrings"}, ...]
 };
 
 // ─── AI Config CRUD ─────────────────────────────────────────────────
@@ -62,6 +67,7 @@ export async function updateAIConfig(orgId, updates, updatedBy) {
     "workingHoursOnly", "workingHoursStart", "workingHoursEnd",
     "excludedIntents", "escalationKeywords", "welcomeMessage",
     "fallbackMessage", "autoReplyEnabled",
+    "catalogueMode", "catalogueLink", "websiteUrl", "categoryPages",
   ];
 
   const sanitized = {};
