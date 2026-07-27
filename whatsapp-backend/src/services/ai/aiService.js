@@ -434,11 +434,21 @@ export async function processWithAI({ orgId, leadId, message, customerName, cust
       leadId ? getConversationHistory(orgId, leadId) : Promise.resolve([]),
     ]);
 
+    // 9b. Append product catalogue context if mode is product_db
+    let enrichedKnowledgeBase = knowledgeBase;
+    if (orgAiConfig.catalogueMode === "product_db" && classification.intent === "product_inquiry") {
+      try {
+        const { getProductContextForAI } = await import("./productCatalogueService.js");
+        const productContext = await getProductContextForAI(orgId);
+        if (productContext) enrichedKnowledgeBase = `${knowledgeBase}\n\n${productContext}`;
+      } catch { /* non-critical */ }
+    }
+
     // 10. Generate response
     const response = await generateResponse({
       message,
       orgConfig: orgAiConfig,
-      knowledgeBase,
+      knowledgeBase: enrichedKnowledgeBase,
       conversationHistory,
       classification,
     });

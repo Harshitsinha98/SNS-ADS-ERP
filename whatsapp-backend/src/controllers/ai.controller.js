@@ -222,3 +222,106 @@ export async function getPlatformAIStats(req, res) {
     return res.status(500).json({ error: "Failed to fetch platform AI stats" });
   }
 }
+
+
+// ─── Org Admin: Product Catalogue ───────────────────────────────────
+
+import {
+  createProduct as createProductService,
+  updateProduct as updateProductService,
+  deleteProduct as deleteProductService,
+  listProducts as listProductsService,
+  getProduct as getProductService,
+  getProductStats as getProductStatsService,
+} from "../services/ai/productCatalogueService.js";
+
+export async function listCatalogueProducts(req, res) {
+  try {
+    const { orgId, category, active } = req.query;
+    if (!orgId) return res.status(400).json({ error: "orgId is required" });
+    if (!(await isOrgAdmin(req.authUser.uid, orgId))) {
+      return res.status(403).json({ error: "Organization admin access required" });
+    }
+    const products = await listProductsService(orgId, {
+      category: category || undefined,
+      active: active === "false" ? false : active === "true" ? true : undefined,
+    });
+    return res.json({ products });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+export async function getCatalogueProduct(req, res) {
+  try {
+    const { orgId } = req.query;
+    const { productId } = req.params;
+    if (!orgId) return res.status(400).json({ error: "orgId is required" });
+    if (!(await isOrgAdmin(req.authUser.uid, orgId))) {
+      return res.status(403).json({ error: "Organization admin access required" });
+    }
+    const product = await getProductService(orgId, productId);
+    if (!product) return res.status(404).json({ error: "Product not found" });
+    return res.json(product);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+export async function createCatalogueProduct(req, res) {
+  try {
+    const { orgId, ...data } = req.body;
+    if (!orgId) return res.status(400).json({ error: "orgId is required" });
+    if (!(await isOrgAdmin(req.authUser.uid, orgId))) {
+      return res.status(403).json({ error: "Organization admin access required" });
+    }
+    const product = await createProductService(orgId, data, req.authUser.uid);
+    return res.status(201).json(product);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+}
+
+export async function updateCatalogueProduct(req, res) {
+  try {
+    const { orgId, ...updates } = req.body;
+    const { productId } = req.params;
+    if (!orgId) return res.status(400).json({ error: "orgId is required" });
+    if (!(await isOrgAdmin(req.authUser.uid, orgId))) {
+      return res.status(403).json({ error: "Organization admin access required" });
+    }
+    const product = await updateProductService(orgId, productId, updates, req.authUser.uid);
+    return res.json(product);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+}
+
+export async function deleteCatalogueProduct(req, res) {
+  try {
+    const { orgId } = req.query;
+    const { productId } = req.params;
+    if (!orgId) return res.status(400).json({ error: "orgId is required" });
+    if (!(await isOrgAdmin(req.authUser.uid, orgId))) {
+      return res.status(403).json({ error: "Organization admin access required" });
+    }
+    const result = await deleteProductService(orgId, productId);
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+}
+
+export async function catalogueStats(req, res) {
+  try {
+    const { orgId } = req.query;
+    if (!orgId) return res.status(400).json({ error: "orgId is required" });
+    if (!(await isOrgAdmin(req.authUser.uid, orgId))) {
+      return res.status(403).json({ error: "Organization admin access required" });
+    }
+    const stats = await getProductStatsService(orgId);
+    return res.json(stats);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}

@@ -131,6 +131,7 @@ function SettingsTab({ config, setConfig, saving, onSave }) {
             { value: "none", label: "None", desc: "AI won't share catalogue links" },
             { value: "whatsapp_catalogue", label: "WhatsApp Catalogue", desc: "Share your WhatsApp Business catalogue link" },
             { value: "website", label: "Website / Pages", desc: "Share your website or specific category page links" },
+            { value: "product_db", label: "Product Database", desc: "Upload products with images — AI sends photos on WhatsApp" },
           ].map((opt) => (
             <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${config.catalogueMode === opt.value ? "border-orange-300 bg-orange-50/50" : "border-cream-200 hover:border-cream-300"}`}>
               <input type="radio" name="catalogueMode" value={opt.value} checked={config.catalogueMode === opt.value}
@@ -182,6 +183,17 @@ function SettingsTab({ config, setConfig, saving, onSave }) {
               <button type="button" onClick={() => setConfig((c) => ({ ...c, categoryPages: [...(c.categoryPages || []), { name: "", url: "" }] }))}
                 className="text-sm text-orange-600 font-medium hover:underline">+ Add category page</button>
             </div>
+          </div>
+        )}
+
+        {config.catalogueMode === "product_db" && (
+          <div className="ml-6 mt-2 p-3 rounded-xl bg-purple-50 border border-purple-100">
+            <p className="text-sm font-medium text-purple-800">Product Database Mode</p>
+            <p className="text-xs text-purple-600 mt-1">
+              Manage your products from the <strong>Products</strong> page in the sidebar.
+              Upload products with images, and AI will automatically send relevant product photos
+              to customers based on their queries.
+            </p>
           </div>
         )}
       </div>

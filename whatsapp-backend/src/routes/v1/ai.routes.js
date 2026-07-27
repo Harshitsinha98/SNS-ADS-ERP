@@ -25,6 +25,12 @@ import {
   testPlayground,
   getUsageStats,
   getPlatformAIStats,
+  listCatalogueProducts,
+  getCatalogueProduct,
+  createCatalogueProduct,
+  updateCatalogueProduct,
+  deleteCatalogueProduct,
+  catalogueStats,
 } from "../../controllers/ai.controller.js";
 
 export function createAIRoutes() {
@@ -54,6 +60,14 @@ export function createAIRoutes() {
 
   // ── Platform-level AI stats (platform admin only) ──
   router.get("/platform-usage", getPlatformAIStats);
+
+  // ── Product Catalogue ──
+  router.get("/catalogue", listCatalogueProducts);
+  router.get("/catalogue/stats", catalogueStats);
+  router.get("/catalogue/:productId", getCatalogueProduct);
+  router.post("/catalogue", createCatalogueProduct);
+  router.patch("/catalogue/:productId", updateCatalogueProduct);
+  router.delete("/catalogue/:productId", deleteCatalogueProduct);
 
   return router;
 }

@@ -19,10 +19,68 @@
 
 import { db } from "../../bootstrap/firebase.js";
 import { processWithAI } from "./aiService.js";
+import { searchProductsForAI } from "./productCatalogueService.js";
 import { nowIso, safeDocId, orgCollection } from "../helpers.js";
 import { metaGraphRequest, decryptWhatsAppToken } from "../meta.js";
 import { logger } from "../../middleware/logger.js";
 import { emitWorkflowTrigger } from "../workflow/workflowEngine.js";
+
+/**
+ * Send a WhatsApp image message with caption (for product photos).
+ */
+async function sendAIWhatsAppImage({ orgId, leadId, phone, imageUrl, caption }) {
+  const credentialSnap = await db.collection("whatsappCredentials").doc(orgId).get();
+  if (!credentialSnap.exists || credentialSnap.data().connectionState !== "connected") {
+    return { sent: false, reason: "whatsapp_not_connected" };
+  }
+
+  const credential = credentialSnap.data();
+  const recipient = String(phone).replace(/\D/g, "");
+  if (!/^\d{7,15}$/.test(recipient)) return { sent: false, reason: "invalid_phone" };
+
+  const token = decryptWhatsAppToken(credential.tokenCiphertext);
+  const clientMessageId = safeDocId(`ai_img_${orgId}_${leadId}_${Date.now()}`);
+
+  try {
+    const result = await metaGraphRequest(`${credential.phoneNumberId}/messages`, {
+      method: "POST",
+      token,
+      body: {
+        messaging_product: "whatsapp",
+        to: recipient,
+        type: "image",
+        image: {
+          link: imageUrl,
+          caption: caption || "",
+        },
+        biz_opaque_callback_data: clientMessageId,
+      },
+    });
+
+    // Persist in message history
+    await orgCollection(db, orgId, "leads").doc(leadId)
+      .collection("messages").doc(clientMessageId).set({
+        direction: "outbound",
+        type: "image",
+        text: caption || "[Product image]",
+        imageUrl,
+        recipient,
+        status: "sent",
+        providerMessageId: result?.messages?.[0]?.id || null,
+        at: nowIso(),
+        atMs: Date.now(),
+        sentAt: nowIso(),
+        sentAtMs: Date.now(),
+        senderName: "AI Customer Care",
+        source: "ai_customer_care",
+      });
+
+    return { sent: true, messageId: clientMessageId };
+  } catch (error) {
+    logger.warn({ orgId, error: error.message }, "AI image send failed");
+    return { sent: false, reason: error.message };
+  }
+}
 
 /**
  * Send an AI-generated WhatsApp reply to the customer.
@@ -157,6 +215,30 @@ export async function triggerAIResponse({ orgId, leadId, phone, customerName, cu
           phone,
           text: aiResult.response,
         });
+
+        // If intent is product_inquiry, also send product images
+        if (aiResult.intent === "product_inquiry") {
+          try {
+            const configSnap = await orgCollection(db, orgId, "aiConfig").doc("settings").get();
+            const orgAiConfig = configSnap.exists ? configSnap.data() : {};
+            if (orgAiConfig.catalogueMode === "product_db") {
+              const products = await searchProductsForAI(orgId, {});
+              for (const product of products.slice(0, 3)) {
+                if (product.imageUrl) {
+                  await sendAIWhatsAppImage({
+                    orgId,
+                    leadId,
+                    phone,
+                    imageUrl: product.imageUrl,
+                    caption: `${product.name} — ₹${Number(product.price).toLocaleString("en-IN")}${product.description ? `\n${product.description.slice(0, 200)}` : ""}`,
+                  });
+                }
+              }
+            }
+          } catch (imgError) {
+            logger.warn({ orgId, error: imgError.message }, "Product image send failed (non-critical)");
+          }
+        }
 
         // Log AI interaction in org activity (non-critical)
         orgCollection(db, orgId, "activity").add({
