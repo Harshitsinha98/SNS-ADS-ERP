@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Building2, User, Phone, ArrowRight, ArrowLeft, Loader2, ShieldCheck,
   CheckCircle2, Sparkles, Check, CreditCard, Gift, Users, Inbox, Lock,
@@ -60,7 +61,7 @@ export default function Signup() {
   const trialDays = config && Number.isFinite(config.trialDays) ? config.trialDays : TRIAL_DAYS;
   const price = cycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
   const planIsStarter = plan.id === "starter";
-  const canFreeTrial = plan.trial && trialAvailable;
+  const canFreeTrial = planIsStarter && plan.trial && trialAvailable;
   const anyGateway = gateways.razorpay || gateways.payu;
 
   const checkExistingPhone = async (value = phone) => {
@@ -306,24 +307,36 @@ export default function Signup() {
           <div className="lg:hidden flex justify-center mb-8"><Link to="/"><Logo /></Link></div>
 
           {step === "done" ? (
-            <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 p-10 text-center animate-fade-in relative overflow-hidden">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="bg-white rounded-3xl shadow-soft border border-cream-300/60 p-10 text-center relative overflow-hidden"
+            >
               <div className="absolute inset-0 bg-gradient-to-b from-emerald-50/50 to-transparent pointer-events-none" />
               <div className="relative">
-                <div className="w-20 h-20 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-100">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                  className="w-20 h-20 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-100"
+                >
                   <CheckCircle2 className="w-11 h-11 text-success-600" />
-                </div>
-                <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 mb-4">
-                  <Sparkles size={12} className="text-emerald-600" />
-                  <span className="text-[11px] font-bold text-emerald-700">Workspace Created Successfully</span>
-                </div>
-                <h1 className="font-display font-bold text-2xl text-ink mb-2">You're all set!</h1>
-                <p className="text-ink-soft mb-6"><span className="font-semibold text-ink">{orgName}</span> is ready. Taking you to your dashboard now...</p>
-                <div className="flex items-center justify-center gap-3">
-                  <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
-                  <span className="text-sm text-ink-muted">Loading your workspace...</span>
-                </div>
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+                  <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 mb-4">
+                    <Sparkles size={12} className="text-emerald-600" />
+                    <span className="text-[11px] font-bold text-emerald-700">Workspace Created Successfully</span>
+                  </div>
+                  <h1 className="font-display font-bold text-2xl text-ink mb-2">You're all set!</h1>
+                  <p className="text-ink-soft mb-6"><span className="font-semibold text-ink">{orgName}</span> is ready. Taking you to your dashboard now...</p>
+                  <div className="flex items-center justify-center gap-3">
+                    <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
+                    <span className="text-sm text-ink-muted">Loading your workspace...</span>
+                  </div>
+                </motion.div>
               </div>
-            </div>
+            </motion.div>
           ) : (
             <div className="bg-white rounded-3xl shadow-xl shadow-cream-300/30 border border-cream-200/80 overflow-hidden">
               {/* Progress bar with glow */}
@@ -357,8 +370,21 @@ export default function Signup() {
 
               <div className="p-7 sm:p-9">
                 {err && (
-                  <div className="bg-danger-50 text-danger-600 text-sm px-4 py-3 rounded-xl mb-4 border border-danger-100">{err}</div>
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-danger-50 text-danger-600 text-sm px-4 py-3 rounded-xl mb-4 border border-danger-100"
+                  >{err}</motion.div>
                 )}
+
+                <AnimatePresence mode="wait">
+                <motion.div
+                  key={step}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.25, ease: "easeInOut" }}
+                >
 
                 {step === "details" && (
                   <>
@@ -448,13 +474,49 @@ export default function Signup() {
                     <p className="text-sm text-ink-soft mb-7">We sent a 6-digit code to <span className="font-semibold text-ink">+91 {phone.slice(0,5)} {phone.slice(5)}</span></p>
                     <form onSubmit={submitOtp} className="space-y-5">
                       <div>
-                        <input className="input text-center text-2xl tracking-[0.6em] font-mono h-14 bg-cream-50/50 border-cream-200 focus:border-orange-300 focus:bg-white" placeholder="------" value={otp}
-                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} maxLength={6} autoFocus disabled={loading} />
+                        <div className="flex justify-center gap-2">
+                          {[0, 1, 2, 3, 4, 5].map((i) => (
+                            <motion.div
+                              key={i}
+                              initial={{ opacity: 0, scale: 0.8 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ delay: i * 0.05, duration: 0.2 }}
+                              className={`w-11 h-14 rounded-xl border-2 flex items-center justify-center text-xl font-bold font-mono transition-all ${
+                                otp[i] ? "border-orange-400 bg-orange-50 text-orange-700 shadow-sm shadow-orange-100" : "border-cream-200 bg-cream-50/50 text-ink-muted"
+                              }`}
+                            >
+                              {otp[i] || ""}
+                            </motion.div>
+                          ))}
+                        </div>
+                        <input
+                          type="tel"
+                          className="sr-only"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                          maxLength={6}
+                          autoFocus
+                          disabled={loading}
+                          id="otp-hidden-input"
+                        />
+                        <label htmlFor="otp-hidden-input" className="flex justify-center mt-3">
+                          <span
+                            onClick={() => document.getElementById("otp-hidden-input")?.focus()}
+                            className="text-xs text-orange-600 font-medium cursor-pointer hover:underline"
+                          >
+                            Tap here to type OTP
+                          </span>
+                        </label>
                         <p className="text-xs text-ink-muted mt-2 text-center">Didn't receive it? Check your messages or wait 30 seconds.</p>
                       </div>
-                      <button type="submit" disabled={loading} className="btn btn-primary w-full py-3.5 text-base">
+                      <motion.button
+                        type="submit"
+                        disabled={loading || otp.length < 6}
+                        className="btn btn-primary w-full py-3.5 text-base disabled:opacity-50"
+                        whileTap={{ scale: 0.97 }}
+                      >
                         {loading ? <><Loader2 size={18} className="animate-spin" /> Verifying...</> : <>Verify & continue <ArrowRight size={18} /></>}
-                      </button>
+                      </motion.button>
                     </form>
                   </>
                 )}
@@ -533,6 +595,9 @@ export default function Signup() {
                     </div>
                   </>
                 )}
+
+                </motion.div>
+                </AnimatePresence>
               </div>
             </div>
           )}
