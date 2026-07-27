@@ -80,35 +80,60 @@ const PRICING_PLANS = [
     name: "Starter",
     price: "599",
     period: "/mo",
-    desc: "Solo agents getting started",
+    desc: "For solo agents and small teams",
     seats: "3 users",
     leads: "1,000 leads",
     cta: "Start free trial",
-    features: ["WhatsApp lead capture", "Auto-assignment", "Mobile app", "Call tracking", "Basic analytics"],
-    missing: ["AI Customer Care", "Workflow automation", "Priority support"],
+    features: [
+      "WhatsApp lead capture",
+      "Round-robin auto-assignment",
+      "Native call tracking (Android)",
+      "Mobile app access",
+      "Basic analytics dashboard",
+    ],
+    missing: ["AI Auto-Reply", "Workflow automation", "Priority support"],
+    comingSoon: [],
   },
   {
     name: "Growth",
     price: "1,499",
     period: "/mo",
-    desc: "Growing teams that want AI power",
+    desc: "For teams ready to automate with AI",
     seats: "10 users",
     leads: "10,000 leads",
     popular: true,
     cta: "Start free trial",
-    features: ["Everything in Starter", "AI Auto-Reply (2,000/mo)", "Workflow automation", "Goals & performance", "Full audit log", "Priority support"],
-    missing: ["Unlimited AI", "Auto-dialer"],
+    features: [
+      "Everything in Starter, plus:",
+      "AI Auto-Reply (2,000/mo)",
+      "5 workflow automation rules",
+      "Goals & performance tracking",
+      "Full activity audit log",
+      "Meta & Google Ad lead capture",
+      "Priority email support",
+    ],
+    missing: ["Unlimited AI Auto-Reply", "API access"],
+    comingSoon: [],
   },
   {
     name: "Scale",
     price: "3,499",
     period: "/mo",
-    desc: "Sales operations at full speed",
+    desc: "For high-volume sales operations",
     seats: "25 users",
     leads: "50,000 leads",
     cta: "Contact sales",
-    features: ["Everything in Growth", "Unlimited AI replies", "Auto-dialer (coming soon)", "API access & webhooks", "Dedicated account manager", "Custom onboarding"],
+    features: [
+      "Everything in Growth, plus:",
+      "AI Auto-Reply (Unlimited)",
+      "25 workflow automation rules",
+      "Full API access & webhooks",
+      "Unlimited website lead forms",
+      "Dedicated account manager",
+      "Custom onboarding",
+    ],
     missing: [],
+    comingSoon: ["Auto-dialer"],
   },
 ];
 
@@ -427,7 +452,7 @@ export default function Landing() {
               Cheaper than <span className="text-gradient">one employee</span>
             </h2>
             <p className="text-lg text-ink-soft">
-              Starting at ₹599/month — that's <strong>₹20/day</strong> for an entire AI-powered CRM. Less than your daily coffee.
+              Starting at ₹599/month — a full AI-powered CRM for <strong>₹20/day</strong>. Every plan includes a {TRIAL_DAYS}-day free trial.
             </p>
           </div>
 
@@ -460,6 +485,12 @@ export default function Landing() {
                     <div key={f} className="flex items-start gap-2 text-sm">
                       <Check size={15} className="text-emerald-500 shrink-0 mt-0.5" />
                       <span className="text-ink-soft">{f}</span>
+                    </div>
+                  ))}
+                  {plan.comingSoon?.map((f) => (
+                    <div key={f} className="flex items-start gap-2 text-sm">
+                      <Clock size={15} className="text-amber-500 shrink-0 mt-0.5" />
+                      <span className="text-ink-muted">{f} <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 ml-1">COMING SOON</span></span>
                     </div>
                   ))}
                   {plan.missing.map((f) => (
