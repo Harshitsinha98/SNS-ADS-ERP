@@ -474,14 +474,14 @@ export default function Signup() {
                     <p className="text-sm text-ink-soft mb-7">We sent a 6-digit code to <span className="font-semibold text-ink">+91 {phone.slice(0,5)} {phone.slice(5)}</span></p>
                     <form onSubmit={submitOtp} className="space-y-5">
                       <div>
-                        <div className="flex justify-center gap-2">
+                        <div className="flex justify-center gap-2" onClick={() => document.getElementById("otp-hidden-input")?.focus()}>
                           {[0, 1, 2, 3, 4, 5].map((i) => (
                             <motion.div
                               key={i}
                               initial={{ opacity: 0, scale: 0.8 }}
                               animate={{ opacity: 1, scale: 1 }}
                               transition={{ delay: i * 0.05, duration: 0.2 }}
-                              className={`w-11 h-14 rounded-xl border-2 flex items-center justify-center text-xl font-bold font-mono transition-all ${
+                              className={`w-11 h-14 rounded-xl border-2 flex items-center justify-center text-xl font-bold font-mono cursor-text transition-all ${
                                 otp[i] ? "border-orange-400 bg-orange-50 text-orange-700 shadow-sm shadow-orange-100" : "border-cream-200 bg-cream-50/50 text-ink-muted"
                               }`}
                             >
@@ -491,7 +491,7 @@ export default function Signup() {
                         </div>
                         <input
                           type="tel"
-                          className="sr-only"
+                          className="absolute opacity-0 w-0 h-0"
                           value={otp}
                           onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                           maxLength={6}
@@ -499,15 +499,7 @@ export default function Signup() {
                           disabled={loading}
                           id="otp-hidden-input"
                         />
-                        <label htmlFor="otp-hidden-input" className="flex justify-center mt-3">
-                          <span
-                            onClick={() => document.getElementById("otp-hidden-input")?.focus()}
-                            className="text-xs text-orange-600 font-medium cursor-pointer hover:underline"
-                          >
-                            Tap here to type OTP
-                          </span>
-                        </label>
-                        <p className="text-xs text-ink-muted mt-2 text-center">Didn't receive it? Check your messages or wait 30 seconds.</p>
+                        <p className="text-xs text-ink-muted mt-3 text-center">Didn't receive it? Check your messages or wait 30 seconds.</p>
                       </div>
                       <motion.button
                         type="submit"
