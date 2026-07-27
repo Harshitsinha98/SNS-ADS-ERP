@@ -18,6 +18,7 @@ import {
   Workflow,
   GitBranch,
   Brain,
+  ShoppingBag,
 } from "lucide-react";
 
 const adminLinks = [
@@ -27,6 +28,7 @@ const adminLinks = [
   { to: "/admin/automation", label: "Automation", icon: Workflow },
   { to: "/admin/workflows", label: "Workflows", icon: GitBranch },
   { to: "/admin/ai-customer-care", label: "AI Customer Care", icon: Brain },
+  { to: "/admin/products", label: "Products", icon: ShoppingBag },
   { to: "/admin/employees", label: "Team", icon: Users },
   { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },

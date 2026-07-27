@@ -23,6 +23,7 @@ import Workflows from "./pages/admin/Workflows";
 import WorkflowBuilder from "./pages/admin/WorkflowBuilder";
 import AdLeadIntegrations from "./pages/admin/AdLeadIntegrations";
 import AICustomerCare from "./pages/admin/AICustomerCare";
+import Products from "./pages/admin/Products";
 import PlatformDashboard from "./pages/platform/PlatformDashboard";
 import ExecutiveDashboard from "./pages/platform/ExecutiveDashboard";
 import OrganizationsPage from "./pages/platform/OrganizationsPage";
@@ -83,6 +84,7 @@ export default function App() {
         <Route path="/admin/workflows/:workflowId" element={<ProtectedRoute role="admin"><WorkflowBuilder /></ProtectedRoute>} />
         <Route path="/admin/ad-leads" element={<ProtectedRoute role="admin"><AdLeadIntegrations /></ProtectedRoute>} />
         <Route path="/admin/ai-customer-care" element={<ProtectedRoute role="admin"><AICustomerCare /></ProtectedRoute>} />
+        <Route path="/admin/products" element={<ProtectedRoute role="admin"><Products /></ProtectedRoute>} />
 
         {/* --- PLATFORM OWNER CONSOLE (self-contained auth inside each page;
                 only +919653043939 can enter). Accessible at /platform/*. --- */}
