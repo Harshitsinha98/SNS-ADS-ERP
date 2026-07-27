@@ -125,16 +125,21 @@ function SettingsTab({ config, setConfig, saving, onSave }) {
 
       <div className="card p-6 space-y-4">
         <h3 className="font-semibold text-ink">Product / Service Catalogue</h3>
-        <p className="text-sm text-ink-muted">Choose how AI shares your products or services with customers</p>
+        <p className="text-sm text-ink-muted">When customers ask about your products or services, how should AI respond?</p>
+
+        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 mb-2">
+          <p className="text-xs text-emerald-700"><strong>Recommended:</strong> Just add your products, pricing, and services info in the <strong>Knowledge Base</strong> tab above. AI will use that information to answer customer queries naturally. No extra setup needed.</p>
+        </div>
+
+        <p className="text-xs font-medium text-ink-soft uppercase tracking-wide mt-4">Optional: Share a catalogue link</p>
         <div className="space-y-3">
           {[
-            { value: "none", label: "None", desc: "AI won't share catalogue links" },
-            { value: "whatsapp_catalogue", label: "WhatsApp Catalogue", desc: "Share your WhatsApp Business catalogue link" },
-            { value: "website", label: "Website / Pages", desc: "Share your website or specific category page links" },
-            { value: "product_db", label: "Product Database", desc: "Upload products with images — AI sends photos on WhatsApp" },
+            { value: "none", label: "Knowledge Base Only", desc: "AI answers from your knowledge base articles (recommended for most businesses)" },
+            { value: "whatsapp_catalogue", label: "WhatsApp Catalogue Link", desc: "Also share your WhatsApp Business catalogue when customers ask to browse" },
+            { value: "website", label: "Website Link", desc: "Also share your website or specific category pages" },
           ].map((opt) => (
-            <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${config.catalogueMode === opt.value ? "border-orange-300 bg-orange-50/50" : "border-cream-200 hover:border-cream-300"}`}>
-              <input type="radio" name="catalogueMode" value={opt.value} checked={config.catalogueMode === opt.value}
+            <label key={opt.value} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${config.catalogueMode === opt.value || (!config.catalogueMode && opt.value === "none") ? "border-orange-300 bg-orange-50/50" : "border-cream-200 hover:border-cream-300"}`}>
+              <input type="radio" name="catalogueMode" value={opt.value} checked={config.catalogueMode === opt.value || (!config.catalogueMode && opt.value === "none")}
                 onChange={() => setConfig((c) => ({ ...c, catalogueMode: opt.value }))}
                 className="mt-0.5 text-orange-500" />
               <div>
@@ -183,17 +188,6 @@ function SettingsTab({ config, setConfig, saving, onSave }) {
               <button type="button" onClick={() => setConfig((c) => ({ ...c, categoryPages: [...(c.categoryPages || []), { name: "", url: "" }] }))}
                 className="text-sm text-orange-600 font-medium hover:underline">+ Add category page</button>
             </div>
-          </div>
-        )}
-
-        {config.catalogueMode === "product_db" && (
-          <div className="ml-6 mt-2 p-3 rounded-xl bg-purple-50 border border-purple-100">
-            <p className="text-sm font-medium text-purple-800">Product Database Mode</p>
-            <p className="text-xs text-purple-600 mt-1">
-              Manage your products from the <strong>Products</strong> page in the sidebar.
-              Upload products with images, and AI will automatically send relevant product photos
-              to customers based on their queries.
-            </p>
           </div>
         )}
       </div>
