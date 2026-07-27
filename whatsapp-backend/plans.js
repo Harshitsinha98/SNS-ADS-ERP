@@ -5,8 +5,8 @@
 export const PLANS = {
   starter: { id: "starter", name: "Starter", monthlyPrice: 599, yearlyPrice: 5999, includedSeats: 3, leadsLimit: 1000, trial: true },
   growth: { id: "growth", name: "Growth", monthlyPrice: 1499, yearlyPrice: 14999, includedSeats: 10, leadsLimit: 10000 },
-  // Keep the stable ID so existing subscriptions and platform overrides remain valid.
   enterprise: { id: "enterprise", name: "Scale", monthlyPrice: 3499, yearlyPrice: 34999, includedSeats: 25, leadsLimit: 50000 },
+  enterprise_plus: { id: "enterprise_plus", name: "Enterprise", monthlyPrice: 7999, yearlyPrice: 79999, includedSeats: -1, leadsLimit: -1 },
 };
 
 // Merge platform-owner overrides (platformConfig/global.plans) on top of defaults.
