@@ -449,7 +449,7 @@ export default function Landing() {
           <div className="text-center max-w-2xl mx-auto mb-14">
             <p className="eyebrow mb-3">Simple pricing</p>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-ink mb-4">
-              Cheaper than <span className="text-gradient">one employee</span>
+              The full AI sales stack — <span className="text-gradient">one subscription</span>
             </h2>
             <p className="text-lg text-ink-soft">
               Starting at ₹599/month — a full AI-powered CRM for <strong>₹20/day</strong>. Every plan includes a {TRIAL_DAYS}-day free trial.

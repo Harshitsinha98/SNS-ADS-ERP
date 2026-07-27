@@ -38,6 +38,7 @@ export const PLANS = [
     leadsLimit: 10000,
     pricePerSeat: 149,
     popular: true,
+    trial: true,
     features: [
       { text: "10 team members", included: true },
       { text: "10,000 leads / month", included: true },

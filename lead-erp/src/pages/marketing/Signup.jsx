@@ -60,7 +60,7 @@ export default function Signup() {
   const trialDays = config && Number.isFinite(config.trialDays) ? config.trialDays : TRIAL_DAYS;
   const price = cycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
   const planIsStarter = plan.id === "starter";
-  const canFreeTrial = planIsStarter && plan.trial && trialAvailable;
+  const canFreeTrial = plan.trial && trialAvailable;
   const anyGateway = gateways.razorpay || gateways.payu;
 
   const checkExistingPhone = async (value = phone) => {
@@ -335,17 +335,21 @@ export default function Signup() {
                 </div>
               </div>
 
-              {/* Step indicators */}
-              <div className="flex items-center justify-between px-9 pt-6 pb-0">
+              {/* Step indicators with connected line */}
+              <div className="relative flex items-center justify-between px-9 pt-6 pb-0">
+                {/* Connecting line behind the dots */}
+                <div className="absolute top-[2.1rem] left-[4.5rem] right-[4.5rem] h-[2px] bg-cream-200 hidden sm:block" />
+                <div className={`absolute top-[2.1rem] left-[4.5rem] h-[2px] bg-orange-400 hidden sm:block transition-all duration-500 ${step === "details" ? "w-0" : step === "otp" ? "w-[calc(50%-1rem)]" : "w-[calc(100%-5rem)]"}`} />
+
                 {["Your details", "Verification", "Activate"].map((label, i) => {
                   const isActive = (i === 0 && step === "details") || (i === 1 && step === "otp") || (i === 2 && step === "checkout");
                   const isDone = (i === 0 && step !== "details") || (i === 1 && step === "checkout");
                   return (
-                    <div key={label} className="flex items-center gap-2">
-                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 ${isDone ? "bg-emerald-500 text-white shadow-sm shadow-emerald-200" : isActive ? "bg-orange-500 text-white shadow-sm shadow-orange-200" : "bg-cream-100 text-ink-muted"}`}>
-                        {isDone ? <Check size={12} strokeWidth={3} /> : i + 1}
+                    <div key={label} className="flex flex-col items-center gap-1.5 relative z-10">
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 ${isDone ? "bg-emerald-500 text-white shadow-md shadow-emerald-200" : isActive ? "bg-orange-500 text-white shadow-md shadow-orange-200" : "bg-cream-100 text-ink-muted border border-cream-200"}`}>
+                        {isDone ? <Check size={13} strokeWidth={3} /> : i + 1}
                       </span>
-                      <span className={`text-xs font-medium hidden sm:inline ${isActive ? "text-ink" : isDone ? "text-emerald-600" : "text-ink-muted"}`}>{label}</span>
+                      <span className={`text-[10px] font-medium ${isActive ? "text-ink" : isDone ? "text-emerald-600" : "text-ink-muted"}`}>{label}</span>
                     </div>
                   );
                 })}
@@ -358,17 +362,17 @@ export default function Signup() {
 
                 {step === "details" && (
                   <>
-                    <h1 className="font-display font-bold text-2xl text-ink mb-1">Get started for free</h1>
-                    <p className="text-sm text-ink-soft mb-7">Takes less than 2 minutes. No credit card needed.</p>
+                    <h1 className="font-display font-bold text-[1.6rem] text-ink mb-1.5">Get started for free</h1>
+                    <p className="text-[13px] text-ink-muted mb-7">Set up your workspace in under 2 minutes. No credit card needed.</p>
                     <form onSubmit={submitDetails} className="space-y-5">
                       <Field icon={User} label="Your name" value={fullName} onChange={setFullName} placeholder="e.g. Rohan Mehta" disabled={loading} />
                       <Field icon={Building2} label="Organization name" value={orgName} onChange={setOrgName} placeholder="e.g. Meridian Properties" disabled={loading} />
                       <div>
                         <label className="block text-sm font-medium text-ink mb-1.5">Mobile number</label>
-                        <div className="relative">
-                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" size={18} />
+                        <div className="relative group">
+                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted/70 group-focus-within:text-orange-500 transition-colors" size={18} />
                           <span className="absolute left-11 top-1/2 -translate-y-1/2 text-ink-soft font-medium text-sm">+91</span>
-                          <input type="tel" className="input pl-[4.5rem]" placeholder="98XXXXXXXX" value={phone}
+                          <input type="tel" className="input pl-[4.5rem] bg-cream-50/30 border-cream-200 focus:border-orange-300 focus:bg-white focus:shadow-sm focus:shadow-orange-100/50 transition-all" placeholder="98XXXXXXXX" value={phone}
                             onChange={(e) => handlePhoneChange(e.target.value)}
                             onBlur={() => checkExistingPhone()}
                             maxLength={10} disabled={loading || checkingAccount} />
@@ -380,23 +384,38 @@ export default function Signup() {
                           </p>
                         )}
                       </div>
+
+                      {/* Divider between details and plan selection */}
+                      <div className="relative py-2">
+                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-cream-200" /></div>
+                        <div className="relative flex justify-center"><span className="px-3 bg-white text-[10px] font-semibold text-ink-muted uppercase tracking-wider">Select plan</span></div>
+                      </div>
+
                       <div>
-                        <label className="block text-sm font-medium text-ink mb-2">Choose your plan</label>
                         <div className="grid grid-cols-3 gap-2.5">
-                          {plans.map((p) => (
+                          {plans.filter((p) => p.id !== "enterprise_plus").map((p) => (
                             <button key={p.id} type="button" onClick={() => setPlanId(p.id)}
-                              className={`relative rounded-xl border px-3 py-3 text-center transition-all duration-200 ${planId === p.id ? "border-orange-400 bg-orange-50/70 shadow-sm shadow-orange-100" : "border-cream-200 hover:border-orange-200 hover:bg-cream-50"}`}>
-                              {p.popular && <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full">POPULAR</span>}
+                              className={`relative rounded-xl border px-2 py-3.5 text-center transition-all duration-200 ${planId === p.id ? "border-orange-400 bg-orange-50/70 shadow-md shadow-orange-100/50 ring-1 ring-orange-200" : "border-cream-200 hover:border-orange-200 hover:bg-cream-50"}`}>
+                              {p.popular && <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm">POPULAR</span>}
+                              {planId === p.id && <span className="absolute top-2 right-2 w-3 h-3 rounded-full bg-orange-500 border-2 border-white shadow-sm" />}
                               <span className={`block text-sm font-bold ${planId === p.id ? "text-orange-700" : "text-ink"}`}>{p.name}</span>
                               <span className="block text-[11px] text-ink-muted mt-0.5">₹{p.monthlyPrice.toLocaleString("en-IN")}/mo</span>
-                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-ink-muted/60"}`}>{p.trial ? "7-day free trial" : "Paid plan"}</span>
+                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-ink-muted/60"}`}>{p.trial ? `${trialDays}-day free trial` : "Contact sales"}</span>
+                              {/* Key feature highlight */}
+                              <span className="block text-[9px] text-ink-muted/80 mt-1.5 leading-tight">
+                                {p.id === "starter" ? "3 users · 1K leads" : p.id === "growth" ? "10 users · AI replies" : "25 users · API access"}
+                              </span>
                             </button>
                           ))}
                         </div>
                       </div>
-                      <button type="submit" disabled={loading || checkingAccount || existingAccount} className="btn btn-primary w-full py-3.5 text-base mt-2">
+
+                      <button type="submit" disabled={loading || checkingAccount || existingAccount || !fullName.trim() || !orgName.trim() || phone.length !== 10} className="btn btn-primary w-full py-3.5 text-base mt-2 disabled:opacity-50 disabled:cursor-not-allowed">
                         {loading || checkingAccount ? <><Loader2 size={18} className="animate-spin" /> Please wait...</> : existingAccount ? <>Account exists — log in instead</> : <>Continue <ArrowRight size={18} /></>}
                       </button>
+                      <p className="text-center text-[11px] text-ink-muted flex items-center justify-center gap-1.5">
+                        <Shield size={11} className="text-ink-muted/60" /> No credit card required to start your trial
+                      </p>
                     </form>
                     <p className="text-center text-sm text-ink-muted mt-6">
                       Already have an account? <Link to="/login" className="text-orange-600 font-semibold hover:underline">Sign in</Link>
