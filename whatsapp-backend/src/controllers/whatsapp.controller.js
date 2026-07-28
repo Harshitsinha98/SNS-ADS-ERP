@@ -370,6 +370,20 @@ export async function sendMessage(req, res) {
       tx.update(leadRef, { lastWhatsAppOutboundAt: nowIso(), lastWhatsAppOutboundAtMs: Date.now(), lastUpdated: nowIso() });
       tx.delete(outboundIntentRef);
     });
+
+    // ── Audit Trail: Write employee message to notes (admin-only visibility) ──
+    const senderName = req.authUser.name || req.authUser.phone_number || "Agent";
+    orgCollection(db, orgId, "leads").doc(leadId).collection("notes").add({
+      type: "whatsapp",
+      text: `[Employee → Customer] ${senderName}: "${text.slice(0, 300)}${text.length > 300 ? "..." : ""}"`,
+      authorId: req.authUser.uid,
+      authorName: senderName,
+      visibility: "admin_only",
+      sourceMessageId: clientMessageId,
+      at: nowIso(),
+      auditType: "employee_reply",
+    }).catch(() => {}); // non-critical — never fail the send
+
     return res.json({ ok: true, messageId: clientMessageId, providerMessageId });
   } catch (error) {
     if (messageRef && messageClaimed) {

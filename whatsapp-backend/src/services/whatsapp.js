@@ -68,12 +68,13 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
       tx.set(leadRef.collection("messages").doc(safeDocId(providerMessageId)), inboundMessage, { merge: true });
       tx.set(leadRef.collection("notes").doc(), {
         type: "whatsapp",
-        text: `New WhatsApp message: ${requirement}`,
+        text: `[Customer → Business] ${requirement}`,
         authorId: "system",
         authorName: "WhatsApp Sync",
         visibility: "admin_only",
         sourceMessageId: providerMessageId,
         at: receivedAt,
+        auditType: "customer_message",
       });
       tx.update(leadRef, {
         lastUpdated: receivedAt,

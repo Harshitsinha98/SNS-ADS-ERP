@@ -6,7 +6,7 @@
  * Includes: AI brief, session messages, reply input, resolve button.
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import {
   MessageCircle, Send, Loader2, CheckCircle2, Clock, User,
@@ -16,7 +16,7 @@ import Layout from "../../components/Layout";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { sendWhatsAppMessage } from "../../utils/billingApi";
-import { resolveSession, getSessionMessages } from "../../utils/chatSessionApi";
+import { resolveSession } from "../../utils/chatSessionApi";
 
 const formatTime = (value) => {
   if (!value) return "";
@@ -36,14 +36,11 @@ export default function Conversations() {
   const [resolving, setResolving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  // Listen for leads with active sessions assigned to this employee
   useEffect(() => {
     if (!orgId || !user?.uid) return;
     const leadsRef = collection(db, "organizations", orgId, "leads");
     const q = query(leadsRef,
-      where("activeChatSessionEmployee", "==", user.uid),
-      orderBy("lastUpdated", "desc")
+      where("activeChatSessionEmployee", "==", user.uid)
     );
     const unsub = onSnapshot(q, (snap) => {
       setLeads(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -61,27 +58,27 @@ export default function Conversations() {
     } catch (e) { setError(e.message); }
   }, [orgId]);
 
-  // Real-time listener for new messages during active session
+  // Real-time listener for new messages during active session — instant like WhatsApp
   useEffect(() => {
-    if (!selectedLead?.id || !session?.startedAtMs || !orgId) return;
+    if (!selectedLead?.id || !orgId) return;
+    const sessionStartMs = selectedLead.aiDisabledAt
+      ? new Date(selectedLead.aiDisabledAt).getTime()
+      : Date.now() - 3600000;
+
+    setSession({ id: selectedLead.activeChatSessionId, startedAtMs: sessionStartMs });
+
     const messagesRef = collection(db, "organizations", orgId, "leads", selectedLead.id, "messages");
-    const q = query(messagesRef,
-      where("atMs", ">=", session.startedAtMs),
-      orderBy("atMs", "asc")
-    );
+    const q = query(messagesRef, orderBy("atMs", "asc"));
     const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      // Filter to session-bounded messages client-side for instant updates
+      const allMsgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setMessages(allMsgs.filter((m) => (m.atMs || 0) >= sessionStartMs));
     });
     return unsub;
-  }, [orgId, selectedLead?.id, session?.startedAtMs]);
+  }, [orgId, selectedLead?.id]);
 
   const selectLead = (lead) => {
     setSelectedLead(lead);
-    setSession({
-      id: lead.activeChatSessionId,
-      startedAtMs: lead.aiDisabledAt ? new Date(lead.aiDisabledAt).getTime() : Date.now() - 3600000,
-    });
-    loadMessages(lead);
   };
 
   const handleSend = async (e) => {
