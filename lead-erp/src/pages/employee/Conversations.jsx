@@ -9,14 +9,13 @@
 import { useEffect, useState } from "react";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import {
-  MessageCircle, Send, Loader2, CheckCircle2, Clock, User,
-  AlertTriangle, Brain, Phone, ArrowRight,
+  MessageCircle, Send, Loader2, CheckCircle2,
+  Brain, Phone,
 } from "lucide-react";
 import Layout from "../../components/Layout";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { sendWhatsAppMessage } from "../../utils/billingApi";
-import { resolveSession } from "../../utils/chatSessionApi";
 
 const formatTime = (value) => {
   if (!value) return "";
@@ -30,59 +29,52 @@ export default function Conversations() {
   const [leads, setLeads] = useState([]);
   const [selectedLead, setSelectedLead] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [session, setSession] = useState(null);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Listen for leads with active sessions assigned to this employee
+  // Listen for ALL leads assigned to this employee (shows their WhatsApp conversations)
   useEffect(() => {
     if (authLoading) return;
     if (!orgId || !user?.uid) { setLoading(false); return; }
     const leadsRef = collection(db, "organizations", orgId, "leads");
-    const q = query(leadsRef,
-      where("activeChatSessionEmployee", "==", user.uid)
-    );
+    const q = query(leadsRef, where("assignedTo", "==", user.uid));
     const unsub = onSnapshot(q, (snap) => {
-      setLeads(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const allLeads = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // Sort by last WhatsApp activity (most recent first)
+      allLeads.sort((a, b) => {
+        const aTime = a.lastWhatsAppInboundAtMs || new Date(a.lastUpdated || 0).getTime();
+        const bTime = b.lastWhatsAppInboundAtMs || new Date(b.lastUpdated || 0).getTime();
+        return bTime - aTime;
+      });
+      setLeads(allLeads);
       setLoading(false);
     }, (err) => {
-      console.warn("Conversations listener error:", err?.code || err?.message);
+      console.warn("Conversations leads listener error:", err?.code || err?.message);
       setLoading(false);
     });
     return unsub;
   }, [orgId, user?.uid, authLoading]);
 
-  // Real-time listener for new messages during active session — instant like WhatsApp
+  // Real-time listener for messages of the selected lead — instant like WhatsApp
   useEffect(() => {
-    if (!selectedLead?.id || !orgId) return;
-    const sessionStartMs = selectedLead.aiDisabledAt
-      ? new Date(selectedLead.aiDisabledAt).getTime()
-      : Date.now() - 3600000;
-
-    setSession({ id: selectedLead.activeChatSessionId, startedAtMs: sessionStartMs });
-
-    // Listen to ALL messages (ordered by 'at' field which all messages have)
-    // then filter client-side for session bounds
+    if (!selectedLead?.id || !orgId) { setMessages([]); return; }
     const messagesRef = collection(db, "organizations", orgId, "leads", selectedLead.id, "messages");
     const q = query(messagesRef, orderBy("at", "asc"));
     const unsub = onSnapshot(q, (snap) => {
-      const allMsgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      // Filter to session-bounded messages — use atMs if available, else parse 'at' string
-      setMessages(allMsgs.filter((m) => {
-        const msgMs = m.atMs || (m.at ? new Date(m.at).getTime() : 0) || (m.sentAt ? new Date(m.sentAt).getTime() : 0);
-        return msgMs >= sessionStartMs;
-      }));
+      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     }, (err) => {
       console.warn("Messages listener error:", err?.code || err?.message);
+      setMessages([]);
     });
     return unsub;
   }, [orgId, selectedLead?.id]);
 
   const selectLead = (lead) => {
     setSelectedLead(lead);
+    setError("");
   };
 
   const handleSend = async (e) => {
@@ -90,24 +82,14 @@ export default function Conversations() {
     if (!text.trim() || sending || !selectedLead) return;
     setSending(true); setError("");
     try {
-      await sendWhatsAppMessage({ orgId, leadId: selectedLead.id, text: text.trim(), clientMessageId: `sess_${Date.now()}` });
+      await sendWhatsAppMessage({ orgId, leadId: selectedLead.id, text: text.trim(), clientMessageId: `conv_${Date.now()}_${Math.random().toString(36).slice(2)}` });
       setText("");
     } catch (err) {
-      setError(err.message || "Could not send message");
+      setError(err.code === "template_required"
+        ? "24-hour reply window expired. Use an approved template from the Lead Detail page."
+        : err.message || "Could not send message");
     }
     setSending(false);
-  };
-
-  const handleResolve = async () => {
-    if (!selectedLead?.activeChatSessionId) return;
-    setResolving(true);
-    try {
-      await resolveSession(orgId, selectedLead.id, selectedLead.activeChatSessionId, "");
-      setSelectedLead(null);
-      setMessages([]);
-      setSession(null);
-    } catch (err) { setError(err.message); }
-    setResolving(false);
   };
 
   if (loading) {
@@ -179,26 +161,12 @@ export default function Conversations() {
                       <p className="text-[11px] text-ink-muted flex items-center gap-1"><Phone size={10} /> {selectedLead.phone}</p>
                     </div>
                   </div>
-                  <button onClick={handleResolve} disabled={resolving}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50">
-                    {resolving ? "Ending..." : "Resolve & End Session"}
-                  </button>
+                  {selectedLead.aiEnabled === false && (
+                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-purple-50 text-purple-700">AI Paused</span>
+                  )}
                 </div>
 
-                {/* AI Brief */}
-                {selectedLead.aiDisabledReason && (
-                  <div className="px-4 py-3 bg-purple-50 border-b border-purple-100">
-                    <div className="flex items-start gap-2">
-                      <Brain size={14} className="text-purple-500 mt-0.5 shrink-0" />
-                      <div>
-                        <p className="text-[11px] font-bold text-purple-700 uppercase">AI Session Brief</p>
-                        <p className="text-xs text-purple-800 mt-0.5 leading-relaxed">Customer requested human assistance. Review messages below and respond from the business number.</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Messages (session-bounded) */}
+                {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-cream-50/30">
                   {messages.length === 0 ? (
                     <p className="text-center text-sm text-ink-muted py-8">Waiting for messages in this session...</p>
