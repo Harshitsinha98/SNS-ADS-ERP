@@ -27,6 +27,13 @@ const typeConfig = {
     borderColor: "border-teal-200",
     label: "New Chat",
   },
+  chat_escalated: {
+    icon: MessageCircle,
+    iconColor: "text-orange-600",
+    bgColor: "bg-orange-50",
+    borderColor: "border-orange-200",
+    label: "Chat Escalated",
+  },
   escalation_alert: {
     icon: AlertTriangle,
     iconColor: "text-red-600",
@@ -126,7 +133,7 @@ export default function NotificationBell() {
     // Navigate to conversations page for chat-related notifications
     if (notif.type === "chat_assigned") {
       navigate("/app/conversations");
-    } else if (notif.type === "escalation_alert") {
+    } else if (notif.type === "escalation_alert" || notif.type === "chat_escalated") {
       navigate("/admin/leads");
     }
     setOpen(false);

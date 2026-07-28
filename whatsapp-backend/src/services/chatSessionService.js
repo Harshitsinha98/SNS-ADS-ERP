@@ -81,9 +81,34 @@ export async function createChatSession(orgId, leadId, { employeeId, employeeNam
       atMs: nowMs,
       orgId,
     });
-    logger.info({ orgId, leadId, employeeId }, "Employee notification created for chat assignment");
+
+    // ── Also notify all admins/owners about the escalation ──
+    const membersSnap = await db.collection("memberships")
+      .where("orgId", "==", orgId)
+      .where("active", "==", true)
+      .get();
+    const admins = membersSnap.docs
+      .map((d) => d.data())
+      .filter((m) => (m.role === "owner" || m.role === "admin") && m.uid !== employeeId);
+
+    for (const admin of admins) {
+      await orgCollection(db, orgId, "notifications").add({
+        userId: admin.uid,
+        type: "chat_escalated",
+        title: "Chat Escalated to Agent",
+        text: `${leadName} requested human help. Chat assigned to ${employeeName || "Agent"}.`,
+        leadId,
+        sessionId: ref.id,
+        read: false,
+        at: now,
+        atMs: nowMs,
+        orgId,
+      });
+    }
+
+    logger.info({ orgId, leadId, employeeId }, "Notifications created for chat assignment");
   } catch (notifErr) {
-    logger.warn({ orgId, leadId, err: notifErr.message }, "Failed to create employee notification");
+    logger.warn({ orgId, leadId, err: notifErr.message }, "Failed to create notifications");
   }
 
   logger.info({ orgId, leadId, sessionId: ref.id, employeeId }, "Chat session created");
