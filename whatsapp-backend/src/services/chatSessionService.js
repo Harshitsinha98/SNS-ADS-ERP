@@ -73,7 +73,7 @@ export async function createChatSession(orgId, leadId, { employeeId, employeeNam
       userId: employeeId,
       type: "chat_assigned",
       title: "New Chat Assigned",
-      text: `Chat with ${leadName} has been assigned to you. Customer requested human assistance.`,
+      text: `Chat with ${leadName} has been assigned to ${employeeName || "Agent"}. Customer requested human assistance.`,
       leadId,
       sessionId: ref.id,
       read: false,
