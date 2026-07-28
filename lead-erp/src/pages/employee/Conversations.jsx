@@ -36,6 +36,8 @@ export default function Conversations() {
   const [resolving, setResolving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Listen for leads with active sessions assigned to this employee
   useEffect(() => {
     if (!orgId || !user?.uid) return;
     const leadsRef = collection(db, "organizations", orgId, "leads");
@@ -48,15 +50,6 @@ export default function Conversations() {
     }, () => setLoading(false));
     return unsub;
   }, [orgId, user?.uid]);
-
-  // Load session messages when a lead is selected
-  const loadMessages = useCallback(async (lead) => {
-    if (!lead?.activeChatSessionId) return;
-    try {
-      const data = await getSessionMessages(orgId, lead.id, lead.activeChatSessionId);
-      setMessages(data.messages || []);
-    } catch (e) { setError(e.message); }
-  }, [orgId]);
 
   // Real-time listener for new messages during active session — instant like WhatsApp
   useEffect(() => {
