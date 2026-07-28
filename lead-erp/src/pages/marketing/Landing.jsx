@@ -91,7 +91,7 @@ const PRICING_PLANS = [
       "Mobile app access",
       "Basic analytics dashboard",
     ],
-    missing: ["AI Auto-Reply", "Workflow automation", "Priority support"],
+    missing: ["AI Auto-Reply", "Human Takeover", "Workflow automation", "Priority support"],
     comingSoon: [],
   },
   {
@@ -106,6 +106,7 @@ const PRICING_PLANS = [
     features: [
       "Everything in Starter, plus:",
       "AI Auto-Reply (2,000/mo)",
+      "Human Takeover + Smart Notifications",
       "5 workflow automation rules",
       "Goals & performance tracking",
       "Full activity audit log",
@@ -373,6 +374,119 @@ export default function Landing() {
                 Indistinguishable from a human agent — trained on your actual business knowledge
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+
+      {/* ============ HUMAN TAKEOVER + SMART NOTIFICATIONS ============ */}
+      <section className="py-20 sm:py-28 bg-gradient-to-b from-white to-teal-50/30 relative">
+        <div className="absolute top-0 left-0 w-80 h-80 bg-teal-200/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 relative">
+          <div className="text-center max-w-3xl mx-auto mb-14">
+            <div className="inline-flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-full px-4 py-1.5 mb-4">
+              <Headphones size={14} className="text-teal-600" />
+              <span className="text-xs font-bold text-teal-700">AI + Human = Perfect Customer Care</span>
+            </div>
+            <h2 className="font-display font-bold text-3xl sm:text-5xl text-ink mb-5">
+              AI handles routine. Your team handles <span className="text-gradient">important</span>.
+            </h2>
+            <p className="text-lg text-ink-soft max-w-2xl mx-auto">
+              When a customer says "I want to talk to a real person" — AI instantly steps aside, assigns a team member, and they take over the chat <strong>from your business number</strong>. No switching apps.
+            </p>
+          </div>
+
+          {/* How it works — visual flow */}
+          <div className="grid md:grid-cols-4 gap-4 mb-14">
+            {[
+              { step: "01", icon: Bot, title: "AI Handles", desc: "AI answers FAQs, pricing, availability — instantly, 24/7" },
+              { step: "02", icon: Headphones, title: "Customer Asks for Human", desc: "Customer says 'talk to agent' — AI detects intent immediately" },
+              { step: "03", icon: Bell, title: "Agent Notified", desc: "Your employee gets instant notification with full context & chat history" },
+              { step: "04", icon: MessageCircle, title: "Seamless Takeover", desc: "Agent replies from business number — customer sees no difference" },
+            ].map((s, i) => (
+              <div key={s.step} className="relative">
+                <div className="bg-white rounded-2xl border border-teal-100 p-5 shadow-sm hover:shadow-md transition-shadow h-full">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+                      <s.icon size={16} className="text-teal-600" />
+                    </div>
+                    <span className="text-[10px] font-bold text-teal-500">{s.step}</span>
+                  </div>
+                  <h4 className="font-semibold text-ink text-sm mb-1.5">{s.title}</h4>
+                  <p className="text-xs text-ink-soft leading-relaxed">{s.desc}</p>
+                </div>
+                {i < 3 && (
+                  <div className="hidden md:block absolute top-1/2 -right-2.5 text-teal-300">
+                    <ChevronRight size={16} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Business use cases + smart notifications */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Left: Why businesses need this */}
+            <div className="bg-white rounded-2xl border border-cream-300/60 p-7 shadow-card">
+              <h3 className="font-display font-semibold text-lg text-ink mb-4 flex items-center gap-2">
+                <Target size={18} className="text-orange-500" />
+                Why your business needs this
+              </h3>
+              <div className="space-y-4">
+                {[
+                  { industry: "Real Estate", scenario: "Customer wants to negotiate price or schedule visit — AI can't do that. Human takes over instantly." },
+                  { industry: "Education", scenario: "Parent has complex admission query or wants counselor — seamless handoff, no repeat." },
+                  { industry: "Healthcare", scenario: "Patient needs urgent appointment or has sensitive question — immediate human connection." },
+                  { industry: "E-commerce", scenario: "Customer has refund dispute or custom order request — your support team jumps in." },
+                  { industry: "Services", scenario: "Client needs custom quote or has a complaint — human empathy + AI efficiency." },
+                ].map((uc) => (
+                  <div key={uc.industry} className="flex items-start gap-3">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 shrink-0 mt-0.5">{uc.industry}</span>
+                    <p className="text-sm text-ink-soft">{uc.scenario}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: Smart Notifications */}
+            <div className="bg-white rounded-2xl border border-cream-300/60 p-7 shadow-card">
+              <h3 className="font-display font-semibold text-lg text-ink mb-4 flex items-center gap-2">
+                <Bell size={18} className="text-teal-500" />
+                Smart Notification System
+              </h3>
+              <div className="space-y-4">
+                {[
+                  { who: "Employee", what: "Instant popup + sound + browser notification when chat is assigned", icon: MessageCircle, color: "teal" },
+                  { who: "Admin", what: "Real-time alert when chat is escalated from AI to human", icon: AlertTriangle, color: "orange" },
+                  { who: "Admin", what: "Escalation alert if employee doesn't reply within 3 minutes", icon: Clock, color: "red" },
+                  { who: "Employee", what: "Session-private view — only sees messages during their session, not full history", icon: ShieldCheck, color: "purple" },
+                  { who: "Admin", what: "Full audit trail — sees complete conversation across all sessions", icon: Crown, color: "orange" },
+                ].map((n, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-cream-50 border border-cream-200">
+                    <div className={`w-8 h-8 rounded-lg bg-${n.color}-100 flex items-center justify-center shrink-0`}>
+                      <n.icon size={14} className={`text-${n.color}-600`} />
+                    </div>
+                    <div>
+                      <span className={`text-[10px] font-bold text-${n.color}-600 uppercase`}>{n.who}</span>
+                      <p className="text-sm text-ink-soft mt-0.5">{n.what}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom CTA */}
+          <div className="text-center mt-10">
+            <p className="text-sm text-ink-muted mb-4 flex items-center justify-center gap-2">
+              <Sparkles size={14} className="text-orange-400" />
+              Available on Growth plan and above — included with AI Customer Care
+            </p>
+            <button onClick={() => navigate("/signup")} className="btn btn-primary text-base px-8 py-3.5">
+              <Headphones size={18} />
+              Try AI + Human Takeover Free
+              <ArrowRight size={18} />
+            </button>
           </div>
         </div>
       </section>

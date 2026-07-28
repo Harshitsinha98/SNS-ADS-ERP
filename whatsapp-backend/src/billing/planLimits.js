@@ -46,6 +46,8 @@ export const PLAN_LIMITS = {
     aiKnowledgeBaseLimit: 0,
     aiTestPlayground: false,
     aiAnalytics: false,
+    humanTakeover: false,
+    smartNotifications: false,
 
     // Catalogue
     catalogueEnabled: false,
@@ -98,6 +100,8 @@ export const PLAN_LIMITS = {
     aiKnowledgeBaseLimit: 30,
     aiTestPlayground: true,
     aiAnalytics: true,
+    humanTakeover: true,
+    smartNotifications: true,
 
     catalogueEnabled: true,
     catalogueProducts: 50,
@@ -145,6 +149,8 @@ export const PLAN_LIMITS = {
     aiKnowledgeBaseLimit: 100,
     aiTestPlayground: true,
     aiAnalytics: true,
+    humanTakeover: true,
+    smartNotifications: true,
 
     catalogueEnabled: true,
     catalogueProducts: 200,
@@ -192,6 +198,8 @@ export const PLAN_LIMITS = {
     aiKnowledgeBaseLimit: 100,
     aiTestPlayground: true,
     aiAnalytics: true,
+    humanTakeover: true,
+    smartNotifications: true,
 
     catalogueEnabled: true,
     catalogueProducts: 500,
