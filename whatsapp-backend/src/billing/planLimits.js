@@ -41,9 +41,9 @@ export const PLAN_LIMITS = {
     activityLog: "basic", // "basic" | "full"
 
     // AI Customer Care
-    aiEnabled: false,
-    aiMessagesPerMonth: 0,
-    aiKnowledgeBaseLimit: 0,
+    aiEnabled: true,
+    aiMessagesPerMonth: 100,
+    aiKnowledgeBaseLimit: 5,
     aiTestPlayground: false,
     aiAnalytics: false,
     humanTakeover: false,
