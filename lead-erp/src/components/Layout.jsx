@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Search, Menu, Clock } from "lucide-react";
 import Sidebar from "./Sidebar";
 import TrialBanner from "./TrialBanner";
+import NotificationBell from "./NotificationBell";
 import { useData } from "../context/DataContext";
 import { useAuth } from "../context/AuthContext";
 
@@ -95,6 +96,9 @@ export default function Layout({ children, title }) {
               </div>
             )}
           </div>
+
+          {/* Notifications */}
+          <NotificationBell />
         </header>
 
         {/* Content */}

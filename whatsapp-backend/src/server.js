@@ -24,6 +24,7 @@ import { runSubscriptionLifecycle } from "./services/subscriptionLifecycle.js";
 import { runFollowUpAutomation } from "../followUpAutomation.js";
 import { db } from "./bootstrap/firebase.js";
 import { recordCronJobHealth, recomputeMissionControlMetrics } from "./services/platformAnalytics.js";
+import { runEscalationCheck } from "./services/escalationService.js";
 
 // ── Cron Jobs ──────────────────────────────────────────────────────
 
@@ -91,6 +92,16 @@ cron.schedule("*/15 * * * *", () => {
     withLease("missionControlReconciliation", 14 * 60 * 1000, async () => {
       await recordCronStart("missionControlReconciliation");
       return recomputeMissionControlMetrics();
+    })
+  );
+});
+
+// Every minute: check for chat sessions where employee hasn't replied in 3 min.
+cron.schedule("* * * * *", () => {
+  runMonitoredCron("chatEscalationCheck", () =>
+    withLease("chatEscalationCheck", 55 * 1000, async () => {
+      await recordCronStart("chatEscalationCheck");
+      return runEscalationCheck();
     })
   );
 });

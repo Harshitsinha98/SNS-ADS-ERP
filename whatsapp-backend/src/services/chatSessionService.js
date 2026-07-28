@@ -65,6 +65,27 @@ export async function createChatSession(orgId, leadId, { employeeId, employeeNam
     activeChatSessionEmployee: employeeId,
   });
 
+  // ── Notify the assigned employee about the new chat ──
+  try {
+    const leadSnap = await orgCollection(db, orgId, "leads").doc(leadId).get();
+    const leadName = leadSnap.exists ? (leadSnap.data().name || leadSnap.data().phone || "Customer") : "Customer";
+    await orgCollection(db, orgId, "notifications").add({
+      userId: employeeId,
+      type: "chat_assigned",
+      title: "New Chat Assigned",
+      text: `Chat with ${leadName} has been assigned to you. Customer requested human assistance.`,
+      leadId,
+      sessionId: ref.id,
+      read: false,
+      at: now,
+      atMs: nowMs,
+      orgId,
+    });
+    logger.info({ orgId, leadId, employeeId }, "Employee notification created for chat assignment");
+  } catch (notifErr) {
+    logger.warn({ orgId, leadId, err: notifErr.message }, "Failed to create employee notification");
+  }
+
   logger.info({ orgId, leadId, sessionId: ref.id, employeeId }, "Chat session created");
   return { id: ref.id, ...sessionData };
 }
