@@ -25,7 +25,7 @@ const formatTime = (value) => {
 };
 
 export default function Conversations() {
-  const { user } = useAuth();
+  const { user, authLoading } = useAuth();
   const orgId = user?.activeOrgId;
   const [leads, setLeads] = useState([]);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -39,7 +39,8 @@ export default function Conversations() {
 
   // Listen for leads with active sessions assigned to this employee
   useEffect(() => {
-    if (!orgId || !user?.uid) return;
+    if (authLoading) return;
+    if (!orgId || !user?.uid) { setLoading(false); return; }
     const leadsRef = collection(db, "organizations", orgId, "leads");
     const q = query(leadsRef,
       where("activeChatSessionEmployee", "==", user.uid)
@@ -47,9 +48,12 @@ export default function Conversations() {
     const unsub = onSnapshot(q, (snap) => {
       setLeads(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, () => setLoading(false));
+    }, (err) => {
+      console.warn("Conversations listener error:", err?.code || err?.message);
+      setLoading(false);
+    });
     return unsub;
-  }, [orgId, user?.uid]);
+  }, [orgId, user?.uid, authLoading]);
 
   // Real-time listener for new messages during active session — instant like WhatsApp
   useEffect(() => {
@@ -60,12 +64,19 @@ export default function Conversations() {
 
     setSession({ id: selectedLead.activeChatSessionId, startedAtMs: sessionStartMs });
 
+    // Listen to ALL messages (ordered by 'at' field which all messages have)
+    // then filter client-side for session bounds
     const messagesRef = collection(db, "organizations", orgId, "leads", selectedLead.id, "messages");
-    const q = query(messagesRef, orderBy("atMs", "asc"));
+    const q = query(messagesRef, orderBy("at", "asc"));
     const unsub = onSnapshot(q, (snap) => {
-      // Filter to session-bounded messages client-side for instant updates
       const allMsgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setMessages(allMsgs.filter((m) => (m.atMs || 0) >= sessionStartMs));
+      // Filter to session-bounded messages — use atMs if available, else parse 'at' string
+      setMessages(allMsgs.filter((m) => {
+        const msgMs = m.atMs || (m.at ? new Date(m.at).getTime() : 0) || (m.sentAt ? new Date(m.sentAt).getTime() : 0);
+        return msgMs >= sessionStartMs;
+      }));
+    }, (err) => {
+      console.warn("Messages listener error:", err?.code || err?.message);
     });
     return unsub;
   }, [orgId, selectedLead?.id]);
