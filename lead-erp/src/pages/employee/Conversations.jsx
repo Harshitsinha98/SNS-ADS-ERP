@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState, useRef } from "react";
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import {
   MessageCircle, Send, Loader2, CheckCircle2,
   Brain, Phone, AlertTriangle, Clock, X,
@@ -111,30 +111,50 @@ export default function Conversations() {
     };
   }, [leads.length]);
 
-  // Real-time listener for messages — session-bounded (from aiDisabledAt onwards)
+  // Real-time listener for messages — session-bounded (from aiDisabledAt onwards).
+  //
+  // Robust by design so a message NEVER silently disappears:
+  //  - No orderBy in the Firestore query. orderBy(field) drops any doc missing
+  //    that field and can also fail on a missing index. We sort client-side.
+  //  - Timestamps are read from whatever field exists (atMs / at / sentAt / receivedAt).
+  //  - The session filter is best-effort. If it would hide EVERYTHING while
+  //    messages actually exist, we fail open and show them rather than a blank pane.
   useEffect(() => {
     if (!selectedLead?.id || !orgId) { setMessages([]); return; }
     const messagesRef = collection(db, "organizations", orgId, "leads", selectedLead.id, "messages");
-    const q = query(messagesRef, orderBy("atMs", "asc"));
-    const unsub = onSnapshot(q, (snap) => {
-      const allMsgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      // Calculate session start time — handle Firestore Timestamp, ISO string, or missing
+    // Extract a millisecond timestamp from any of the fields our writers use.
+    const msOf = (m) => {
+      if (typeof m.atMs === "number" && m.atMs > 0) return m.atMs;
+      const candidate = m.at || m.sentAt || m.receivedAt;
+      const parsed = candidate ? Date.parse(candidate) : NaN;
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+
+    const unsub = onSnapshot(messagesRef, (snap) => {
+      const allMsgs = snap.docs
+        .map((d) => ({ id: d.id, ...d.data(), _ms: msOf(d.data()) }))
+        .sort((a, b) => a._ms - b._ms);
+
+      // Calculate session start time — handle ISO string, Firestore Timestamp, or number.
       let sessionStart = 0;
       const raw = selectedLead.aiDisabledAt;
       if (raw) {
-        if (typeof raw === "string") sessionStart = new Date(raw).getTime();
+        if (typeof raw === "string") sessionStart = Date.parse(raw) || 0;
         else if (typeof raw?.toMillis === "function") sessionStart = raw.toMillis();
         else if (typeof raw?.seconds === "number") sessionStart = raw.seconds * 1000;
         else sessionStart = Number(raw) || 0;
       }
 
-      // If sessionStart is valid, show only messages from that point
-      // If not (edge case), show all messages
-      const filtered = sessionStart > 0
-        ? allMsgs.filter((m) => (m.atMs || 0) >= sessionStart)
+      // Show only messages from the escalation point onwards (privacy: the employee
+      // must not see pre-escalation history). Small negative skew tolerance so the
+      // very message that triggered escalation isn't lost to clock rounding.
+      const bounded = sessionStart > 0
+        ? allMsgs.filter((m) => m._ms >= sessionStart - 5000)
         : allMsgs;
-      setMessages(filtered);
+
+      // Fail open: never show a blank pane when messages genuinely exist.
+      setMessages(bounded.length === 0 && allMsgs.length > 0 ? allMsgs : bounded);
     }, (err) => {
       console.warn("Messages listener error:", err?.code || err?.message);
     });
