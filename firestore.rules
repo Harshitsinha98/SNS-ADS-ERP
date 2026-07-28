@@ -263,6 +263,14 @@ service cloud.firestore {
         allow read: if isAdmin(orgId) || isPlatformAdmin();
         allow write: if false;
       }
+
+      // Chat sessions — employees see only their own active sessions.
+      // Admins see all sessions for audit/monitoring.
+      match /leads/{leadId}/chatSessions/{sessionId} {
+        allow read: if isAdmin(orgId)
+          || (isActiveMember(orgId) && resource.data.employeeId == request.auth.uid);
+        allow write: if false;
+      }
     }
 
     // Website-integration credentials, public-form settings, and shared rate

@@ -24,6 +24,7 @@ import { nowIso, safeDocId, orgCollection } from "../helpers.js";
 import { metaGraphRequest, decryptWhatsAppToken } from "../meta.js";
 import { logger } from "../../middleware/logger.js";
 import { emitWorkflowTrigger } from "../workflow/workflowEngine.js";
+import { isAIActiveForLead, createChatSession } from "../chatSessionService.js";
 
 /**
  * Send a WhatsApp image message with caption (for product photos).
@@ -199,6 +200,13 @@ async function notifyEscalation({ orgId, leadId, assignedTo, reason, customerMes
  */
 export async function triggerAIResponse({ orgId, leadId, phone, customerName, customerMessage }) {
   try {
+    // Check if AI is disabled for this lead (human session active)
+    const aiActive = await isAIActiveForLead(orgId, leadId);
+    if (!aiActive) {
+      logger.info({ orgId, leadId }, "AI skipped — human session active for this lead");
+      return { action: "skip", reason: "human_session_active" };
+    }
+
     const aiResult = await processWithAI({
       orgId,
       leadId,
@@ -256,6 +264,16 @@ export async function triggerAIResponse({ orgId, leadId, phone, customerName, cu
         // Get the lead's assigned employee for notification
         const leadSnap = await orgCollection(db, orgId, "leads").doc(leadId).get();
         const assignedTo = leadSnap.exists ? leadSnap.data().assignedTo : null;
+        const assignedToName = leadSnap.exists ? leadSnap.data().assignedToName : null;
+
+        // If customer explicitly requested human, create a chat session
+        if (aiResult.reason === "customer_requested_human" && assignedTo) {
+          createChatSession(orgId, leadId, {
+            employeeId: assignedTo,
+            employeeName: assignedToName || "Agent",
+            reason: "customer_requested_human",
+          }).catch((e) => logger.warn({ error: e.message }, "Auto-session creation failed"));
+        }
 
         await notifyEscalation({
           orgId,

@@ -9,6 +9,7 @@ import { CheckCircle, Phone, PhoneOff } from "lucide-react";
 import { fmtDuration } from "../../utils/helpers";
 import Timeline from "../../components/Timeline";
 import WhatsAppConversation from "../../components/WhatsAppConversation";
+import ChatSessionControls from "../../components/ChatSessionControls";
 import FollowUpTaskControls from "../../components/FollowUpTaskControls";
 
 const PRIORITIES = ["Hot", "Warm", "Cold"];
@@ -194,6 +195,8 @@ export default function LeadDetail() {
           </div>
 
           <WhatsAppConversation lead={lead} />
+
+          <ChatSessionControls lead={lead} orgId={orgId} onUpdate={() => window.location.reload()} />
 
           <div className="bg-white rounded-xl shadow border p-5">
             <h3 className="font-semibold mb-3">Add Worknote</h3>

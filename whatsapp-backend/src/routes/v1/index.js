@@ -20,6 +20,7 @@ import { createHealthRoutes } from "./health.routes.js";
 import { createWorkflowRoutes, createTicketRoutes } from "./workflow.routes.js";
 import { createPlatformRoutes } from "./platform.routes.js";
 import { createAIRoutes } from "./ai.routes.js";
+import { createChatSessionRoutes } from "./chatSession.routes.js";
 import { publicChatMessage } from "../../controllers/publicChat.controller.js";
 
 export function createV1Router() {
@@ -48,6 +49,9 @@ export function createV1Router() {
 
   // AI Customer Care (org admin + platform admin)
   router.use("/ai", createAIRoutes());
+
+  // Chat Sessions (human takeover, session-bounded messaging)
+  router.use("/chat-sessions", createChatSessionRoutes());
 
   // Platform Owner Console — cross-tenant operations (platform admin only)
   router.use("/platform", createPlatformRoutes());
