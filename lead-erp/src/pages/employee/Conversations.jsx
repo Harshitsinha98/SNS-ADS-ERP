@@ -115,7 +115,7 @@ export default function Conversations() {
   useEffect(() => {
     if (!selectedLead?.id || !orgId) { setMessages([]); return; }
     const messagesRef = collection(db, "organizations", orgId, "leads", selectedLead.id, "messages");
-    const q = query(messagesRef, orderBy("at", "asc"));
+    const q = query(messagesRef, orderBy("atMs", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       const allMsgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       // Show messages from when AI was disabled (session start)
@@ -123,10 +123,7 @@ export default function Conversations() {
         ? new Date(selectedLead.aiDisabledAt).getTime()
         : 0;
       const filtered = sessionStart > 0
-        ? allMsgs.filter((m) => {
-            const t = m.atMs || (m.at ? new Date(m.at).getTime() : 0);
-            return t >= sessionStart;
-          })
+        ? allMsgs.filter((m) => (m.atMs || 0) >= sessionStart)
         : allMsgs;
       setMessages(filtered);
     }, (err) => {
