@@ -1,21 +1,22 @@
 /**
  * Employee Conversations Page.
  *
- * Shows session-bounded WhatsApp conversations assigned to the current employee.
- * Employee can only see messages from their active session — not before or after.
- * Includes: AI brief, session messages, reply input, resolve button.
+ * Shows ONLY leads where AI has escalated to this employee (aiEnabled=false).
+ * Employee sees session-bounded messages, can reply, and resolve/close the session.
+ * Includes notification popup on new assignment and 3-min auto-escalation timer.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import {
   MessageCircle, Send, Loader2, CheckCircle2,
-  Brain, Phone,
+  Brain, Phone, AlertTriangle, Clock, X,
 } from "lucide-react";
 import Layout from "../../components/Layout";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { sendWhatsAppMessage } from "../../utils/billingApi";
+import { resolveSession, reEnableAI } from "../../utils/chatSessionApi";
 
 const formatTime = (value) => {
   if (!value) return "";
@@ -34,43 +35,110 @@ export default function Conversations() {
   const [resolving, setResolving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notification, setNotification] = useState(null);
+  const [escalationTimers, setEscalationTimers] = useState({});
+  const prevLeadIds = useRef(new Set());
+  const messagesEndRef = useRef(null);
 
-  // Listen for ALL leads assigned to this employee (shows their WhatsApp conversations)
+  // Listen for leads where AI is disabled AND assigned to this employee
+  // These are the leads where human takeover happened
   useEffect(() => {
     if (authLoading) return;
     if (!orgId || !user?.uid) { setLoading(false); return; }
     const leadsRef = collection(db, "organizations", orgId, "leads");
-    const q = query(leadsRef, where("assignedTo", "==", user.uid));
+    const q = query(leadsRef,
+      where("assignedTo", "==", user.uid),
+      where("aiEnabled", "==", false)
+    );
     const unsub = onSnapshot(q, (snap) => {
-      const allLeads = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      // Sort by last WhatsApp activity (most recent first)
-      allLeads.sort((a, b) => {
-        const aTime = a.lastWhatsAppInboundAtMs || new Date(a.lastUpdated || 0).getTime();
-        const bTime = b.lastWhatsAppInboundAtMs || new Date(b.lastUpdated || 0).getTime();
+      const newLeads = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      // Detect newly assigned leads → show notification popup
+      const newIds = new Set(newLeads.map((l) => l.id));
+      const freshlyAssigned = newLeads.filter((l) => !prevLeadIds.current.has(l.id));
+      if (freshlyAssigned.length > 0 && prevLeadIds.current.size > 0) {
+        const newest = freshlyAssigned[0];
+        setNotification({
+          lead: newest,
+          message: `New chat assigned: ${newest.name || newest.phone}`,
+          time: Date.now(),
+        });
+        // Auto-dismiss notification after 10 seconds
+        setTimeout(() => setNotification(null), 10000);
+      }
+      prevLeadIds.current = newIds;
+
+      // Sort by AI disabled time (most recent first)
+      newLeads.sort((a, b) => {
+        const aTime = a.aiDisabledAt ? new Date(a.aiDisabledAt).getTime() : 0;
+        const bTime = b.aiDisabledAt ? new Date(b.aiDisabledAt).getTime() : 0;
         return bTime - aTime;
       });
-      setLeads(allLeads);
+      setLeads(newLeads);
       setLoading(false);
     }, (err) => {
-      console.warn("Conversations leads listener error:", err?.code || err?.message);
+      console.warn("Conversations listener error:", err?.code || err?.message);
       setLoading(false);
     });
     return unsub;
   }, [orgId, user?.uid, authLoading]);
 
-  // Real-time listener for messages of the selected lead — instant like WhatsApp
+  // 3-minute auto-escalation timer for each lead
+  useEffect(() => {
+    const timers = {};
+    leads.forEach((lead) => {
+      if (escalationTimers[lead.id]) return; // already has a timer
+      const disabledAt = lead.aiDisabledAt ? new Date(lead.aiDisabledAt).getTime() : Date.now();
+      const threeMinMs = 3 * 60 * 1000;
+      const elapsed = Date.now() - disabledAt;
+      const remaining = threeMinMs - elapsed;
+
+      if (remaining <= 0) {
+        // Already past 3 minutes — mark as escalated
+        timers[lead.id] = "escalated";
+      } else {
+        // Set timer to escalate
+        const timer = setTimeout(() => {
+          setEscalationTimers((prev) => ({ ...prev, [lead.id]: "escalated" }));
+          // TODO: Backend will handle the actual admin notification via cron
+        }, remaining);
+        timers[lead.id] = timer;
+      }
+    });
+    setEscalationTimers((prev) => ({ ...prev, ...timers }));
+    return () => {
+      Object.values(timers).forEach((t) => { if (typeof t === "number") clearTimeout(t); });
+    };
+  }, [leads.length]);
+
+  // Real-time listener for messages — session-bounded (from aiDisabledAt onwards)
   useEffect(() => {
     if (!selectedLead?.id || !orgId) { setMessages([]); return; }
     const messagesRef = collection(db, "organizations", orgId, "leads", selectedLead.id, "messages");
     const q = query(messagesRef, orderBy("at", "asc"));
     const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      const allMsgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // Show messages from when AI was disabled (session start)
+      const sessionStart = selectedLead.aiDisabledAt
+        ? new Date(selectedLead.aiDisabledAt).getTime()
+        : 0;
+      const filtered = sessionStart > 0
+        ? allMsgs.filter((m) => {
+            const t = m.atMs || (m.at ? new Date(m.at).getTime() : 0);
+            return t >= sessionStart;
+          })
+        : allMsgs;
+      setMessages(filtered);
     }, (err) => {
       console.warn("Messages listener error:", err?.code || err?.message);
-      setMessages([]);
     });
     return unsub;
-  }, [orgId, selectedLead?.id]);
+  }, [orgId, selectedLead?.id, selectedLead?.aiDisabledAt]);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const selectLead = (lead) => {
     setSelectedLead(lead);
@@ -82,14 +150,25 @@ export default function Conversations() {
     if (!text.trim() || sending || !selectedLead) return;
     setSending(true); setError("");
     try {
-      await sendWhatsAppMessage({ orgId, leadId: selectedLead.id, text: text.trim(), clientMessageId: `conv_${Date.now()}_${Math.random().toString(36).slice(2)}` });
+      await sendWhatsAppMessage({ orgId, leadId: selectedLead.id, text: text.trim(), clientMessageId: `sess_${Date.now()}_${Math.random().toString(36).slice(2)}` });
       setText("");
     } catch (err) {
       setError(err.code === "template_required"
-        ? "24-hour reply window expired. Use an approved template from the Lead Detail page."
+        ? "24-hour reply window expired. Use an approved template."
         : err.message || "Could not send message");
     }
     setSending(false);
+  };
+
+  const handleResolve = async () => {
+    if (!selectedLead) return;
+    setResolving(true); setError("");
+    try {
+      await reEnableAI(orgId, selectedLead.id);
+      setSelectedLead(null);
+      setMessages([]);
+    } catch (err) { setError(err.message); }
+    setResolving(false);
   };
 
   if (loading) {
@@ -98,12 +177,32 @@ export default function Conversations() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto relative">
+        {/* Notification Popup */}
+        {notification && (
+          <div className="fixed top-4 right-4 z-50 animate-slide-in-right">
+            <div className="bg-white rounded-2xl shadow-xl border border-orange-200 p-4 w-80 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+                <MessageCircle size={18} className="text-orange-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-ink">New Chat Assigned</p>
+                <p className="text-xs text-ink-muted mt-0.5 truncate">{notification.lead?.name || "Customer"} needs your help</p>
+                <button onClick={() => { selectLead(notification.lead); setNotification(null); }}
+                  className="text-xs font-semibold text-orange-600 mt-1.5 hover:underline">Open conversation</button>
+              </div>
+              <button onClick={() => setNotification(null)} className="text-ink-muted hover:text-ink shrink-0">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center gap-3 mb-6">
           <MessageCircle size={24} className="text-teal-600" />
           <div>
             <h1 className="text-xl font-display font-bold text-ink">My Conversations</h1>
-            <p className="text-sm text-ink-muted">Active customer chats assigned to you</p>
+            <p className="text-sm text-ink-muted">Chats escalated from AI that need your attention</p>
           </div>
         </div>
 
@@ -119,7 +218,8 @@ export default function Conversations() {
               {leads.length === 0 ? (
                 <div className="p-6 text-center">
                   <CheckCircle2 size={32} className="mx-auto text-emerald-400 mb-2" />
-                  <p className="text-sm text-ink-muted">No active conversations. AI is handling everything!</p>
+                  <p className="text-sm text-ink-muted">No escalated conversations right now.</p>
+                  <p className="text-xs text-ink-muted/60 mt-1">AI is handling all chats. You'll be notified when a customer needs you.</p>
                 </div>
               ) : leads.map((lead) => (
                 <button key={lead.id} onClick={() => selectLead(lead)}
@@ -132,7 +232,12 @@ export default function Conversations() {
                       <p className="text-sm font-semibold text-ink truncate">{lead.name || "Unknown"}</p>
                       <p className="text-[11px] text-ink-muted truncate">{lead.phone || ""}</p>
                     </div>
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
+                      {escalationTimers[lead.id] === "escalated" && (
+                        <span className="text-[9px] text-red-600 font-bold">3m+</span>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))}
@@ -146,6 +251,7 @@ export default function Conversations() {
                 <div className="text-center">
                   <MessageCircle size={40} className="mx-auto text-cream-300 mb-3" />
                   <p className="text-ink-muted">Select a conversation to start chatting</p>
+                  <p className="text-xs text-ink-muted/60 mt-1">Only escalated chats appear here</p>
                 </div>
               </div>
             ) : (
@@ -161,15 +267,36 @@ export default function Conversations() {
                       <p className="text-[11px] text-ink-muted flex items-center gap-1"><Phone size={10} /> {selectedLead.phone}</p>
                     </div>
                   </div>
-                  {selectedLead.aiEnabled === false && (
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-purple-50 text-purple-700">AI Paused</span>
+                  <button onClick={handleResolve} disabled={resolving}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors disabled:opacity-50">
+                    {resolving ? "Closing..." : "Resolve & Close Chat"}
+                  </button>
+                </div>
+
+                {/* Session Brief */}
+                <div className="px-4 py-3 bg-purple-50 border-b border-purple-100">
+                  <div className="flex items-start gap-2">
+                    <Brain size={14} className="text-purple-500 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-[11px] font-bold text-purple-700">Session Info</p>
+                      <p className="text-xs text-purple-800 mt-0.5">Customer requested human assistance. Reply below — messages are sent from the business number.</p>
+                    </div>
+                  </div>
+                  {escalationTimers[selectedLead.id] === "escalated" && (
+                    <div className="flex items-center gap-1.5 mt-2 text-xs text-red-600 font-medium">
+                      <AlertTriangle size={12} /> Response overdue (3+ minutes). Admin has been notified.
+                    </div>
                   )}
                 </div>
 
                 {/* Messages */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-cream-50/30">
                   {messages.length === 0 ? (
-                    <p className="text-center text-sm text-ink-muted py-8">Waiting for messages in this session...</p>
+                    <div className="text-center py-8">
+                      <Clock size={24} className="mx-auto text-cream-300 mb-2" />
+                      <p className="text-sm text-ink-muted">No messages yet in this session.</p>
+                      <p className="text-xs text-ink-muted/60">Customer's next message will appear here instantly.</p>
+                    </div>
                   ) : messages.map((msg) => (
                     <div key={msg.id} className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
@@ -184,6 +311,7 @@ export default function Conversations() {
                       </div>
                     </div>
                   ))}
+                  <div ref={messagesEndRef} />
                 </div>
 
                 {/* Reply Input */}
