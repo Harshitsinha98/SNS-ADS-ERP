@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState, useRef } from "react";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
 import {
   MessageCircle, Send, Loader2, CheckCircle2,
   Brain, Phone, AlertTriangle, Clock, X,
@@ -111,55 +111,95 @@ export default function Conversations() {
     };
   }, [leads.length]);
 
-  // Real-time listener for messages — session-bounded (from aiDisabledAt onwards).
+  // Real-time listener for messages — STRICT session-bounded.
   //
-  // Robust by design so a message NEVER silently disappears:
-  //  - No orderBy in the Firestore query. orderBy(field) drops any doc missing
-  //    that field and can also fail on a missing index. We sort client-side.
-  //  - Timestamps are read from whatever field exists (atMs / at / sentAt / receivedAt).
-  //  - The session filter is best-effort. If it would hide EVERYTHING while
-  //    messages actually exist, we fail open and show them rather than a blank pane.
+  // Privacy model:
+  //  - Employee sees ONLY messages from session start to session end.
+  //  - AI/admin messages before escalation are NEVER shown.
+  //  - After session is resolved, messages stop appearing.
+  //  - Each new assignment = fresh session = fresh message window.
+  //
+  // Implementation:
+  //  - Fetch the active chatSession doc to get exact startedAtMs / endedAtMs.
+  //  - Filter messages strictly within that window.
+  //  - No fail-open: if session boundaries yield no messages, show "No messages"
+  //    honestly rather than leaking private history.
   useEffect(() => {
     if (!selectedLead?.id || !orgId) { setMessages([]); return; }
-    const messagesRef = collection(db, "organizations", orgId, "leads", selectedLead.id, "messages");
 
-    // Extract a millisecond timestamp from any of the fields our writers use.
-    const msOf = (m) => {
-      if (typeof m.atMs === "number" && m.atMs > 0) return m.atMs;
-      const candidate = m.at || m.sentAt || m.receivedAt;
-      const parsed = candidate ? Date.parse(candidate) : NaN;
-      return Number.isNaN(parsed) ? 0 : parsed;
-    };
+    let cancelled = false;
+    let unsub = () => {};
 
-    const unsub = onSnapshot(messagesRef, (snap) => {
-      const allMsgs = snap.docs
-        .map((d) => ({ id: d.id, ...d.data(), _ms: msOf(d.data()) }))
-        .sort((a, b) => a._ms - b._ms);
+    // First: get session boundaries
+    const setupListener = async () => {
+      let sessionStartMs = 0;
+      let sessionEndMs = Infinity; // Active session = no upper bound
 
-      // Calculate session start time — handle ISO string, Firestore Timestamp, or number.
-      let sessionStart = 0;
-      const raw = selectedLead.aiDisabledAt;
-      if (raw) {
-        if (typeof raw === "string") sessionStart = Date.parse(raw) || 0;
-        else if (typeof raw?.toMillis === "function") sessionStart = raw.toMillis();
-        else if (typeof raw?.seconds === "number") sessionStart = raw.seconds * 1000;
-        else sessionStart = Number(raw) || 0;
+      // Try to fetch the active session doc for precise boundaries
+      const sessionId = selectedLead.activeChatSessionId;
+      if (sessionId) {
+        try {
+          const sessionRef = doc(db, "organizations", orgId, "leads", selectedLead.id, "chatSessions", sessionId);
+          const sessionSnap = await getDoc(sessionRef);
+          if (sessionSnap.exists()) {
+            const session = sessionSnap.data();
+            sessionStartMs = session.startedAtMs || 0;
+            if (session.endedAtMs) sessionEndMs = session.endedAtMs;
+          }
+        } catch (err) {
+          // If we can't read the session (permission or missing), fall back to aiDisabledAt
+          console.warn("Could not read session doc:", err?.code || err?.message);
+        }
       }
 
-      // Show only messages from the escalation point onwards (privacy: the employee
-      // must not see pre-escalation history). Small negative skew tolerance so the
-      // very message that triggered escalation isn't lost to clock rounding.
-      const bounded = sessionStart > 0
-        ? allMsgs.filter((m) => m._ms >= sessionStart - 5000)
-        : allMsgs;
+      // Fallback: use aiDisabledAt from the lead if session doc unavailable
+      if (sessionStartMs === 0) {
+        const raw = selectedLead.aiDisabledAt;
+        if (raw) {
+          if (typeof raw === "string") sessionStartMs = Date.parse(raw) || 0;
+          else if (typeof raw?.toMillis === "function") sessionStartMs = raw.toMillis();
+          else if (typeof raw?.seconds === "number") sessionStartMs = raw.seconds * 1000;
+          else sessionStartMs = Number(raw) || 0;
+        }
+      }
 
-      // Fail open: never show a blank pane when messages genuinely exist.
-      setMessages(bounded.length === 0 && allMsgs.length > 0 ? allMsgs : bounded);
-    }, (err) => {
-      console.warn("Messages listener error:", err?.code || err?.message);
-    });
-    return unsub;
-  }, [orgId, selectedLead?.id, selectedLead?.aiDisabledAt]);
+      if (cancelled) return;
+
+      // Now set up real-time listener with strict session filter
+      const messagesRef = collection(db, "organizations", orgId, "leads", selectedLead.id, "messages");
+
+      const msOf = (m) => {
+        if (typeof m.atMs === "number" && m.atMs > 0) return m.atMs;
+        const candidate = m.at || m.sentAt || m.receivedAt;
+        const parsed = candidate ? Date.parse(candidate) : NaN;
+        return Number.isNaN(parsed) ? 0 : parsed;
+      };
+
+      unsub = onSnapshot(messagesRef, (snap) => {
+        if (cancelled) return;
+        const allMsgs = snap.docs
+          .map((d) => ({ id: d.id, ...d.data(), _ms: msOf(d.data()) }))
+          .sort((a, b) => a._ms - b._ms);
+
+        // STRICT filter: only messages within [sessionStart, sessionEnd]
+        // Employee must NOT see AI/admin messages before their session
+        const sessionMessages = sessionStartMs > 0
+          ? allMsgs.filter((m) => m._ms >= sessionStartMs && m._ms <= sessionEndMs)
+          : [];
+
+        setMessages(sessionMessages);
+      }, (err) => {
+        console.warn("Messages listener error:", err?.code || err?.message);
+      });
+    };
+
+    setupListener();
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [orgId, selectedLead?.id, selectedLead?.activeChatSessionId, selectedLead?.aiDisabledAt]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {

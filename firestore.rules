@@ -123,12 +123,15 @@ service cloud.firestore {
         }
 
         // Provider transcripts are sensitive customer communications. Admins
-        // see every message for audit. The assigned employee may also read the
-        // transcript of a lead handed to them (human takeover / escalation);
-        // the UI bounds their view to the active session (from aiDisabledAt),
-        // while admins retain the full history.
+        // see every message for audit. The assigned employee may read messages
+        // ONLY while their session is active (aiEnabled == false AND they are
+        // the assignee). Once the session is resolved (aiEnabled flips to true),
+        // access is revoked — no historical messages are ever visible to employees.
         match /messages/{messageId} {
-          allow read: if isAdmin(orgId) || isLeadAssignee(orgId, leadId);
+          allow read: if isAdmin(orgId)
+            || (isActiveMember(orgId)
+              && get(leadPath(orgId, leadId)).data.assignedTo == request.auth.uid
+              && get(leadPath(orgId, leadId)).data.aiEnabled == false);
           allow write: if false;
         }
       }
