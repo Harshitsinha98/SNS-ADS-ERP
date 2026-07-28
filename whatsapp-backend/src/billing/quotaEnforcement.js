@@ -131,6 +131,11 @@ export async function checkQuota(orgId, action) {
         return { allowed: true };
       }
 
+      case "human_takeover": {
+        if (!limits.humanTakeover) return { allowed: false, reason: "human_takeover_not_available_on_plan" };
+        return { allowed: true };
+      }
+
       default:
         return { allowed: true };
     }

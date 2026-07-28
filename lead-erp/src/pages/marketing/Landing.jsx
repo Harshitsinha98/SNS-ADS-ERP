@@ -105,7 +105,7 @@ const PRICING_PLANS = [
     seats: "10 users",
     leads: "10,000 leads",
     popular: true,
-    cta: "Start free trial",
+    cta: "Get started",
     features: [
       "Everything in Starter, plus:",
       "AI Auto-Reply (2,000/mo)",
@@ -126,18 +126,38 @@ const PRICING_PLANS = [
     desc: "For high-volume sales operations",
     seats: "25 users",
     leads: "50,000 leads",
-    cta: "Contact sales",
+    cta: "Get started",
     features: [
       "Everything in Growth, plus:",
-      "AI Auto-Reply (Unlimited)",
+      "AI Auto-Reply (10,000/mo)",
       "25 workflow automation rules",
       "Full API access & webhooks",
       "Unlimited website lead forms",
-      "Dedicated account manager",
-      "Custom onboarding",
+      "Priority chat support",
+      "Guided onboarding",
     ],
     missing: [],
     comingSoon: ["Auto-dialer"],
+  },
+  {
+    name: "Enterprise",
+    price: "7,999",
+    period: "/mo",
+    desc: "Unlimited everything for large teams",
+    seats: "Unlimited users",
+    leads: "Unlimited leads",
+    cta: "Contact sales",
+    features: [
+      "Everything in Scale, plus:",
+      "Unlimited AI Auto-Reply",
+      "Unlimited workflow rules",
+      "500 products + unlimited images",
+      "Dedicated account manager",
+      "White-glove onboarding",
+      "Custom integrations",
+    ],
+    missing: [],
+    comingSoon: [],
   },
 ];
 
@@ -569,11 +589,11 @@ export default function Landing() {
               The full AI sales stack — <span className="text-gradient">one subscription</span>
             </h2>
             <p className="text-lg text-ink-soft">
-              Starting at ₹599/month — a full AI-powered CRM for <strong>₹20/day</strong>. Every plan includes a {TRIAL_DAYS}-day free trial.
+              Starting at ₹599/month — a full AI-powered CRM for <strong>₹20/day</strong>. Starter plan includes a {TRIAL_DAYS}-day free trial.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {PRICING_PLANS.map((plan) => (
               <div key={plan.name} className={`relative bg-white rounded-3xl border p-7 shadow-card transition-all hover:-translate-y-1 hover:shadow-card-hover ${plan.popular ? "border-orange-300 ring-2 ring-orange-200" : "border-cream-300/60"}`}>
                 {plan.popular && (
@@ -622,7 +642,7 @@ export default function Landing() {
           </div>
 
           <p className="text-center text-sm text-ink-muted mt-8">
-            All plans include a {TRIAL_DAYS}-day free trial. No credit card required.
+            Starter plan includes a {TRIAL_DAYS}-day free trial. No credit card required.
             <br />Save <strong>20%</strong> with yearly billing.
           </p>
         </div>

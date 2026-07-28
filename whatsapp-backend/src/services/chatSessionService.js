@@ -19,6 +19,7 @@ import { db } from "../bootstrap/firebase.js";
 import { nowIso, orgCollection } from "./helpers.js";
 import { aiConfig } from "../config/env.js";
 import { logger } from "../middleware/logger.js";
+import { checkQuota } from "../billing/quotaEnforcement.js";
 
 // ─── Session CRUD ───────────────────────────────────────────────────
 
@@ -27,6 +28,15 @@ import { logger } from "../middleware/logger.js";
  * Disables AI for this lead and assigns conversation to the employee.
  */
 export async function createChatSession(orgId, leadId, { employeeId, employeeName, reason }) {
+  // ── Plan gate: check if human takeover is allowed on this plan ──
+  const quota = await checkQuota(orgId, "human_takeover");
+  if (!quota.allowed) {
+    const err = new Error("Human takeover is not available on your current plan. Upgrade to Growth or above.");
+    err.code = "plan_limit";
+    err.reason = quota.reason;
+    throw err;
+  }
+
   // End any existing active session for this lead
   const existingActive = await getActiveSession(orgId, leadId);
   if (existingActive) {

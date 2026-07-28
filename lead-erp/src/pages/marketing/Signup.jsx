@@ -426,10 +426,10 @@ export default function Signup() {
                               {planId === p.id && <span className="absolute top-2 right-2 w-3 h-3 rounded-full bg-orange-500 border-2 border-white shadow-sm" />}
                               <span className={`block text-sm font-bold ${planId === p.id ? "text-orange-700" : "text-ink"}`}>{p.name}</span>
                               <span className="block text-[11px] text-ink-muted mt-0.5">₹{p.monthlyPrice.toLocaleString("en-IN")}/mo</span>
-                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-ink-muted/60"}`}>{p.trial ? `${trialDays}-day free trial` : "Contact sales"}</span>
+                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-ink-muted/60"}`}>{p.trial ? `${trialDays}-day free trial` : p.id === "enterprise" ? "Contact sales" : "Paid plan"}</span>
                               {/* Key feature highlight */}
                               <span className="block text-[9px] text-ink-muted/80 mt-1.5 leading-tight">
-                                {p.id === "starter" ? "3 users · 1K leads" : p.id === "growth" ? "10 users · AI replies" : "25 users · API access"}
+                                {p.id === "starter" ? "3 users · 1K leads" : p.id === "growth" ? "10 users · AI + Human Takeover" : p.id === "enterprise" ? "25 users · API access" : "Unlimited everything"}
                               </span>
                             </button>
                           ))}
