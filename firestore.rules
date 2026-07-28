@@ -122,10 +122,13 @@ service cloud.firestore {
           allow read, write: if isAdmin(orgId);
         }
 
-        // Provider transcripts are sensitive customer communications and remain
-        // visible only to workspace administrators.
+        // Provider transcripts are sensitive customer communications. Admins
+        // see every message for audit. The assigned employee may also read the
+        // transcript of a lead handed to them (human takeover / escalation);
+        // the UI bounds their view to the active session (from aiDisabledAt),
+        // while admins retain the full history.
         match /messages/{messageId} {
-          allow read: if isAdmin(orgId);
+          allow read: if isAdmin(orgId) || isLeadAssignee(orgId, leadId);
           allow write: if false;
         }
       }
