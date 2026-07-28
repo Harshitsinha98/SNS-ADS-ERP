@@ -37,6 +37,7 @@ const adminLinks = [
 
 const empLinks = [
   { to: "/app", label: "Workspace", end: true, icon: LayoutDashboard },
+  { to: "/app/leads", label: "My Leads", icon: Inbox },
   { to: "/app/conversations", label: "My Conversations", icon: MessageCircle },
   { to: "/app/tasks", label: "My Follow-ups", icon: ClipboardList },
 ];

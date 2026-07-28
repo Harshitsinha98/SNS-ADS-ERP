@@ -40,6 +40,7 @@ import SupportPage from "./pages/platform/SupportPage";
 import Workspace from "./pages/employee/Workspace";
 import LeadAction from "./pages/employee/LeadAction";
 import Conversations from "./pages/employee/Conversations";
+import MyLeads from "./pages/employee/MyLeads";
 import Tasks from "./pages/employee/Tasks";
 
 // 1. 📲 Imported the native Android Call Tracker hook
@@ -107,6 +108,7 @@ export default function App() {
 
         {/* --- EMPLOYEE SECTION --- */}
         <Route path="/app" element={<ProtectedRoute role="employee"><Workspace /></ProtectedRoute>} />
+        <Route path="/app/leads" element={<ProtectedRoute role="employee"><MyLeads /></ProtectedRoute>} />
         <Route path="/app/lead/:id" element={<ProtectedRoute role="employee"><LeadAction /></ProtectedRoute>} />
         <Route path="/app/conversations" element={<ProtectedRoute role="employee"><Conversations /></ProtectedRoute>} />
         <Route path="/app/tasks" element={<ProtectedRoute role="employee"><Tasks /></ProtectedRoute>} />
