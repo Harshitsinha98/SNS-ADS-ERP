@@ -118,10 +118,19 @@ export default function Conversations() {
     const q = query(messagesRef, orderBy("atMs", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       const allMsgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      // Show messages from when AI was disabled (session start)
-      const sessionStart = selectedLead.aiDisabledAt
-        ? new Date(selectedLead.aiDisabledAt).getTime()
-        : 0;
+
+      // Calculate session start time — handle Firestore Timestamp, ISO string, or missing
+      let sessionStart = 0;
+      const raw = selectedLead.aiDisabledAt;
+      if (raw) {
+        if (typeof raw === "string") sessionStart = new Date(raw).getTime();
+        else if (typeof raw?.toMillis === "function") sessionStart = raw.toMillis();
+        else if (typeof raw?.seconds === "number") sessionStart = raw.seconds * 1000;
+        else sessionStart = Number(raw) || 0;
+      }
+
+      // If sessionStart is valid, show only messages from that point
+      // If not (edge case), show all messages
       const filtered = sessionStart > 0
         ? allMsgs.filter((m) => (m.atMs || 0) >= sessionStart)
         : allMsgs;
