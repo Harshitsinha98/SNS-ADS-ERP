@@ -271,6 +271,14 @@
       "fields": [
         { "fieldPath": "source", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "leads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedTo", "order": "ASCENDING" },
+        { "fieldPath": "aiEnabled", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
