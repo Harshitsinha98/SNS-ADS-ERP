@@ -12,9 +12,11 @@ import { useState } from "react";
 import { Brain, UserCheck, Loader2, RotateCcw, AlertCircle } from "lucide-react";
 import { takeOverLead, reEnableAI } from "../utils/chatSessionApi";
 import { useAuth } from "../context/AuthContext";
+import { useData } from "../context/DataContext";
 
 export default function ChatSessionControls({ lead, orgId, onUpdate }) {
   const { user } = useAuth();
+  const { users } = useData();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -73,7 +75,7 @@ export default function ChatSessionControls({ lead, orgId, onUpdate }) {
           </div>
           {hasActiveSession && (
             <div className="text-xs text-ink-muted bg-cream-50 rounded-lg p-2.5">
-              <p><strong>Session:</strong> {lead.activeChatSessionEmployee === user?.uid ? "You" : "Another agent"} is handling this conversation.</p>
+              <p><strong>Session:</strong> {lead.activeChatSessionEmployee === user?.uid ? "You" : (users.find((u) => u.uid === lead.activeChatSessionEmployee || u.id === lead.activeChatSessionEmployee)?.name || "Agent")} handling this conversation.</p>
               {lead.aiDisabledAt && <p className="mt-1">Since: {new Date(lead.aiDisabledAt).toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" })}</p>}
             </div>
           )}
