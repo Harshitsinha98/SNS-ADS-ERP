@@ -23,14 +23,14 @@ export const PLANS = [
       { text: "Round-robin auto-assignment", included: true },
       { text: "AI auto-reply (100/mo)", included: true },
       { text: "5 knowledge base articles", included: true },
-      { text: "Call tracking (Android)", included: true },
+      { text: "Native call tracking (Android)", included: true },
       { text: "1 website lead form", included: true },
       { text: "Follow-up reminders (basic)", included: true },
       { text: "Activity log", included: true },
       { text: "Full AI Customer Care (2,000/mo)", included: false },
-      { text: "Human Takeover + Smart Notifications", included: false },
+      { text: "Bridge calling — number masked + recorded", included: false },
+      { text: "AI Voice Bot (auto-call & qualify)", included: false },
       { text: "Workflow automation", included: false },
-      { text: "Product catalogue", included: false },
     ],
   },
   {
@@ -49,13 +49,13 @@ export const PLANS = [
       { text: "Everything in Starter", included: true },
       { text: "AI auto-reply (2,000/mo)", included: true },
       { text: "Human Takeover + Smart Notifications", included: true },
-      { text: "30 knowledge base articles", included: true },
+      { text: "Bridge calling — number masked + recorded", included: true },
       { text: "5 workflow rules", included: true },
       { text: "50 products in catalogue", included: true },
       { text: "Goals & performance", included: true },
       { text: "Meta & Google Ad leads", included: true },
       { text: "Priority email support", included: true },
-      { text: "API access", included: false },
+      { text: "AI Voice Bot (auto-call & qualify)", included: false },
     ],
   },
   {
@@ -72,7 +72,7 @@ export const PLANS = [
       { text: "50,000 leads / month", included: true },
       { text: "Everything in Growth", included: true },
       { text: "AI auto-reply (10,000/mo)", included: true },
-      { text: "100 knowledge base articles", included: true },
+      { text: "AI Voice Bot — auto-call, qualify & warm-transfer", included: true },
       { text: "25 workflow rules", included: true },
       { text: "200 products in catalogue", included: true },
       { text: "API access & webhooks", included: true },
@@ -94,12 +94,12 @@ export const PLANS = [
       { text: "Unlimited leads", included: true },
       { text: "Everything in Scale", included: true },
       { text: "Unlimited AI auto-replies", included: true },
+      { text: "AI Voice Bot + Bridge calling", included: true },
       { text: "500 products + unlimited images", included: true },
       { text: "Unlimited workflows", included: true },
       { text: "Full API & webhooks", included: true },
       { text: "Dedicated account manager", included: true },
-      { text: "White-glove onboarding", included: true },
-      { text: "Custom integrations", included: true },
+      { text: "White-glove onboarding + custom integrations", included: true },
     ],
   },
 ];
@@ -111,6 +111,10 @@ export const ADD_ONS = [
   { id: "catalogue_pro", name: "Catalogue Pro", price: 499, unit: "500 products", description: "500 products + 5,000 image messages/month" },
   { id: "workflow_unlimited", name: "Unlimited Workflows", price: 299, unit: "unlimited", description: "Unlimited workflow automation rules" },
   { id: "api_access", name: "API & Webhooks", price: 999, unit: "full access", description: "REST API + real-time webhook access" },
+  // ── Codeskate Voice — prepaid, pay-as-you-go. Minutes never expire while your
+  //    plan is active. Billed from the wallet at a flat per-minute rate.
+  { id: "voice_bridge_pack", name: "Bridge Call Wallet", price: 1999, unit: "1,000 mins", description: "1,000 masked & recorded bridge-call minutes. Top up anytime — pay only for what you use." },
+  { id: "voice_ai_pack", name: "AI Voice Bot Wallet", price: 3999, unit: "500 mins", description: "500 minutes of AI voice-bot calling in Hindi & English. Auto-qualify leads and warm-transfer to agents." },
 ];
 
 // Default free-trial length (days).

@@ -21,6 +21,7 @@ import { createWorkflowRoutes, createTicketRoutes } from "./workflow.routes.js";
 import { createPlatformRoutes } from "./platform.routes.js";
 import { createAIRoutes } from "./ai.routes.js";
 import { createChatSessionRoutes } from "./chatSession.routes.js";
+import { createOtpRoutes } from "./otp.routes.js";
 import { publicChatMessage } from "../../controllers/publicChat.controller.js";
 
 export function createV1Router() {
@@ -31,6 +32,9 @@ export function createV1Router() {
 
   // Public AI chat widget — no auth required (rate-limited by IP)
   router.post("/public/chat", publicChatMessage);
+
+  // Multi-channel OTP (WhatsApp → SMS → Voice) — public, pre-auth
+  router.use("/otp", createOtpRoutes());
 
   // WhatsApp management
   router.use("/whatsapp", createWhatsAppRoutes());

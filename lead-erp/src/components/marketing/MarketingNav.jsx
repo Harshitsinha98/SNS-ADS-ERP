@@ -5,6 +5,7 @@ import Logo from "./Logo";
 
 const NAV_LINKS = [
   { label: "Features", to: "/#features" },
+  { label: "Voice", to: "/#voice" },
   { label: "How it works", to: "/#how" },
   { label: "Pricing", to: "/pricing" },
   { label: "FAQ", to: "/pricing#faq" },

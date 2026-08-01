@@ -126,7 +126,7 @@ export default function Signup() {
     setErr("");
     if (otp.length !== 6) return setErr("Please enter the 6-digit code.");
     setLoading(true);
-    const res = await verifyOtp(confirmation, otp.trim());
+    const res = await verifyOtp(confirmation, otp.trim(), phone.trim());
     if (!res.ok) { setLoading(false); return setErr(res.error); }
 
     // The backend is authoritative for one-trial-per-phone enforcement. It
@@ -418,18 +418,18 @@ export default function Signup() {
                       </div>
 
                       <div>
-                        <div className="grid grid-cols-3 gap-2.5">
-                          {plans.filter((p) => p.id !== "enterprise_plus").map((p) => (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                          {plans.map((p) => (
                             <button key={p.id} type="button" onClick={() => setPlanId(p.id)}
                               className={`relative rounded-xl border px-2 py-3.5 text-center transition-all duration-200 ${planId === p.id ? "border-orange-400 bg-orange-50/70 shadow-md shadow-orange-100/50 ring-1 ring-orange-200" : "border-cream-200 hover:border-orange-200 hover:bg-cream-50"}`}>
                               {p.popular && <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm">POPULAR</span>}
                               {planId === p.id && <span className="absolute top-2 right-2 w-3 h-3 rounded-full bg-orange-500 border-2 border-white shadow-sm" />}
                               <span className={`block text-sm font-bold ${planId === p.id ? "text-orange-700" : "text-ink"}`}>{p.name}</span>
                               <span className="block text-[11px] text-ink-muted mt-0.5">₹{p.monthlyPrice.toLocaleString("en-IN")}/mo</span>
-                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-ink-muted/60"}`}>{p.trial ? `${trialDays}-day free trial` : p.id === "enterprise" ? "Contact sales" : "Paid plan"}</span>
+                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-ink-muted/60"}`}>{p.trial ? `${trialDays}-day free trial` : "Paid plan"}</span>
                               {/* Key feature highlight */}
                               <span className="block text-[9px] text-ink-muted/80 mt-1.5 leading-tight">
-                                {p.id === "starter" ? "3 users · 1K leads" : p.id === "growth" ? "10 users · AI + Human Takeover" : p.id === "enterprise" ? "25 users · API access" : "Unlimited everything"}
+                                {p.id === "starter" ? "3 users · 1K leads" : p.id === "growth" ? "10 users · AI + Human Takeover" : p.id === "enterprise" ? "25 users · Bridge calling" : "Unlimited + AI Voice Bot"}
                               </span>
                             </button>
                           ))}
@@ -535,8 +535,8 @@ export default function Signup() {
                         </div>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-ink-soft border-t border-cream-200/80 pt-3">
-                        <span className="flex items-center gap-1.5"><Users size={13} className="text-orange-500" /> {plan.includedSeats} seats</span>
-                        <span className="flex items-center gap-1.5"><Inbox size={13} className="text-orange-500" /> {plan.leadsLimit >= 1000000 ? "Unlimited" : plan.leadsLimit.toLocaleString("en-IN")} leads</span>
+                        <span className="flex items-center gap-1.5"><Users size={13} className="text-orange-500" /> {plan.includedSeats < 0 ? "Unlimited" : plan.includedSeats} seats</span>
+                        <span className="flex items-center gap-1.5"><Inbox size={13} className="text-orange-500" /> {plan.leadsLimit < 0 || plan.leadsLimit >= 1000000 ? "Unlimited" : plan.leadsLimit.toLocaleString("en-IN")} leads</span>
                       </div>
                     </div>
 
