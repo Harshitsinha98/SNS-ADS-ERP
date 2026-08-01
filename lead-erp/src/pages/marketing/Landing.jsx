@@ -5,11 +5,42 @@ import {
   Brain, Bot, BookOpen, PhoneCall, Headphones, Rocket, Globe2,
   AlertTriangle, Crown, ChevronRight, Play, BadgeCheck, Timer,
   MessageCircle, GitBranch, Building2, CreditCard, Lock, Layers,
+  PhoneForwarded, Mic, Voicemail, Wallet,
 } from "lucide-react";
 import MarketingNav from "../../components/marketing/MarketingNav";
 import MarketingFooter from "../../components/marketing/MarketingFooter";
 import AIChatWidget from "../../components/marketing/AIChatWidget";
+import { Reveal, Stagger, StaggerItem, motion } from "../../components/marketing/Motion";
 import { TRIAL_DAYS } from "../../data/plans";
+
+
+/* ── Codeskate Voice — the three calling modes ───────────────────── */
+const VOICE_MODES = [
+  {
+    icon: Phone,
+    tag: "Every plan",
+    tagColor: "emerald",
+    title: "Native Call Tracking",
+    desc: "Your telecaller dials the lead from the app — the call is auto-logged with duration and outcome, straight onto the lead's timeline. Zero manual entry.",
+    points: ["Works on Android", "Auto call logging", "No extra telephony cost"],
+  },
+  {
+    icon: PhoneForwarded,
+    tag: "Growth & up",
+    tagColor: "orange",
+    title: "Bridge Calling",
+    desc: "Connect agent and lead through a virtual number. Neither side sees the other's real number, and every call is recorded and stored for the owner.",
+    points: ["Number masking (privacy)", "Call recording for owner", "Pay-as-you-go wallet"],
+  },
+  {
+    icon: Bot,
+    tag: "Scale & up",
+    tagColor: "purple",
+    title: "AI Voice Bot",
+    desc: "AI calls your leads in Hindi & English, asks qualifying questions, then warm-transfers hot leads to an available agent — or updates the lead itself.",
+    points: ["Natural Hindi + English", "Auto-qualify leads", "Warm transfer to agent"],
+  },
+];
 
 
 const URGENCY_STATS = [
@@ -21,10 +52,10 @@ const URGENCY_STATS = [
 
 const COMPETITORS_MISSING = [
   "AI WhatsApp Auto-Reply",
-  "Knowledge Base Training",
+  "AI Voice Bot (Hindi & English)",
+  "Bridge Calling with Number Masking",
+  "Call Recording on the lead timeline",
   "Workflow Automation Engine",
-  "Auto-Dialer Call Center",
-  "Real-time Lead Assignment",
   "Native Call Tracking",
 ];
 
@@ -94,7 +125,7 @@ const PRICING_PLANS = [
       "Activity log",
       "Mobile app access",
     ],
-    missing: ["Full AI (2,000/mo)", "Human Takeover", "Workflow automation"],
+    missing: ["Bridge calling (masked + recorded)", "AI Voice Bot", "Full AI (2,000/mo)"],
     comingSoon: [],
   },
   {
@@ -110,13 +141,13 @@ const PRICING_PLANS = [
       "Everything in Starter, plus:",
       "AI Auto-Reply (2,000/mo)",
       "Human Takeover + Smart Notifications",
+      "Bridge calling — masked + recorded",
       "5 workflow automation rules",
       "Goals & performance tracking",
-      "Full activity audit log",
       "Meta & Google Ad lead capture",
       "Priority email support",
     ],
-    missing: ["Unlimited AI Auto-Reply", "API access"],
+    missing: ["AI Voice Bot", "Unlimited AI Auto-Reply"],
     comingSoon: [],
   },
   {
@@ -129,12 +160,12 @@ const PRICING_PLANS = [
     cta: "Get started",
     features: [
       "Everything in Growth, plus:",
+      "AI Voice Bot — auto-call & qualify",
       "AI Auto-Reply (10,000/mo)",
       "25 workflow automation rules",
       "Full API access & webhooks",
       "Unlimited website lead forms",
       "Priority chat support",
-      "Guided onboarding",
     ],
     missing: [],
     comingSoon: ["Auto-dialer"],
@@ -150,11 +181,11 @@ const PRICING_PLANS = [
     features: [
       "Everything in Scale, plus:",
       "Unlimited AI Auto-Reply",
+      "AI Voice Bot + Bridge calling",
       "Unlimited workflow rules",
       "500 products + unlimited images",
       "Dedicated account manager",
-      "White-glove onboarding",
-      "Custom integrations",
+      "White-glove onboarding + custom integrations",
     ],
     missing: [],
     comingSoon: [],
@@ -515,18 +546,125 @@ export default function Landing() {
       </section>
 
 
+      {/* ============ CODESKATE VOICE — Calling Suite ============ */}
+      <section id="voice" className="relative py-20 sm:py-28 bg-ink texture-grain overflow-hidden scroll-mt-16">
+        <div className="absolute inset-0 pattern-grid opacity-[0.15] pointer-events-none" />
+        <div className="absolute -top-24 right-0 w-[30rem] h-[30rem] bg-orange-500/20 rounded-full blur-3xl animate-blob pointer-events-none" />
+        <div className="absolute -bottom-24 -left-16 w-96 h-96 bg-purple-500/15 rounded-full blur-3xl animate-blob pointer-events-none" style={{ animationDelay: "5s" }} />
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
+          <Reveal className="text-center max-w-3xl mx-auto mb-16">
+            <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 mb-4 backdrop-blur">
+              <PhoneCall size={14} className="text-orange-400" />
+              <span className="text-xs font-bold text-orange-300 uppercase tracking-wider">Codeskate Voice</span>
+            </div>
+            <h2 className="font-display font-bold text-3xl sm:text-5xl text-white mb-5">
+              Calling that closes — <span className="text-gradient">masked, recorded &amp; AI-powered</span>
+            </h2>
+            <p className="text-lg text-cream-300/85">
+              Three ways to call your leads, right inside the CRM. Protect your team's numbers,
+              record every conversation, and let AI make the first call for you.
+            </p>
+          </Reveal>
+
+          {/* Three voice modes */}
+          <Stagger className="grid md:grid-cols-3 gap-6 mb-14">
+            {VOICE_MODES.map((m) => {
+              const Icon = m.icon;
+              const tagStyle = {
+                emerald: "bg-emerald-500/15 text-emerald-300 border-emerald-400/30",
+                orange: "bg-orange-500/15 text-orange-300 border-orange-400/30",
+                purple: "bg-purple-500/15 text-purple-300 border-purple-400/30",
+              }[m.tagColor];
+              const iconStyle = {
+                emerald: "bg-emerald-500/15 text-emerald-300",
+                orange: "bg-orange-500/15 text-orange-300",
+                purple: "bg-purple-500/15 text-purple-300",
+              }[m.tagColor];
+              return (
+                <StaggerItem key={m.title}>
+                  <div className="group h-full bg-white/[0.04] hover:bg-white/[0.07] border border-white/10 hover:border-white/20 rounded-2xl p-7 transition-all duration-300 backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-5">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${iconStyle}`}>
+                        <Icon size={22} />
+                      </div>
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${tagStyle}`}>{m.tag}</span>
+                    </div>
+                    <h3 className="font-display font-semibold text-xl text-white mb-2.5">{m.title}</h3>
+                    <p className="text-sm text-cream-300/80 leading-relaxed mb-5">{m.desc}</p>
+                    <ul className="space-y-2">
+                      {m.points.map((p) => (
+                        <li key={p} className="flex items-center gap-2 text-sm text-cream-200/90">
+                          <Check size={14} className="text-emerald-400 shrink-0" strokeWidth={3} />
+                          {p}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </StaggerItem>
+              );
+            })}
+          </Stagger>
+
+          {/* How bridge calling works — mini flow */}
+          <Reveal className="bg-white/[0.04] border border-white/10 rounded-3xl p-6 sm:p-8 backdrop-blur-sm">
+            <div className="flex items-center gap-2 mb-6">
+              <PhoneForwarded size={16} className="text-orange-400" />
+              <p className="text-xs font-bold text-orange-300 uppercase tracking-wider">How a bridge call works</p>
+            </div>
+            <div className="grid sm:grid-cols-4 gap-4">
+              {[
+                { icon: Users, title: "Agent clicks call", desc: "One tap on the lead in your CRM." },
+                { icon: PhoneCall, title: "We call the agent", desc: "Codeskate Voice rings your agent first." },
+                { icon: PhoneForwarded, title: "Bridge to the lead", desc: "We dial the lead & connect both — via a virtual number." },
+                { icon: Voicemail, title: "Recorded & logged", desc: "Recording + duration saved to the lead automatically." },
+              ].map((s, i) => (
+                <div key={s.title} className="relative">
+                  <div className="w-9 h-9 rounded-lg bg-orange-500/15 flex items-center justify-center mb-3">
+                    <s.icon size={17} className="text-orange-300" />
+                  </div>
+                  <p className="font-semibold text-white text-sm mb-1">{s.title}</p>
+                  <p className="text-xs text-cream-300/70 leading-relaxed">{s.desc}</p>
+                  {i < 3 && <ChevronRight className="hidden sm:block absolute top-1 -right-2.5 text-white/20" size={16} />}
+                </div>
+              ))}
+            </div>
+          </Reveal>
+
+          {/* Voice wallet — pay-as-you-go */}
+          <Reveal delay={0.1}>
+            <div className="mt-6 flex flex-col sm:flex-row items-center gap-4 bg-gradient-to-r from-orange-500/15 to-purple-500/10 border border-white/10 rounded-2xl px-6 py-5">
+              <div className="w-11 h-11 rounded-xl bg-orange-500/20 flex items-center justify-center shrink-0">
+                <Wallet size={20} className="text-orange-300" />
+              </div>
+              <div className="flex-1 text-center sm:text-left">
+                <p className="font-semibold text-white text-sm">Prepaid voice wallet — pay only for what you use</p>
+                <p className="text-xs text-cream-300/75 mt-0.5">
+                  Bridge from ₹2/min · AI Voice Bot from ₹8/min. Top up anytime, minutes never expire while your plan is active.
+                </p>
+              </div>
+              <button onClick={() => navigate("/signup")} className="btn bg-white text-ink hover:bg-cream-100 text-sm px-5 py-2.5 shrink-0 font-semibold">
+                Get Started
+                <ArrowRight size={15} />
+              </button>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+
       {/* ============ ALL FEATURES ============ */}
       <section id="features" className="relative py-20 sm:py-28 bg-cream-50 scroll-mt-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <p className="eyebrow mb-3">86+ Features, One Platform</p>
+          <Reveal className="text-center max-w-2xl mx-auto mb-16">
+            <p className="eyebrow mb-3">90+ Features, One Platform</p>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-ink mb-4">
               Everything you need — <span className="text-gradient">one platform</span>
             </h2>
             <p className="text-lg text-ink-soft">
-              CRM + WhatsApp + AI + Automation + Call Center — 5 tools replaced by 1. Simple. Powerful. Affordable.
+              CRM + WhatsApp + AI + Voice + Automation — 5 tools replaced by 1. Simple. Powerful. Affordable.
             </p>
-          </div>
+          </Reveal>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {POWER_FEATURES.map((f) => {
@@ -583,7 +721,7 @@ export default function Landing() {
       {/* ============ PRICING ============ */}
       <section id="pricing" className="py-20 sm:py-28 bg-cream-50 texture-grain scroll-mt-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center max-w-2xl mx-auto mb-14">
+          <Reveal className="text-center max-w-2xl mx-auto mb-14">
             <p className="eyebrow mb-3">Simple pricing</p>
             <h2 className="font-display font-bold text-3xl sm:text-5xl text-ink mb-4">
               The full AI sales stack — <span className="text-gradient">one subscription</span>
@@ -591,7 +729,7 @@ export default function Landing() {
             <p className="text-lg text-ink-soft">
               Starting at ₹599/month — a full AI-powered CRM for <strong>₹20/day</strong>. Starter plan includes a {TRIAL_DAYS}-day free trial.
             </p>
-          </div>
+          </Reveal>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {PRICING_PLANS.map((plan) => (
@@ -643,7 +781,7 @@ export default function Landing() {
 
           <p className="text-center text-sm text-ink-muted mt-8">
             Starter plan includes a {TRIAL_DAYS}-day free trial. No credit card required.
-            <br />Save <strong>20%</strong> with yearly billing.
+            <br />Save <strong>20%</strong> with yearly billing · Voice calling is a prepaid wallet — pay only for minutes you use.
           </p>
         </div>
       </section>

@@ -1,10 +1,33 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, X, ArrowRight, Sparkles, ChevronDown } from "lucide-react";
+import { Check, X, ArrowRight, Sparkles, ChevronDown, PhoneForwarded, Bot, Wallet } from "lucide-react";
 import MarketingNav from "../../components/marketing/MarketingNav";
 import MarketingFooter from "../../components/marketing/MarketingFooter";
+import { Reveal } from "../../components/marketing/Motion";
 import { TRIAL_DAYS, mergePlansWithConfig } from "../../data/plans";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
+
+// Codeskate Voice — prepaid, pay-as-you-go wallet packs.
+const VOICE_PACKS = [
+  {
+    icon: PhoneForwarded,
+    name: "Bridge Call Wallet",
+    price: "₹1,999",
+    unit: "1,000 minutes",
+    rate: "≈ ₹2 / min",
+    desc: "Masked & recorded agent-to-lead calls. Numbers stay private; recordings land on the lead.",
+    plan: "Available on Growth & up",
+  },
+  {
+    icon: Bot,
+    name: "AI Voice Bot Wallet",
+    price: "₹3,999",
+    unit: "500 minutes",
+    rate: "≈ ₹8 / min",
+    desc: "AI calls, qualifies in Hindi & English, and warm-transfers hot leads to an available agent.",
+    plan: "Available on Scale & up",
+  },
+];
 
 const SALES_WHATSAPP_NUMBER = (import.meta.env.VITE_SALES_WHATSAPP_NUMBER || "919653043939").replace(/\D/g, "");
 const salesWhatsAppUrl = `https://wa.me/${SALES_WHATSAPP_NUMBER}?text=${encodeURIComponent("Hi Codeskate CRM team, I need help with a custom CRM plan.")}`;
@@ -219,6 +242,53 @@ export default function Pricing() {
           All prices in INR and exclusive of applicable taxes. Need a custom plan?{" "}
           <a href={salesWhatsAppUrl} target="_blank" rel="noreferrer" className="text-orange-600 font-semibold hover:underline">Talk to sales →</a>
         </p>
+      </section>
+
+      {/* ===== CODESKATE VOICE — pay-as-you-go wallets ===== */}
+      <section className="pb-20 sm:pb-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <Reveal className="text-center max-w-2xl mx-auto mb-10">
+            <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-full px-4 py-1.5 mb-4">
+              <Wallet size={14} className="text-orange-600" />
+              <span className="text-xs font-bold text-orange-700 uppercase tracking-wider">Codeskate Voice</span>
+            </div>
+            <h2 className="font-display font-bold text-2xl sm:text-4xl text-ink mb-3">
+              Add calling, <span className="text-gradient">pay only for what you use</span>
+            </h2>
+            <p className="text-ink-soft">
+              Voice is a prepaid wallet on top of any eligible plan — no fixed monthly commitment.
+              Top up anytime; minutes never expire while your plan is active.
+            </p>
+          </Reveal>
+
+          <div className="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            {VOICE_PACKS.map((p) => {
+              const Icon = p.icon;
+              return (
+                <Reveal key={p.name}>
+                  <div className="h-full bg-white rounded-2xl border border-cream-300/60 p-7 shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-orange/10 flex items-center justify-center">
+                        <Icon size={20} className="text-orange-600" />
+                      </div>
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-cream-200 text-ink-soft">{p.plan}</span>
+                    </div>
+                    <h3 className="font-display font-bold text-lg text-ink">{p.name}</h3>
+                    <div className="flex items-end gap-2 mt-2 mb-1">
+                      <span className="font-display font-bold text-3xl text-ink">{p.price}</span>
+                      <span className="text-sm text-ink-muted mb-1">/ {p.unit}</span>
+                    </div>
+                    <p className="text-xs font-semibold text-orange-600 mb-3">{p.rate}</p>
+                    <p className="text-sm text-ink-soft leading-relaxed">{p.desc}</p>
+                  </div>
+                </Reveal>
+              );
+            })}
+          </div>
+          <p className="text-center text-xs text-ink-muted mt-6">
+            Native call tracking (Android) is included free on every plan. Bridge &amp; AI Voice Bot are billed from your voice wallet.
+          </p>
+        </div>
       </section>
 
       {/* ===== FEATURE COMPARISON STRIP ===== */}
