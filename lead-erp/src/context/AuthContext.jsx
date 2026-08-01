@@ -1,9 +1,10 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged } from "firebase/auth";
+import { RecaptchaVerifier, signInWithPhoneNumber, signInWithCustomToken, signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { withTimeout } from "../utils/withTimeout";
 import { claimTeamInvites } from "../utils/billingApi";
+import { getOtpConfig, sendOtpRequest, verifyOtpRequest } from "../utils/otpApi";
 import { PLATFORM_OWNER_PHONE } from "../data/constants";
 
 const AuthContext = createContext();
@@ -217,35 +218,65 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Step 1: Send OTP to phone
+  // ── Step 1: Send OTP ────────────────────────────────────────────────
+  // Prefers the multi-channel backend (WhatsApp → SMS → Voice) when it is
+  // configured; otherwise transparently falls back to Firebase Phone Auth.
+  // Returns `{ ok, mode, confirmation?, channel?, devCode?, error? }`.
   const requestOtp = async (phone) => {
-    const phoneId = toE164(phone);
+    // Try multi-channel OTP first.
+    try {
+      const cfg = await getOtpConfig();
+      if (cfg?.enabled) {
+        const r = await sendOtpRequest(phone);
+        if (r.ok) return { ok: true, mode: "multi", channel: r.channel, devCode: r.devCode };
+        return { ok: false, mode: "multi", error: r.error, retryAfter: r.retryAfter };
+      }
+    } catch (e) {
+      console.warn("Multi-channel OTP unavailable, falling back to Firebase:", e?.message);
+    }
 
-    // Guard: make sure Firebase config actually loaded (.env missing = no apiKey)
+    // Fallback: Firebase Phone Auth (SMS via reCAPTCHA).
+    const phoneId = toE164(phone);
     if (!import.meta.env.VITE_FIREBASE_API_KEY) {
       return {
         ok: false,
         error: "Firebase config missing. Create a .env file (VITE_FIREBASE_* keys) and restart the app.",
       };
     }
-
     try {
       const verifier = ensureRecaptcha();
       const confirmation = await signInWithPhoneNumber(auth, phoneId, verifier);
-      return { ok: true, confirmation };
+      return { ok: true, mode: "firebase", confirmation };
     } catch (e) {
       console.error("requestOtp error:", e.code, e.message);
-      // reset so the user can retry without a stale captcha
       resetRecaptcha();
       return { ok: false, error: otpErrorMessage(e.code) };
     }
   };
 
-  // Step 2: OTP verify
-  const verifyOtp = async (confirmation, otp) => {
+  // ── Step 2: Verify OTP ──────────────────────────────────────────────
+  // Backward compatible: existing callers pass (confirmation, otp). For the
+  // multi-channel flow there is no confirmation object, so callers pass the
+  // phone number as the third argument and we verify server-side, then sign in
+  // with the returned Firebase custom token.
+  const verifyOtp = async (confirmation, otp, phone) => {
+    // Multi-channel path (no Firebase confirmation object).
     if (!confirmation) {
-      return { ok: false, error: "Session expired. Please request a new OTP." };
+      if (!phone) {
+        return { ok: false, error: "Session expired. Please request a new code." };
+      }
+      const r = await verifyOtpRequest(phone, otp);
+      if (!r.ok) return { ok: false, error: r.error };
+      try {
+        await signInWithCustomToken(auth, r.token);
+        return { ok: true };
+      } catch (e) {
+        console.error("signInWithCustomToken error:", e.code, e.message);
+        return { ok: false, error: "Could not complete sign in. Please try again." };
+      }
     }
+
+    // Firebase Phone Auth path.
     try {
       await confirmation.confirm(otp);
       return { ok: true };

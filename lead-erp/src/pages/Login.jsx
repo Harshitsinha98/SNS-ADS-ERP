@@ -72,7 +72,7 @@ export default function Login() {
   const confirmOtp = async (e) => {
     e.preventDefault();
     setErr(""); setLoading(true);
-    const res = await verifyOtp(confirmation, otp.trim());
+    const res = await verifyOtp(confirmation, otp.trim(), phone.trim());
     setLoading(false);
     if (!res.ok) setErr(res.error);
     // success → AuthContext sets user → useEffect routes/verifies

@@ -93,3 +93,45 @@ export const aiConfig = {
   customerCareProvider: process.env.AI_CUSTOMER_CARE_PROVIDER || "gemini", // "openai" or "gemini"
   homepageChatProvider: process.env.AI_HOMEPAGE_CHAT_PROVIDER || "openai", // "openai" or "gemini"
 };
+
+
+/**
+ * Multi-channel OTP (WhatsApp → SMS → Voice) via MSG91.
+ *
+ * The whole feature is OFF by default: unless MSG91_AUTH_KEY is present the
+ * backend returns `configured: false` and the frontend keeps using Firebase
+ * Phone Auth. This lets us ship the code without disrupting the live login.
+ *
+ * `channelOrder` controls the fallback chain — the first channel that accepts
+ * the request wins. In non-production, when no provider is configured, a dev
+ * fallback returns the code in the API response so the flow stays testable.
+ */
+export const otpConfig = {
+  // MSG91 handles WhatsApp, SMS and Voice OTP under one auth key.
+  msg91AuthKey: process.env.MSG91_AUTH_KEY || "",
+  msg91SmsTemplateId: process.env.MSG91_SMS_TEMPLATE_ID || "",
+  msg91WhatsappTemplateId: process.env.MSG91_WHATSAPP_TEMPLATE_ID || "",
+  msg91WhatsappNumber: process.env.MSG91_WHATSAPP_NUMBER || "",
+  msg91VoiceTemplateId: process.env.MSG91_VOICE_TEMPLATE_ID || "",
+  msg91SenderId: process.env.MSG91_SENDER_ID || "",
+
+  // Fallback chain. Comma-separated: "whatsapp,sms,voice".
+  channelOrder: (process.env.OTP_CHANNEL_ORDER || "whatsapp,sms,voice")
+    .split(",")
+    .map((c) => c.trim().toLowerCase())
+    .filter(Boolean),
+
+  // Secret pepper mixed into the OTP hash so a Firestore leak isn't enough.
+  hashPepper: process.env.OTP_HASH_PEPPER || "",
+
+  codeLength: Number(process.env.OTP_CODE_LENGTH) || 6,
+  ttlSeconds: Number(process.env.OTP_TTL_SECONDS) || 300, // 5 min
+  maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS) || 5,
+  resendCooldownSeconds: Number(process.env.OTP_RESEND_COOLDOWN) || 30,
+  maxSendsPerWindow: Number(process.env.OTP_MAX_SENDS_PER_WINDOW) || 5,
+  sendWindowSeconds: Number(process.env.OTP_SEND_WINDOW_SECONDS) || 3600, // 1 hr
+
+  get enabled() {
+    return Boolean(this.msg91AuthKey);
+  },
+};

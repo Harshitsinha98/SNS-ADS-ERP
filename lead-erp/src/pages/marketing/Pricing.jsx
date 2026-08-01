@@ -98,7 +98,7 @@ function PlanCard({ plan, cycle, onSelect }) {
           </p>
         ) : (
           <p className={`text-xs mt-1 ${plan.popular ? "text-cream-300/60" : "text-ink-muted"}`}>
-            {plan.includedSeats} seats included
+            {plan.includedSeats < 0 ? "Unlimited" : plan.includedSeats} seats included
           </p>
         )}
       </div>
