@@ -132,6 +132,14 @@ export const otpConfig = {
   sendWindowSeconds: Number(process.env.OTP_SEND_WINDOW_SECONDS) || 3600, // 1 hr
 
   get enabled() {
+    // Explicit kill-switch: set OTP_MULTICHANNEL_ENABLED=false to fall back to
+    // Firebase Phone Auth even while MSG91 credentials stay configured. Useful
+    // when a WhatsApp authentication template is still pending Meta approval or
+    // SMS DLT registration isn't done yet — login keeps working via Firebase
+    // without having to wipe the MSG91 keys.
+    if (String(process.env.OTP_MULTICHANNEL_ENABLED || "").toLowerCase() === "false") {
+      return false;
+    }
     return Boolean(this.msg91AuthKey);
   },
 };
