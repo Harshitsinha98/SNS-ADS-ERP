@@ -223,16 +223,26 @@ export function AuthProvider({ children }) {
   // configured; otherwise transparently falls back to Firebase Phone Auth.
   // Returns `{ ok, mode, confirmation?, channel?, devCode?, error? }`.
   const requestOtp = async (phone) => {
-    // Try multi-channel OTP first.
-    try {
-      const cfg = await getOtpConfig();
-      if (cfg?.enabled) {
-        const r = await sendOtpRequest(phone);
-        if (r.ok) return { ok: true, mode: "multi", channel: r.channel, devCode: r.devCode };
-        return { ok: false, mode: "multi", error: r.error, retryAfter: r.retryAfter };
+    // Frontend kill-switch: set VITE_OTP_FORCE_FIREBASE=true to bypass the
+    // MSG91 multi-channel backend entirely and use Firebase Phone Auth. Useful
+    // while the WhatsApp authentication template is pending Meta approval (or
+    // SMS DLT isn't registered), so login keeps working without touching the
+    // backend deployment. Remove it to restore the normal multi-channel flow.
+    const forceFirebase =
+      String(import.meta.env.VITE_OTP_FORCE_FIREBASE || "").toLowerCase() === "true";
+
+    // Try multi-channel OTP first — unless explicitly forced to Firebase.
+    if (!forceFirebase) {
+      try {
+        const cfg = await getOtpConfig();
+        if (cfg?.enabled) {
+          const r = await sendOtpRequest(phone);
+          if (r.ok) return { ok: true, mode: "multi", channel: r.channel, devCode: r.devCode };
+          return { ok: false, mode: "multi", error: r.error, retryAfter: r.retryAfter };
+        }
+      } catch (e) {
+        console.warn("Multi-channel OTP unavailable, falling back to Firebase:", e?.message);
       }
-    } catch (e) {
-      console.warn("Multi-channel OTP unavailable, falling back to Firebase:", e?.message);
     }
 
     // Fallback: Firebase Phone Auth (SMS via reCAPTCHA).
