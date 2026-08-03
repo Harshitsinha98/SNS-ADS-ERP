@@ -186,13 +186,25 @@ const SENDERS = {
   voice: sendVoice,                   // MSG91 voice
 };
 
+// Map a user-facing channel type ("whatsapp"/"sms"/"voice") to the internal
+// sender keys. WhatsApp covers both the direct-Meta and MSG91 senders.
+function matchesType(channel, type) {
+  if (type === "whatsapp") return channel === "whatsapp_meta" || channel === "whatsapp";
+  return channel === type;
+}
+
 /**
- * Try each configured channel in order; return the first that succeeds.
+ * Try configured channels in order; return the first that succeeds.
+ * When `only` is set ("whatsapp"|"sms"|"voice"), restrict to that type — used
+ * for user-requested fallbacks ("didn't get it? send SMS / call me").
  * @returns {Promise<{ ok: boolean, channel?: string, tried: string[] }>}
  */
-export async function sendViaChannels(e164, code) {
+export async function sendViaChannels(e164, code, only = null) {
+  const order = only
+    ? otpConfig.channelOrder.filter((c) => matchesType(c, only))
+    : otpConfig.channelOrder;
   const tried = [];
-  for (const channel of otpConfig.channelOrder) {
+  for (const channel of order) {
     const sender = SENDERS[channel];
     if (!sender) continue;
     const result = await sender(e164, code);

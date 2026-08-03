@@ -46,7 +46,7 @@ function hashCode(code, e164) {
  * Generate, persist and deliver an OTP.
  * @returns {Promise<{ ok, channel?, error?, retryAfter?, devCode? }>}
  */
-export async function sendOtp(phone) {
+export async function sendOtp(phone, preferredChannel = null) {
   const e164 = toE164(phone);
   if (e164.length !== 13) return { ok: false, error: "Invalid phone number." };
 
@@ -80,10 +80,15 @@ export async function sendOtp(phone) {
   // Deliver (or dev-fallback) ------------------------------------------
   let channel = null;
   if (otpConfig.enabled) {
-    const result = await sendViaChannels(e164, code);
+    const result = await sendViaChannels(e164, code, preferredChannel);
     if (!result.ok) {
-      logger.error({ e164, tried: result.tried }, "All OTP channels failed");
-      return { ok: false, error: "Could not send the verification code. Please try again." };
+      logger.error({ e164, tried: result.tried, preferredChannel }, "All OTP channels failed");
+      return {
+        ok: false,
+        error: preferredChannel
+          ? `Could not send the code via ${preferredChannel}. Please try another option.`
+          : "Could not send the verification code. Please try again.",
+      };
     }
     channel = result.channel;
   } else if (isProd) {

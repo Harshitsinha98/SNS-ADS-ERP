@@ -2,9 +2,19 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   Phone, ShieldCheck, ArrowRight, ArrowLeft, Loader2, Shield, Users, XCircle,
+  MessageCircle, Smartphone, PhoneCall, CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { getOtpConfig } from "../utils/otpApi";
 import Logo from "../components/marketing/Logo";
+
+// Map an internal channel key to a friendly label for the verify screen.
+function channelLabel(ch) {
+  if (ch === "whatsapp_meta" || ch === "whatsapp") return "WhatsApp";
+  if (ch === "sms") return "SMS";
+  if (ch === "voice") return "call";
+  return "";
+}
 
 export default function Login() {
   const { user, requestOtp, verifyOtp, logout } = useAuth();
@@ -15,9 +25,21 @@ export default function Login() {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [err, setErr] = useState("");
+  const [info, setInfo] = useState("");           // success/resend confirmation
   const [loading, setLoading] = useState(false);
   const [confirmation, setConfirmation] = useState(null);
+  const [channel, setChannel] = useState(null);   // channel the code was sent on
+  const [resending, setResending] = useState(null); // which fallback is in-flight
+  const [voiceAvailable, setVoiceAvailable] = useState(false);
   const [roleError, setRoleError] = useState(""); // portal ↔ role mismatch
+
+  // Discover whether a voice/call channel is configured on the backend so we
+  // only offer the "Get a call" option when it can actually work.
+  useEffect(() => {
+    getOtpConfig()
+      .then((cfg) => setVoiceAvailable(Array.isArray(cfg?.availableChannels) && cfg.availableChannels.includes("voice")))
+      .catch(() => {});
+  }, []);
 
   // Route (or reject) once AuthContext resolves the user's real role.
   useEffect(() => {
@@ -62,11 +84,28 @@ export default function Login() {
 
   const sendOtp = async (e) => {
     e.preventDefault();
-    setErr(""); setLoading(true);
+    setErr(""); setInfo(""); setLoading(true);
     const res = await requestOtp(phone.trim());
     setLoading(false);
-    if (res.ok) { setConfirmation(res.confirmation); setStep("otp"); }
+    if (res.ok) { setConfirmation(res.confirmation || null); setChannel(res.channel || null); setStep("otp"); }
     else setErr(res.error);
+  };
+
+  // Resend the code through a specific channel ("whatsapp" | "sms_firebase" | "voice").
+  const resend = async (via) => {
+    if (resending || loading) return;
+    setErr(""); setInfo(""); setResending(via);
+    const res = await requestOtp(phone.trim(), via);
+    setResending(null);
+    if (res.ok) {
+      setConfirmation(res.confirmation || null);
+      setChannel(res.channel || null);
+      setOtp("");
+      const label = channelLabel(res.channel);
+      setInfo(label ? `A new code has been sent via ${label}.` : "A new code has been sent.");
+    } else {
+      setErr(res.error);
+    }
   };
 
   const confirmOtp = async (e) => {
@@ -80,7 +119,7 @@ export default function Login() {
 
   const resetToPortal = () => {
     setPortal(null); setStep("phone"); setPhone(""); setOtp("");
-    setErr(""); setRoleError(""); setConfirmation(null);
+    setErr(""); setInfo(""); setRoleError(""); setConfirmation(null); setChannel(null);
   };
 
   return (
@@ -148,7 +187,7 @@ export default function Login() {
           <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 overflow-hidden">
             <div className="h-1.5 bg-gradient-orange" />
             <div className="p-7 sm:p-9">
-              <button onClick={step === "otp" ? () => { setStep("phone"); setOtp(""); setErr(""); } : resetToPortal}
+              <button onClick={step === "otp" ? () => { setStep("phone"); setOtp(""); setErr(""); setInfo(""); } : resetToPortal}
                 className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-orange-600 mb-4">
                 <ArrowLeft size={15} /> Back
               </button>
@@ -162,12 +201,22 @@ export default function Login() {
                 {step === "phone" ? "Enter your number" : "Enter your code"}
               </h1>
               <p className="text-sm text-ink-soft mb-6">
-                {step === "phone" ? "Secure sign in with OTP." : `Code sent to +91${phone}`}
+                {step === "phone"
+                  ? "Secure sign in with OTP."
+                  : channelLabel(channel)
+                    ? <>Code sent to <span className="font-semibold text-ink">+91{phone}</span> via {channelLabel(channel)}</>
+                    : <>Code sent to <span className="font-semibold text-ink">+91{phone}</span></>}
               </p>
 
               {err && (
                 <div className="bg-danger-50 text-danger-600 text-sm px-4 py-3 rounded-xl mb-4 border border-danger-100 flex items-start gap-2">
                   <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" />{err}
+                </div>
+              )}
+
+              {info && !err && (
+                <div className="bg-success-50 text-success-700 text-sm px-4 py-3 rounded-xl mb-4 border border-success-100 flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />{info}
                 </div>
               )}
 
@@ -187,13 +236,39 @@ export default function Login() {
                   </button>
                 </form>
               ) : (
-                <form onSubmit={confirmOtp} className="space-y-5">
-                  <input className="input text-center text-2xl tracking-[0.5em] font-mono" placeholder="000000" value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} maxLength={6} required autoFocus disabled={loading} />
-                  <button disabled={loading || otp.length !== 6} className="btn btn-primary w-full py-3.5 text-base">
-                    {loading ? <><Loader2 size={18} className="animate-spin" /> Verifying…</> : <>Verify & sign in <ArrowRight size={18} /></>}
-                  </button>
-                </form>
+                <>
+                  <form onSubmit={confirmOtp} className="space-y-5">
+                    <input className="input text-center text-2xl tracking-[0.5em] font-mono" placeholder="000000" value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} maxLength={6} required autoFocus disabled={loading} />
+                    <button disabled={loading || otp.length !== 6} className="btn btn-primary w-full py-3.5 text-base">
+                      {loading ? <><Loader2 size={18} className="animate-spin" /> Verifying…</> : <>Verify & sign in <ArrowRight size={18} /></>}
+                    </button>
+                  </form>
+
+                  {/* Didn't receive it? — alternate delivery channels */}
+                  <div className="mt-5 pt-4 border-t border-cream-200">
+                    <p className="text-xs text-ink-muted mb-2.5">Didn't receive the code?</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => resend("whatsapp")} disabled={!!resending || loading}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-cream-300 hover:border-orange-300 hover:bg-orange-50 text-ink-soft disabled:opacity-50 transition-colors">
+                        {resending === "whatsapp" ? <Loader2 size={13} className="animate-spin" /> : <MessageCircle size={13} className="text-green-600" />}
+                        Resend on WhatsApp
+                      </button>
+                      <button type="button" onClick={() => resend("sms_firebase")} disabled={!!resending || loading}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-cream-300 hover:border-orange-300 hover:bg-orange-50 text-ink-soft disabled:opacity-50 transition-colors">
+                        {resending === "sms_firebase" ? <Loader2 size={13} className="animate-spin" /> : <Smartphone size={13} />}
+                        Send on phone (SMS)
+                      </button>
+                      {voiceAvailable && (
+                        <button type="button" onClick={() => resend("voice")} disabled={!!resending || loading}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-cream-300 hover:border-orange-300 hover:bg-orange-50 text-ink-soft disabled:opacity-50 transition-colors">
+                          {resending === "voice" ? <Loader2 size={13} className="animate-spin" /> : <PhoneCall size={13} />}
+                          Get a call
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>

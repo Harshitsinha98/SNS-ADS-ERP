@@ -21,15 +21,21 @@ import { sendOtp, verifyOtp } from "../services/otpService.js";
 import { logger } from "../middleware/logger.js";
 
 export function getOtpConfig(req, res) {
-  res.json({ enabled: otpConfig.enabled, channels: otpConfig.channelOrder });
+  res.json({
+    enabled: otpConfig.enabled,
+    channels: otpConfig.channelOrder,
+    availableChannels: otpConfig.availableChannels,
+  });
 }
 
 export async function sendOtpHandler(req, res) {
   try {
-    const { phone } = req.body || {};
+    const { phone, channel } = req.body || {};
     if (!phone) return res.status(400).json({ error: "Phone number is required." });
 
-    const result = await sendOtp(phone);
+    const allowedChannels = ["whatsapp", "sms", "voice"];
+    const preferredChannel = allowedChannels.includes(channel) ? channel : null;
+    const result = await sendOtp(phone, preferredChannel);
     if (!result.ok) {
       return res.status(result.retryAfter ? 429 : 400).json(result);
     }
