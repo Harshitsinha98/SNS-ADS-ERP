@@ -93,7 +93,7 @@ async function sendWhatsAppViaMeta(e164, code) {
     return { ok: false, skipped: true };
   }
   try {
-    await metaGraphRequest(`${metaWhatsappPhoneNumberId}/messages`, {
+    const result = await metaGraphRequest(`${metaWhatsappPhoneNumberId}/messages`, {
       method: "POST",
       token: metaWhatsappAccessToken,
       body: {
@@ -115,6 +115,20 @@ async function sendWhatsAppViaMeta(e164, code) {
         },
       },
     });
+    // Diagnostic: log Meta's accepted message id + resolved WhatsApp id so a
+    // non-delivering send can be traced in WhatsApp Manager. `wa_id` confirms
+    // Meta recognised the recipient as a WhatsApp user.
+    logger.info(
+      {
+        to: toDigits(e164),
+        messageId: result?.messages?.[0]?.id || null,
+        waId: result?.contacts?.[0]?.wa_id || null,
+        messageStatus: result?.messages?.[0]?.message_status || null,
+        template: metaWhatsappTemplateName,
+        lang: metaWhatsappTemplateLang,
+      },
+      "OTP WhatsApp (Meta Cloud API) accepted by provider"
+    );
     return { ok: true };
   } catch (e) {
     logger.warn({ err: e.message }, "OTP WhatsApp (Meta Cloud API) send failed");
