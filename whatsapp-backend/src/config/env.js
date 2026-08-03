@@ -115,8 +115,20 @@ export const otpConfig = {
   msg91VoiceTemplateId: process.env.MSG91_VOICE_TEMPLATE_ID || "",
   msg91SenderId: process.env.MSG91_SENDER_ID || "",
 
-  // Fallback chain. Comma-separated: "whatsapp,sms,voice".
-  channelOrder: (process.env.OTP_CHANNEL_ORDER || "whatsapp,sms,voice")
+  // ── Direct Meta WhatsApp Cloud API OTP (no BSP / no MSG91) ──────────
+  // Preferred channel when configured: sends the approved authentication
+  // template straight through Meta's Graph API, so login OTPs don't depend
+  // on any BSP account, plan, or markup. Requires a dedicated WhatsApp
+  // number's phone_number_id and a long-lived System User access token with
+  // whatsapp_business_messaging permission.
+  metaWhatsappPhoneNumberId: process.env.WHATSAPP_OTP_PHONE_NUMBER_ID || "",
+  metaWhatsappAccessToken: process.env.WHATSAPP_OTP_ACCESS_TOKEN || "",
+  metaWhatsappTemplateName: process.env.WHATSAPP_OTP_TEMPLATE_NAME || "",
+  metaWhatsappTemplateLang: process.env.WHATSAPP_OTP_TEMPLATE_LANG || "en_US",
+
+  // Fallback chain. Comma-separated. "whatsapp_meta" = direct Meta Cloud API;
+  // "whatsapp"/"sms"/"voice" = MSG91 channels.
+  channelOrder: (process.env.OTP_CHANNEL_ORDER || "whatsapp_meta,whatsapp,sms,voice")
     .split(",")
     .map((c) => c.trim().toLowerCase())
     .filter(Boolean),
@@ -131,15 +143,25 @@ export const otpConfig = {
   maxSendsPerWindow: Number(process.env.OTP_MAX_SENDS_PER_WINDOW) || 5,
   sendWindowSeconds: Number(process.env.OTP_SEND_WINDOW_SECONDS) || 3600, // 1 hr
 
+  // True when a direct-Meta WhatsApp OTP sender is fully configured.
+  get metaWhatsappEnabled() {
+    return Boolean(
+      this.metaWhatsappPhoneNumberId &&
+      this.metaWhatsappAccessToken &&
+      this.metaWhatsappTemplateName
+    );
+  },
+
   get enabled() {
     // Explicit kill-switch: set OTP_MULTICHANNEL_ENABLED=false to fall back to
-    // Firebase Phone Auth even while MSG91 credentials stay configured. Useful
+    // Firebase Phone Auth even while OTP credentials stay configured. Useful
     // when a WhatsApp authentication template is still pending Meta approval or
     // SMS DLT registration isn't done yet — login keeps working via Firebase
-    // without having to wipe the MSG91 keys.
+    // without having to wipe any keys.
     if (String(process.env.OTP_MULTICHANNEL_ENABLED || "").toLowerCase() === "false") {
       return false;
     }
-    return Boolean(this.msg91AuthKey);
+    // Enabled if EITHER the direct-Meta sender OR MSG91 is configured.
+    return this.metaWhatsappEnabled || Boolean(this.msg91AuthKey);
   },
 };

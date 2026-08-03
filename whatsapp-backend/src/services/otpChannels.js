@@ -16,13 +16,16 @@
  */
 import { otpConfig } from "../config/env.js";
 import { logger } from "../middleware/logger.js";
+import { metaGraphRequest } from "./meta.js";
 
 const MSG91_BASE = "https://control.msg91.com/api/v5";
 
-// MSG91 wants bare digits with country code, e.g. 919876543210.
-function toMsg91Number(e164) {
+// Both MSG91 and Meta want bare digits with country code, e.g. 919876543210.
+function toDigits(e164) {
   return String(e164 || "").replace(/\D/g, "");
 }
+// Backward-compatible alias used by the MSG91 senders below.
+const toMsg91Number = toDigits;
 
 async function postJson(url, headers, body) {
   const res = await fetch(url, {
@@ -70,6 +73,55 @@ async function sendWhatsApp(e164, code) {
   }
 }
 
+/**
+ * WhatsApp OTP via Meta's WhatsApp Cloud API directly (no BSP).
+ *
+ * Sends the approved AUTHENTICATION template. Meta requires the OTP code in
+ * BOTH the body parameter and the button parameter (the "Copy code" / one-tap
+ * button), otherwise the send is rejected. This is the preferred channel: it
+ * has no BSP markup and depends only on the org's own Meta app + a long-lived
+ * System User token.
+ */
+async function sendWhatsAppViaMeta(e164, code) {
+  const {
+    metaWhatsappPhoneNumberId,
+    metaWhatsappAccessToken,
+    metaWhatsappTemplateName,
+    metaWhatsappTemplateLang,
+  } = otpConfig;
+  if (!metaWhatsappPhoneNumberId || !metaWhatsappAccessToken || !metaWhatsappTemplateName) {
+    return { ok: false, skipped: true };
+  }
+  try {
+    await metaGraphRequest(`${metaWhatsappPhoneNumberId}/messages`, {
+      method: "POST",
+      token: metaWhatsappAccessToken,
+      body: {
+        messaging_product: "whatsapp",
+        to: toDigits(e164),
+        type: "template",
+        template: {
+          name: metaWhatsappTemplateName,
+          language: { code: metaWhatsappTemplateLang },
+          components: [
+            { type: "body", parameters: [{ type: "text", text: code }] },
+            {
+              type: "button",
+              sub_type: "url",
+              index: "0",
+              parameters: [{ type: "text", text: code }],
+            },
+          ],
+        },
+      },
+    });
+    return { ok: true };
+  } catch (e) {
+    logger.warn({ err: e.message }, "OTP WhatsApp (Meta Cloud API) send failed");
+    return { ok: false, error: e.message };
+  }
+}
+
 /** SMS OTP via MSG91 OTP API. */
 async function sendSMS(e164, code) {
   const { msg91AuthKey, msg91SmsTemplateId } = otpConfig;
@@ -113,7 +165,12 @@ async function sendVoice(e164, code) {
   }
 }
 
-const SENDERS = { whatsapp: sendWhatsApp, sms: sendSMS, voice: sendVoice };
+const SENDERS = {
+  whatsapp_meta: sendWhatsAppViaMeta, // direct Meta Cloud API (preferred, no BSP)
+  whatsapp: sendWhatsApp,             // MSG91 WhatsApp
+  sms: sendSMS,                       // MSG91 SMS
+  voice: sendVoice,                   // MSG91 voice
+};
 
 /**
  * Try each configured channel in order; return the first that succeeds.
