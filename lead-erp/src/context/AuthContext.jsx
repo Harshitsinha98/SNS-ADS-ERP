@@ -222,7 +222,12 @@ export function AuthProvider({ children }) {
   // Prefers the multi-channel backend (WhatsApp → SMS → Voice) when it is
   // configured; otherwise transparently falls back to Firebase Phone Auth.
   // Returns `{ ok, mode, confirmation?, channel?, devCode?, error? }`.
-  const requestOtp = async (phone) => {
+  // `via` lets the caller request a specific delivery channel for the
+  // "didn't receive it?" fallbacks:
+  //   - "whatsapp" | "voice"  → force that channel on the multi-channel backend
+  //   - "sms_firebase"        → use Firebase Phone Auth (SMS) directly
+  //   - null/undefined        → default fallback chain (WhatsApp first)
+  const requestOtp = async (phone, via = null) => {
     // Frontend kill-switch: set VITE_OTP_FORCE_FIREBASE=true to bypass the
     // MSG91 multi-channel backend entirely and use Firebase Phone Auth. Useful
     // while the WhatsApp authentication template is pending Meta approval (or
@@ -230,13 +235,15 @@ export function AuthProvider({ children }) {
     // backend deployment. Remove it to restore the normal multi-channel flow.
     const forceFirebase =
       String(import.meta.env.VITE_OTP_FORCE_FIREBASE || "").toLowerCase() === "true";
+    const useFirebaseSms = via === "sms_firebase";
 
-    // Try multi-channel OTP first — unless explicitly forced to Firebase.
-    if (!forceFirebase) {
+    // Try multi-channel OTP first — unless forced/asked to use Firebase.
+    if (!forceFirebase && !useFirebaseSms) {
       try {
         const cfg = await getOtpConfig();
         if (cfg?.enabled) {
-          const r = await sendOtpRequest(phone);
+          const channel = ["whatsapp", "sms", "voice"].includes(via) ? via : undefined;
+          const r = await sendOtpRequest(phone, channel);
           if (r.ok) return { ok: true, mode: "multi", channel: r.channel, devCode: r.devCode };
           return { ok: false, mode: "multi", error: r.error, retryAfter: r.retryAfter };
         }
@@ -245,7 +252,7 @@ export function AuthProvider({ children }) {
       }
     }
 
-    // Fallback: Firebase Phone Auth (SMS via reCAPTCHA).
+    // Firebase Phone Auth (SMS via reCAPTCHA) — default fallback or explicit SMS.
     const phoneId = toE164(phone);
     if (!import.meta.env.VITE_FIREBASE_API_KEY) {
       return {
@@ -256,7 +263,7 @@ export function AuthProvider({ children }) {
     try {
       const verifier = ensureRecaptcha();
       const confirmation = await signInWithPhoneNumber(auth, phoneId, verifier);
-      return { ok: true, mode: "firebase", confirmation };
+      return { ok: true, mode: "firebase", channel: "sms", confirmation };
     } catch (e) {
       console.error("requestOtp error:", e.code, e.message);
       resetRecaptcha();

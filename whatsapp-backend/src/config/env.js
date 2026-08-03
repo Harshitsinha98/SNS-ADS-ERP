@@ -152,6 +152,19 @@ export const otpConfig = {
     );
   },
 
+  // User-facing channel types that are actually configured and can be offered
+  // as "send the code via …" options on the login screen.
+  get availableChannels() {
+    const list = [];
+    const whatsappMsg91 = Boolean(
+      this.msg91AuthKey && this.msg91WhatsappTemplateId && this.msg91WhatsappNumber
+    );
+    if (this.metaWhatsappEnabled || whatsappMsg91) list.push("whatsapp");
+    if (this.msg91AuthKey && this.msg91SmsTemplateId) list.push("sms");
+    if (this.msg91AuthKey && this.msg91VoiceTemplateId) list.push("voice");
+    return list;
+  },
+
   get enabled() {
     // Explicit kill-switch: set OTP_MULTICHANNEL_ENABLED=false to fall back to
     // Firebase Phone Auth even while OTP credentials stay configured. Useful

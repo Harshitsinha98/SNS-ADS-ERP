@@ -30,8 +30,11 @@ export async function getOtpConfig() {
   return _configCache;
 }
 
-export async function sendOtpRequest(phone) {
-  const { ok, data } = await postJson("/api/v1/otp/send", { phone });
+export async function sendOtpRequest(phone, channel) {
+  // `channel` ("whatsapp"|"sms"|"voice") forces a specific delivery channel
+  // for user-requested fallbacks; omit it to use the default fallback chain.
+  const body = channel ? { phone, channel } : { phone };
+  const { ok, data } = await postJson("/api/v1/otp/send", body);
   if (!ok) return { ok: false, error: data.error || "Could not send code.", retryAfter: data.retryAfter };
   return { ok: true, channel: data.channel, devCode: data.devCode };
 }
