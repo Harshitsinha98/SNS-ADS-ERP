@@ -22,6 +22,7 @@ import { createPlatformRoutes } from "./platform.routes.js";
 import { createAIRoutes } from "./ai.routes.js";
 import { createChatSessionRoutes } from "./chatSession.routes.js";
 import { createOtpRoutes } from "./otp.routes.js";
+import { createBridgeCallRoutes } from "./bridgeCall.routes.js";
 import { publicChatMessage } from "../../controllers/publicChat.controller.js";
 
 export function createV1Router() {
@@ -35,6 +36,9 @@ export function createV1Router() {
 
   // Multi-channel OTP (WhatsApp → SMS → Voice) — public, pre-auth
   router.use("/otp", createOtpRoutes());
+
+  // Bridge Call (Plivo two-leg call bridging) — mixed auth
+  router.use("/bridge-call", createBridgeCallRoutes());
 
   // WhatsApp management
   router.use("/whatsapp", createWhatsAppRoutes());

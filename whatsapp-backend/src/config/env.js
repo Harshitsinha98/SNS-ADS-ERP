@@ -185,3 +185,23 @@ export const otpConfig = {
     return this.metaWhatsappEnabled || Boolean(this.plivoAuthId && this.plivoAuthToken) || Boolean(this.msg91AuthKey);
   },
 };
+
+
+/**
+ * Bridge Call configuration (Plivo two-leg call bridging).
+ */
+export const bridgeCallConfig = {
+  plivoAuthId: process.env.PLIVO_AUTH_ID || "",
+  plivoAuthToken: process.env.PLIVO_AUTH_TOKEN || "",
+  fromNumber: process.env.PLIVO_BRIDGE_FROM_NUMBER || process.env.PLIVO_FROM_NUMBER || "",
+  publicBackendUrl: process.env.PUBLIC_BACKEND_URL || "",
+  maxCallDurationSeconds: Number(process.env.BRIDGE_CALL_MAX_DURATION) || 600,
+  ringTimeoutSeconds: Number(process.env.BRIDGE_CALL_RING_TIMEOUT) || 45,
+  recordByDefault: String(process.env.BRIDGE_CALL_RECORD || "true").toLowerCase() === "true",
+  costPerMinuteInr: Number(process.env.BRIDGE_CALL_COST_PER_MIN) || 1.20,
+  allowedPlanIds: (process.env.BRIDGE_CALL_ALLOWED_PLANS || "growth,enterprise,enterprise_plus")
+    .split(",").map((s) => s.trim()).filter(Boolean),
+  get enabled() {
+    return Boolean(this.plivoAuthId && this.plivoAuthToken && this.fromNumber && this.publicBackendUrl);
+  },
+};
