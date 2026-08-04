@@ -7,7 +7,8 @@ import Timeline from "../../components/Timeline";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import { fmtDate, fmtDuration, toWaNumber } from "../../utils/helpers";
-import { Phone, PhoneOff, MessageCircle } from "lucide-react";
+import { Phone, PhoneOff, MessageCircle, PhoneCall, Loader2 } from "lucide-react";
+import { useBridgeCall } from "../../hooks/useBridgeCall";
 import FollowUpTaskControls from "../../components/FollowUpTaskControls";
 import WhatsAppConversation from "../../components/WhatsAppConversation";
 
@@ -58,6 +59,9 @@ export default function LeadAction() {
     setCallActive(true);
     window.location.href = `tel:${lead.phone}`;
   };
+
+  const { bridgeState, bridgeError, bridgeDuration, bridgeRecording, startBridgeCall, resetBridgeCall } = useBridgeCall();
+  const handleBridgeCall = async () => { const r = await startBridgeCall(lead); if (r?.fallback) startCall(); };
 
   const endCall = () => {
     setPendingDuration(elapsed);
@@ -110,15 +114,38 @@ export default function LeadAction() {
           <p className="text-sm mb-1"><span className="text-ink/40">Source</span> · {lead.source}</p>
           <p className="text-sm mb-4"><span className="text-ink/40">Requirement</span> · {lead.requirement}</p>
 
-          {!callActive ? (
-            <button onClick={startCall} className="w-full flex items-center justify-center gap-2 bg-success-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-success-700 transition-colors">
-              <Phone size={15} /> Start call
-            </button>
-          ) : (
+          {bridgeState !== "idle" && bridgeState !== "completed" && bridgeState !== "failed" && (
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-2.5 text-xs text-blue-800 flex items-center gap-2 mb-2">
+              <Loader2 size={13} className="animate-spin" />
+              {bridgeState === "initiating" && "Connecting..."}
+              {bridgeState === "ringing" && "Ringing your phone..."}
+              {bridgeState === "in-progress" && "Connected!"}
+            </div>
+          )}
+          {bridgeState === "completed" && (
+            <div className="bg-green-50 border border-green-200 rounded-md p-2.5 text-xs text-green-800 mb-2">
+              Done ({fmtDuration(bridgeDuration)}). <button onClick={resetBridgeCall} className="underline">OK</button>
+            </div>
+          )}
+          {bridgeState === "failed" && bridgeError && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-2.5 text-xs text-red-700 mb-2">
+              {bridgeError} <button onClick={resetBridgeCall} className="underline">OK</button>
+            </div>
+          )}
+          {!callActive && bridgeState === "idle" ? (
+            <div className="space-y-2">
+              <button onClick={handleBridgeCall} className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-blue-700 transition-colors">
+                <PhoneCall size={15} /> Bridge call (masked)
+              </button>
+              <button onClick={startCall} className="w-full flex items-center justify-center gap-2 bg-success-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-success-700 transition-colors">
+                <Phone size={15} /> Direct call
+              </button>
+            </div>
+          ) : callActive ? (
             <button onClick={endCall} className="w-full flex items-center justify-center gap-2 bg-danger-600 text-white rounded-md p-2.5 text-sm font-medium animate-pulse">
               <PhoneOff size={15} /> End call · {fmtDuration(elapsed)}
             </button>
-          )}
+          ) : null}}
           <button onClick={quickWhatsApp} className="w-full flex items-center justify-center gap-2 bg-success-50 text-success-700 border border-success-200 rounded-md p-2.5 text-sm font-medium mt-2 hover:bg-success-100 transition-colors">
             <MessageCircle size={15} /> Open WhatsApp
           </button>

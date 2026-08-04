@@ -5,8 +5,9 @@ import { db } from "../../firebase";
 import Layout from "../../components/Layout";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
-import { CheckCircle, Phone, PhoneOff } from "lucide-react";
+import { CheckCircle, Phone, PhoneOff, PhoneCall, Loader2 } from "lucide-react";
 import { fmtDuration } from "../../utils/helpers";
+import { useBridgeCall } from "../../hooks/useBridgeCall";
 import Timeline from "../../components/Timeline";
 import WhatsAppConversation from "../../components/WhatsAppConversation";
 import ChatSessionControls from "../../components/ChatSessionControls";
@@ -104,6 +105,16 @@ export default function LeadDetail() {
     window.location.href = `tel:${lead.phone}`;
   };
 
+  const {
+    bridgeState, bridgeError, bridgeDuration, bridgeRecording,
+    startBridgeCall, resetBridgeCall,
+  } = useBridgeCall();
+
+  const handleBridgeCall = async () => {
+    const result = await startBridgeCall(lead);
+    if (result?.fallback) startCall();
+  };
+
   const endCall = () => {
     setPendingDuration(elapsed);
     setCallActive(false);
@@ -167,15 +178,40 @@ export default function LeadDetail() {
             </div>
 
             <div className="mt-6 space-y-2">
-              {!callActive ? (
-                <button onClick={startCall} className="w-full flex items-center justify-center gap-2 bg-green-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-green-700 transition">
-                  <Phone size={15} /> Start call
-                </button>
-              ) : (
+              {bridgeState !== "idle" && bridgeState !== "completed" && bridgeState !== "failed" && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm text-blue-800 flex items-center gap-2">
+                  <Loader2 size={15} className="animate-spin" />
+                  {bridgeState === "initiating" && "Connecting to your phone..."}
+                  {bridgeState === "ringing" && "Ringing your phone — pick up!"}
+                  {bridgeState === "in-progress" && "Connected! Talking to lead..."}
+                </div>
+              )}
+              {bridgeState === "completed" && (
+                <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-800">
+                  Bridge call done ({fmtDuration(bridgeDuration)}).
+                  {bridgeRecording && <a href={bridgeRecording} target="_blank" rel="noreferrer" className="ml-2 underline font-medium">Play recording</a>}
+                  <button onClick={resetBridgeCall} className="ml-2 text-xs underline">Dismiss</button>
+                </div>
+              )}
+              {bridgeState === "failed" && bridgeError && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-3 text-sm text-red-700">
+                  {bridgeError} <button onClick={resetBridgeCall} className="ml-2 text-xs underline">Dismiss</button>
+                </div>
+              )}
+              {!callActive && bridgeState === "idle" ? (
+                <div className="space-y-2">
+                  <button onClick={handleBridgeCall} className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-blue-700 transition">
+                    <PhoneCall size={15} /> Bridge call (masked + recorded)
+                  </button>
+                  <button onClick={startCall} className="w-full flex items-center justify-center gap-2 bg-green-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-green-700 transition">
+                    <Phone size={15} /> Direct call
+                  </button>
+                </div>
+              ) : callActive ? (
                 <button onClick={endCall} className="w-full flex items-center justify-center gap-2 bg-red-600 text-white rounded-md p-2.5 text-sm font-medium animate-pulse">
                   <PhoneOff size={15} /> End call · {fmtDuration(elapsed)}
                 </button>
-              )}
+              ) : null}
             </div>
 
             {isOrgAdmin && (

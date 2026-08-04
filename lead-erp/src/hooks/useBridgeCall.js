@@ -1,0 +1,55 @@
+import { useState, useRef, useCallback } from "react";
+import { useAuth } from "../context/AuthContext";
+import { initiateBridgeCall, watchBridgeCall } from "../utils/bridgeCallApi";
+
+export function useBridgeCall() {
+  const { user } = useAuth();
+  const [bridgeState, setBridgeState] = useState("idle");
+  const [bridgeError, setBridgeError] = useState("");
+  const [bridgeCallId, setBridgeCallId] = useState(null);
+  const [bridgeDuration, setBridgeDuration] = useState(0);
+  const [bridgeRecording, setBridgeRecording] = useState(null);
+  const stopWatchRef = useRef(null);
+
+  const startBridgeCall = useCallback(async (lead) => {
+    if (!user?.activeOrgId || !lead?.phone) return;
+    setBridgeState("initiating"); setBridgeError(""); setBridgeCallId(null);
+    setBridgeDuration(0); setBridgeRecording(null);
+
+    const result = await initiateBridgeCall({
+      orgId: user.activeOrgId, leadId: lead.id, leadPhone: lead.phone, leadName: lead.name || "",
+    });
+
+    if (!result.ok) {
+      if (result.code === "plan_upgrade_required" || result.code === "wallet_empty") {
+        setBridgeState("idle"); setBridgeError(result.error);
+        return { fallback: false, error: result.error, code: result.code };
+      }
+      setBridgeState("failed"); setBridgeError(result.error || "Could not connect.");
+      return { fallback: true, error: result.error };
+    }
+
+    setBridgeState("ringing"); setBridgeCallId(result.callId);
+    const stop = watchBridgeCall(result.callId, (s) => {
+      if (s.status === "ringing") setBridgeState("ringing");
+      else if (s.status === "in-progress") setBridgeState("in-progress");
+      else if (s.status === "completed" || s.status === "wallet-deducted") {
+        setBridgeState("completed"); setBridgeDuration(s.durationSeconds || 0);
+        setBridgeRecording(s.recordingUrl || null);
+      } else if (s.status === "failed" || s.status === "no-answer") {
+        setBridgeState("failed");
+        setBridgeError(s.status === "no-answer" ? "Lead did not answer." : "Call failed.");
+      }
+    });
+    stopWatchRef.current = stop;
+    return { fallback: false, callId: result.callId };
+  }, [user?.activeOrgId]);
+
+  const resetBridgeCall = useCallback(() => {
+    if (stopWatchRef.current) stopWatchRef.current();
+    setBridgeState("idle"); setBridgeError(""); setBridgeCallId(null);
+    setBridgeDuration(0); setBridgeRecording(null);
+  }, []);
+
+  return { bridgeState, bridgeError, bridgeCallId, bridgeDuration, bridgeRecording, startBridgeCall, resetBridgeCall };
+}
