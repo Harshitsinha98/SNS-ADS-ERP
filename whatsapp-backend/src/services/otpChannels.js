@@ -157,6 +157,68 @@ async function sendSMS(e164, code) {
   }
 }
 
+/**
+ * Voice-call OTP via Plivo (outbound call with Text-to-Speech).
+ *
+ * Plivo makes an outbound call to the recipient, and when they pick up, TTS
+ * reads out the OTP digits slowly. No DLT registration needed for voice.
+ * The call XML is inline via Plivo's answer_url with the phlo/XML approach,
+ * but simpler: we use the `call` API with `answer_url` pointing to a data-URI
+ * that Plivo fetches — or even simpler, the `answer_method` + inline XML via
+ * the speak element in the call creation body param. Plivo supports passing
+ * a direct XML document inline or via a URL. We'll use Plivo's PHLO-less
+ * approach: create a call that answers with machine_detection OFF and a
+ * simple Speak XML response hosted on our backend.
+ *
+ * Actually the simplest Plivo approach: Use their Outbound Call API with
+ * `answer_url` pointing to our backend endpoint that returns XML, OR use
+ * their newer `call_with_speak` approach. Simplest: we host a tiny XML
+ * endpoint on our backend.
+ *
+ * SIMPLEST APPROACH: Plivo allows `answer_url` to be a publicly accessible
+ * URL. We'll create a simple endpoint OR use a data URL. But actually Plivo
+ * requires a real HTTP URL for answer_url.
+ *
+ * FINAL APPROACH: We use Plivo's call API and point answer_url to our backend
+ * at /api/v1/otp/plivo-answer?code=XXXXXX which returns Speak XML.
+ */
+async function sendVoiceViaPlivo(e164, code) {
+  const { plivoAuthId, plivoAuthToken, plivoFromNumber, plivoAnswerUrl } = otpConfig;
+  if (!plivoAuthId || !plivoAuthToken || !plivoFromNumber) {
+    return { ok: false, skipped: true };
+  }
+  try {
+    const to = toDigits(e164);
+    // Plivo wants the number with country code, no + prefix
+    const from = toDigits(plivoFromNumber);
+    const spokenCode = code.split("").join(". "); // "1. 2. 3. 4. 5. 6"
+    const answerUrl = `${plivoAnswerUrl}?code=${encodeURIComponent(spokenCode)}`;
+
+    const auth = Buffer.from(`${plivoAuthId}:${plivoAuthToken}`).toString("base64");
+    const res = await fetch(`https://api.plivo.com/v1/Account/${plivoAuthId}/Call/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Basic ${auth}`,
+      },
+      body: JSON.stringify({
+        from: from,
+        to: to,
+        answer_url: answerUrl,
+        answer_method: "GET",
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.error) {
+      throw new Error(data?.error || data?.message || `Plivo responded ${res.status}`);
+    }
+    return { ok: true };
+  } catch (e) {
+    logger.warn({ err: e.message }, "OTP Voice (Plivo) send failed");
+    return { ok: false, error: e.message };
+  }
+}
+
 /** Voice-call OTP via MSG91. */
 async function sendVoice(e164, code) {
   const { msg91AuthKey, msg91VoiceTemplateId } = otpConfig;
@@ -183,6 +245,7 @@ const SENDERS = {
   whatsapp_meta: sendWhatsAppViaMeta, // direct Meta Cloud API (preferred, no BSP)
   whatsapp: sendWhatsApp,             // MSG91 WhatsApp
   sms: sendSMS,                       // MSG91 SMS
+  voice_plivo: sendVoiceViaPlivo,     // Plivo voice call (no DLT needed)
   voice: sendVoice,                   // MSG91 voice
 };
 
@@ -190,6 +253,7 @@ const SENDERS = {
 // sender keys. WhatsApp covers both the direct-Meta and MSG91 senders.
 function matchesType(channel, type) {
   if (type === "whatsapp") return channel === "whatsapp_meta" || channel === "whatsapp";
+  if (type === "voice") return channel === "voice_plivo" || channel === "voice";
   return channel === type;
 }
 
