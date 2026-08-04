@@ -81,9 +81,20 @@ export async function verifyOtpHandler(req, res) {
  * This endpoint is publicly accessible (Plivo needs to fetch it), but only
  * returns a generic speak element — no sensitive data beyond the OTP digits
  * that are already being delivered to the verified phone owner.
+ *
+ * SECURITY: Basic validation ensures the code param looks like OTP digits
+ * (not arbitrary injected content). IP rate-limited in the route layer.
  */
 export function plivoAnswerHandler(req, res) {
-  const code = req.query.code || "0. 0. 0. 0. 0. 0";
+  const rawCode = String(req.query.code || "");
+  // Validate: code should only contain digits, dots, and spaces (our format: "1. 2. 3. 4. 5. 6")
+  // Reject anything that looks like XML/script injection.
+  if (!rawCode || rawCode.length > 50 || /[<>&"']/.test(rawCode)) {
+    return res.status(400).set("Content-Type", "application/xml").send(
+      `<?xml version="1.0" encoding="UTF-8"?><Response><Speak>Invalid request.</Speak><Hangup/></Response>`
+    );
+  }
+  const code = rawCode.replace(/[^0-9.\s]/g, ""); // extra sanitize
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Wait length="1"/>

@@ -7,3 +7,4 @@ export { requireAuth, isOrgAdmin, getActiveMembership, isPlatformAdmin, requireO
 export { createCors } from "./cors.js";
 export { globalErrorHandler } from "./errorHandler.js";
 export { validate } from "./validate.js";
+export { createRateLimiter } from "./rateLimiter.js";
