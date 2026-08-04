@@ -70,3 +70,33 @@ export async function verifyOtpHandler(req, res) {
     return res.status(500).json({ error: "Could not verify code." });
   }
 }
+
+
+
+/**
+ * GET /api/v1/otp/plivo-answer — Plivo fetches this when the outbound call
+ * connects. Returns Plivo XML (Response > Speak) that reads out the OTP code.
+ *
+ * The `code` query param contains the pre-formatted spoken digits (e.g. "1. 2. 3. 4. 5. 6").
+ * This endpoint is publicly accessible (Plivo needs to fetch it), but only
+ * returns a generic speak element — no sensitive data beyond the OTP digits
+ * that are already being delivered to the verified phone owner.
+ */
+export function plivoAnswerHandler(req, res) {
+  const code = req.query.code || "0. 0. 0. 0. 0. 0";
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Wait length="1"/>
+  <Speak voice="Polly.Aditi" language="hi-IN">Namaste. Aapka verification code hai:</Speak>
+  <Wait length="1"/>
+  <Speak voice="Polly.Aditi" language="hi-IN">${code}</Speak>
+  <Wait length="2"/>
+  <Speak voice="Polly.Aditi" language="hi-IN">Main dobara bolta hoon. Aapka code hai:</Speak>
+  <Wait length="1"/>
+  <Speak voice="Polly.Aditi" language="hi-IN">${code}</Speak>
+  <Wait length="1"/>
+  <Speak voice="Polly.Aditi" language="hi-IN">Dhanyavaad.</Speak>
+</Response>`;
+  res.set("Content-Type", "application/xml");
+  res.send(xml);
+}

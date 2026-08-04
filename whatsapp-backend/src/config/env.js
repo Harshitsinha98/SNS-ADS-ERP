@@ -126,6 +126,12 @@ export const otpConfig = {
   metaWhatsappTemplateName: process.env.WHATSAPP_OTP_TEMPLATE_NAME || "",
   metaWhatsappTemplateLang: process.env.WHATSAPP_OTP_TEMPLATE_LANG || "en_US",
 
+  // ── Plivo Voice OTP (outbound call with TTS, no DLT needed) ──────────
+  plivoAuthId: process.env.PLIVO_AUTH_ID || "",
+  plivoAuthToken: process.env.PLIVO_AUTH_TOKEN || "",
+  plivoFromNumber: process.env.PLIVO_FROM_NUMBER || "",
+  plivoAnswerUrl: process.env.PLIVO_OTP_ANSWER_URL || "",
+
   // Fallback chain. Comma-separated. "whatsapp_meta" = direct Meta Cloud API;
   // "whatsapp"/"sms"/"voice" = MSG91 channels.
   channelOrder: (process.env.OTP_CHANNEL_ORDER || "whatsapp_meta,whatsapp,sms,voice")
@@ -161,7 +167,8 @@ export const otpConfig = {
     );
     if (this.metaWhatsappEnabled || whatsappMsg91) list.push("whatsapp");
     if (this.msg91AuthKey && this.msg91SmsTemplateId) list.push("sms");
-    if (this.msg91AuthKey && this.msg91VoiceTemplateId) list.push("voice");
+    if (this.plivoAuthId && this.plivoAuthToken && this.plivoFromNumber) list.push("voice");
+    else if (this.msg91AuthKey && this.msg91VoiceTemplateId) list.push("voice");
     return list;
   },
 
@@ -174,7 +181,7 @@ export const otpConfig = {
     if (String(process.env.OTP_MULTICHANNEL_ENABLED || "").toLowerCase() === "false") {
       return false;
     }
-    // Enabled if EITHER the direct-Meta sender OR MSG91 is configured.
-    return this.metaWhatsappEnabled || Boolean(this.msg91AuthKey);
+    // Enabled if EITHER the direct-Meta sender, Plivo voice, OR MSG91 is configured.
+    return this.metaWhatsappEnabled || Boolean(this.plivoAuthId && this.plivoAuthToken) || Boolean(this.msg91AuthKey);
   },
 };
