@@ -206,6 +206,8 @@ async function sendVoiceViaPlivo(e164, code) {
         to: to,
         answer_url: answerUrl,
         answer_method: "GET",
+        time_limit: 59,        // Auto-hangup after 59 seconds — prevents runaway billing
+        ring_timeout: 30,      // Give up ringing after 30 seconds if not answered
       }),
     });
     const data = await res.json().catch(() => ({}));
