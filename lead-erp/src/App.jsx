@@ -15,6 +15,7 @@ import Employees from "./pages/admin/Employees";
 import EmployeeDetail from "./pages/admin/EmployeeDetail";
 import Settings from "./pages/admin/Settings";
 import Billing from "./pages/admin/Billing";
+import VoiceWallet from "./pages/admin/VoiceWallet";
 import WhatsApp from "./pages/admin/WhatsApp";
 import WebsiteLeadIntegration from "./pages/admin/WebsiteLeadIntegration";
 import WebsiteLeadForm from "./pages/public/WebsiteLeadForm";
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="/admin/employees/:id" element={<ProtectedRoute role="admin"><EmployeeDetail /></ProtectedRoute>} />
         <Route path="/admin/settings" element={<ProtectedRoute role="admin"><Settings /></ProtectedRoute>} />
         <Route path="/admin/billing" element={<ProtectedRoute role="admin"><Billing /></ProtectedRoute>} />
+        <Route path="/admin/voice-wallet" element={<ProtectedRoute role="admin"><VoiceWallet /></ProtectedRoute>} />
         <Route path="/admin/whatsapp" element={<ProtectedRoute role="admin"><WhatsApp /></ProtectedRoute>} />
         <Route path="/admin/website-lead-integration" element={<ProtectedRoute role="admin"><WebsiteLeadIntegration /></ProtectedRoute>} />
         <Route path="/admin/follow-ups" element={<ProtectedRoute role="admin"><FollowUpQueue /></ProtectedRoute>} />

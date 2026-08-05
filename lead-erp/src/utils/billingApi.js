@@ -141,3 +141,9 @@ export const sendWhatsAppMessage = (body) => authedPost("/api/whatsapp/messages"
 export const syncWhatsAppTemplates = (body) => authedPost("/api/whatsapp/templates/sync", body);
 export const sendWhatsAppTemplate = (body) => authedPost("/api/whatsapp/templates/send", body);
 export const runFollowUpAutomation = (body) => authedPost("/api/follow-ups/run-automation", body);
+
+// ---- Voice Wallet (prepaid top-up) ----
+export const getWalletBalance = (orgId) => authedGet(`/api/wallet/balance?orgId=${encodeURIComponent(orgId)}`);
+export const getWalletTransactions = (orgId) => authedGet(`/api/wallet/transactions?orgId=${encodeURIComponent(orgId)}`);
+export const createWalletOrder = (body) => authedPost("/api/wallet/order", body);
+export const verifyWalletPayment = (body) => authedPost("/api/wallet/verify", body);
