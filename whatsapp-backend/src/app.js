@@ -94,7 +94,16 @@ app.use("/api/whatsapp/templates", createWhatsAppTemplatesRouter(db, {
 // These are mounted at their original paths for backward compatibility.
 import { requireAuth } from "./middleware/auth.js";
 import { getBalance, getTransactions, createOrder, verifyPayment } from "./controllers/wallet.controller.js";
-import { createHandler as broadcastCreate, listHandler as broadcastList, statusHandler as broadcastStatus, cancelHandler as broadcastCancel } from "./controllers/broadcast.controller.js";
+import {
+  createHandler as broadcastCreate,
+  previewHandler as broadcastPreview,
+  listHandler as broadcastList,
+  statusHandler as broadcastStatus,
+  recipientsHandler as broadcastRecipients,
+  analyticsHandler as broadcastAnalytics,
+  retryHandler as broadcastRetry,
+  cancelHandler as broadcastCancel,
+} from "./controllers/broadcast.controller.js";
 import {
   connectWhatsApp,
   getWhatsAppStatus,
@@ -122,8 +131,12 @@ app.post("/api/wallet/verify", requireAuth, verifyPayment);
 
 // ── WhatsApp Broadcast (legacy paths) ──
 app.post("/api/broadcast/create", requireAuth, broadcastCreate);
+app.post("/api/broadcast/preview", requireAuth, broadcastPreview);
 app.get("/api/broadcast/list", requireAuth, broadcastList);
 app.get("/api/broadcast/status", requireAuth, broadcastStatus);
+app.get("/api/broadcast/recipients", requireAuth, broadcastRecipients);
+app.get("/api/broadcast/analytics", requireAuth, broadcastAnalytics);
+app.post("/api/broadcast/retry", requireAuth, broadcastRetry);
 app.post("/api/broadcast/cancel", requireAuth, broadcastCancel);
 
 // ── Root ──

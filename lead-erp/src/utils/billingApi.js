@@ -150,6 +150,10 @@ export const verifyWalletPayment = (body) => authedPost("/api/wallet/verify", bo
 
 // ---- WhatsApp Broadcast (bulk template sending) ----
 export const createBroadcast = (body) => authedPost("/api/broadcast/create", body);
+export const previewBroadcastAudience = (body) => authedPost("/api/broadcast/preview", body);
 export const getBroadcasts = (orgId) => authedGet(`/api/broadcast/list?orgId=${encodeURIComponent(orgId)}`);
 export const getBroadcastStatus = (broadcastId) => authedGet(`/api/broadcast/status?broadcastId=${encodeURIComponent(broadcastId)}`);
+export const getBroadcastRecipients = (broadcastId, status) => authedGet(`/api/broadcast/recipients?broadcastId=${encodeURIComponent(broadcastId)}${status ? `&status=${encodeURIComponent(status)}` : ""}`);
+export const getBroadcastAnalytics = (orgId) => authedGet(`/api/broadcast/analytics?orgId=${encodeURIComponent(orgId)}`);
+export const retryBroadcast = (body) => authedPost("/api/broadcast/retry", body);
 export const cancelBroadcast = (body) => authedPost("/api/broadcast/cancel", body);

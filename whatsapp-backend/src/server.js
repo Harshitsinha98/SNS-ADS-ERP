@@ -25,6 +25,7 @@ import { runFollowUpAutomation } from "../followUpAutomation.js";
 import { db } from "./bootstrap/firebase.js";
 import { recordCronJobHealth, recomputeMissionControlMetrics } from "./services/platformAnalytics.js";
 import { runEscalationCheck } from "./services/escalationService.js";
+import { runScheduledBroadcasts } from "./services/broadcast.js";
 
 // ── Cron Jobs ──────────────────────────────────────────────────────
 
@@ -102,6 +103,18 @@ cron.schedule("* * * * *", () => {
     withLease("chatEscalationCheck", 55 * 1000, async () => {
       await recordCronStart("chatEscalationCheck");
       return runEscalationCheck();
+    })
+  );
+});
+
+// Every minute: fire any scheduled WhatsApp broadcasts that are now due.
+cron.schedule("* * * * *", () => {
+  runMonitoredCron("scheduledBroadcasts", () =>
+    withLease("scheduledBroadcasts", 55 * 1000, async () => {
+      await recordCronStart("scheduledBroadcasts");
+      const fired = await runScheduledBroadcasts();
+      if (fired) logger.info({ fired }, "Scheduled broadcasts dispatched");
+      return fired;
     })
   );
 });

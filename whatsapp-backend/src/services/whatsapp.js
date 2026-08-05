@@ -19,6 +19,7 @@ import { withLease } from "./lease.js";
 import { logger } from "../middleware/logger.js";
 import { emitWorkflowTrigger } from "./workflow/workflowEngine.js";
 import { triggerAIResponse } from "./ai/aiWhatsAppBridge.js";
+import { handleBroadcastStatusReceipt } from "./broadcast.js";
 
 // ─── Pending Queue ──────────────────────────────────────────────────
 
@@ -299,6 +300,17 @@ export async function processInboundMessage({ orgId, message, contact }) {
 export async function reconcileOutboundWhatsAppStatus(orgId, status) {
   const clientMessageId = safeDocId(status?.biz_opaque_callback_data || "");
   if (!clientMessageId) return { status: "ignored", reason: "missing_callback_data" };
+
+  // Broadcast recipients live in a separate dispatch space. A callback ID
+  // belongs to EITHER a per-lead conversation reply OR a broadcast send, never
+  // both, so trying the broadcast path first is safe and avoids a redundant
+  // per-lead transaction for broadcast receipts.
+  const providerStatus = String(status.status || "");
+  const matchedBroadcast = await handleBroadcastStatusReceipt(
+    orgId, clientMessageId, providerStatus, status.id || null
+  );
+  if (matchedBroadcast) return { status: "reconciled_broadcast" };
+
   const dispatchRef = db.collection("whatsappOutboundDispatches").doc(clientMessageId);
   await db.runTransaction(async (tx) => {
     const dispatchSnap = await tx.get(dispatchRef);
