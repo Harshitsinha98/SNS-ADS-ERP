@@ -198,7 +198,7 @@ export const bridgeCallConfig = {
   maxCallDurationSeconds: Number(process.env.BRIDGE_CALL_MAX_DURATION) || 600,
   ringTimeoutSeconds: Number(process.env.BRIDGE_CALL_RING_TIMEOUT) || 45,
   recordByDefault: String(process.env.BRIDGE_CALL_RECORD || "true").toLowerCase() === "true",
-  costPerMinuteInr: Number(process.env.BRIDGE_CALL_COST_PER_MIN) || 1.20,
+  costPerMinuteInr: Number(process.env.BRIDGE_CALL_COST_PER_MIN) || 1,
   allowedPlanIds: (process.env.BRIDGE_CALL_ALLOWED_PLANS || "growth,enterprise,enterprise_plus")
     .split(",").map((s) => s.trim()).filter(Boolean),
   get enabled() {

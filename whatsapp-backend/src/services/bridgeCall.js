@@ -100,7 +100,7 @@ export async function initiateBridgeCall({
   }
 }
 
-export async function handleCallCompleted(callId, { duration, recordingUrl, status, bLegUuid }) {
+export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, dialStatus, recordingUrl, status, bLegUuid }) {
   const callRef = db.collection("bridgeCalls").doc(callId);
   const snap = await callRef.get();
   if (!snap.exists) { logger.warn({ callId }, "Bridge call status for unknown callId"); return; }
@@ -108,31 +108,73 @@ export async function handleCallCompleted(callId, { duration, recordingUrl, stat
   const call = snap.data();
   if (call.status === "completed" || call.status === "wallet-deducted") return;
 
-  const durationSeconds = Number(duration) || 0;
-  const billedMinutes = Math.ceil(durationSeconds / 60);
-  const costInr = billedMinutes * bridgeCallConfig.costPerMinuteInr;
+  // ── 2-Leg Billing Logic ──
+  // Plivo charges us per-leg, 60/60 increment (ceil to next minute).
+  // We mirror that to the customer at ₹1/min per leg.
+  //
+  // Leg A (employee): billed from the moment employee answers until hangup.
+  //   - If employee answered (which they must have, since answerURL was hit),
+  //     minimum 1 min is charged even if B-leg didn't connect.
+  // Leg B (customer): billed only if customer answered (DialStatus=completed).
+  //   - Duration = actual talk time, rounded up to next minute.
+
+  const aSeconds = Number(aLegSeconds) || 0;
+  const bSeconds = Number(bLegSeconds) || 0;
+  const bLegConnected = dialStatus === "completed" || bSeconds > 0;
+
+  // Leg A: employee answered (must have, since we got answerURL callback)
+  // Minimum 1 min charged (Plivo charges us even for short A-leg)
+  const aLegBilledMinutes = aSeconds > 0 ? Math.ceil(aSeconds / 60) : 1;
+
+  // Leg B: only if customer picked up
+  const bLegBilledMinutes = bLegConnected ? Math.max(1, Math.ceil(bSeconds / 60)) : 0;
+
+  const totalBilledMinutes = aLegBilledMinutes + bLegBilledMinutes;
+  const costPerMinPerLeg = bridgeCallConfig.costPerMinuteInr; // ₹1/min per leg
+  const costInr = totalBilledMinutes * costPerMinPerLeg;
+
+  const durationSeconds = bLegConnected ? bSeconds : aSeconds;
 
   const updateData = {
-    status: durationSeconds > 0 ? "completed" : (status || "no-answer"),
-    durationSeconds, billedMinutes, costInr,
+    status: bLegConnected ? "completed" : (status || dialStatus || "no-answer"),
+    durationSeconds,
+    aLegSeconds: aSeconds,
+    bLegSeconds: bSeconds,
+    aLegBilledMinutes,
+    bLegBilledMinutes,
+    billedMinutes: totalBilledMinutes,
+    costInr,
+    dialStatus: dialStatus || null,
     completedAt: nowIso(), completedAtMs: Date.now(),
   };
   if (recordingUrl) updateData.recordingUrl = recordingUrl;
   if (bLegUuid) updateData.plivoBLegUuid = bLegUuid;
   await callRef.update(updateData);
 
-  if (billedMinutes > 0) await deductWalletMinutes(call.orgId, billedMinutes, costInr, callId);
+  // Always deduct — even if only A-leg connected (employee answered, customer didn't)
+  if (totalBilledMinutes > 0) await deductWalletMinutes(call.orgId, totalBilledMinutes, costInr, callId);
 
-  if (durationSeconds > 0 && call.leadId) {
+  // Add lead note only if actual conversation happened (B-leg connected)
+  if (bLegConnected && call.leadId) {
+    const noteText = `Bridge call: ${call.employeeName || "Agent"} \u2192 ${call.leadName || call.leadPhone} (${formatDuration(bSeconds)}) — ₹${costInr.toFixed(0)} (${aLegBilledMinutes}+${bLegBilledMinutes} min)`;
     await orgCollection(db, call.orgId, "leads").doc(call.leadId).collection("notes").add({
       type: "bridge_call",
-      text: `Bridge call: ${call.employeeName || "Agent"} \u2192 ${call.leadName || call.leadPhone} (${formatDuration(durationSeconds)})`,
+      text: noteText,
       authorId: call.employeeUid, authorName: call.employeeName || "Agent",
-      visibility: "team", at: nowIso(), bridgeCallId: callId, duration: durationSeconds,
+      visibility: "team", at: nowIso(), bridgeCallId: callId, duration: bSeconds,
       ...(recordingUrl ? { recordingUrl } : {}),
     }).catch((e) => logger.warn({ err: e.message }, "Bridge call note write failed"));
+  } else if (!bLegConnected && call.leadId) {
+    // Customer didn't pick up — still log it
+    await orgCollection(db, call.orgId, "leads").doc(call.leadId).collection("notes").add({
+      type: "bridge_call",
+      text: `Bridge call: ${call.employeeName || "Agent"} \u2192 ${call.leadName || call.leadPhone} — customer didn't answer (₹${costInr.toFixed(0)}, ${aLegBilledMinutes} min A-leg)`,
+      authorId: call.employeeUid, authorName: call.employeeName || "Agent",
+      visibility: "team", at: nowIso(), bridgeCallId: callId, duration: 0,
+    }).catch((e) => logger.warn({ err: e.message }, "Bridge call note write failed"));
   }
-  logger.info({ callId, durationSeconds, billedMinutes, costInr }, "Bridge call completed");
+
+  logger.info({ callId, aLegBilledMinutes, bLegBilledMinutes, totalBilledMinutes, costInr, dialStatus }, "Bridge call completed — 2-leg billing applied");
 }
 
 async function deductWalletMinutes(orgId, minutes, costInr, callId) {
@@ -159,7 +201,7 @@ async function deductWalletMinutes(orgId, minutes, costInr, callId) {
     packName: "Bridge Call",
     minutes: -minutes,
     amountInr: costInr,
-    description: `Bridge call usage (${minutes} min${minutes > 1 ? "s" : ""})`,
+    description: `Bridge call (${minutes} min — A+B legs)`,
     callId,
     createdAt: nowIso(),
     timestamp: Date.now(),

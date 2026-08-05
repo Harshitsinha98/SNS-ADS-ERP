@@ -70,13 +70,46 @@ export async function statusHandler(req, res) {
     const callId = req.query.callId || req.body?.callId;
     if (!callId) return res.status(200).send("ok");
     const body = req.body || {};
-    const duration = Number(body.Duration || body.duration || body.RecordingDuration || body.BillDuration || 0);
-    logger.info({ callId, body, duration }, "Bridge call status webhook received");
+    logger.info({ callId, body }, "Bridge call status webhook received");
+
+    // Plivo sends multiple callbacks to the same URL:
+    // 1. Dial action callback → has DialStatus, DialBLegUUID
+    // 2. Hangup callback → has Duration (A-leg total), CallStatus
+    // 3. Recording callback → has RecordUrl
+    //
+    // We handle all — handleCallCompleted is idempotent (skips if already processed).
+
+    const dialStatus = body.DialStatus || body.dial_status || null;
+    const aLegDuration = Number(body.Duration || body.duration || body.ALegDuration || 0);
+    const bLegDuration = Number(body.DialBLegDuration || body.BLegDuration || body.DialBLegBillDuration || 0);
+
+    // If this is a Dial action callback, Duration = B-leg connected duration
+    // If this is a hangup callback, Duration = total A-leg duration
+    // We need to determine which callback this is:
+    const isDialCallback = Boolean(dialStatus); // has DialStatus → it's from <Dial> action
+    const isRecordingCallback = Boolean(body.RecordUrl || body.RecordingUrl);
+
+    let effectiveBLegSeconds = 0;
+    let effectiveALegSeconds = 0;
+
+    if (isDialCallback) {
+      // Dial action callback: Duration here is the B-leg connected time
+      effectiveBLegSeconds = dialStatus === "completed" ? (bLegDuration || aLegDuration) : 0;
+      // A-leg was alive from answer until now — at minimum 1 min (employee heard TTS + ringing)
+      effectiveALegSeconds = aLegDuration || effectiveBLegSeconds || 0;
+    } else if (!isRecordingCallback) {
+      // Hangup callback: Duration = total A-leg time
+      effectiveALegSeconds = aLegDuration;
+      effectiveBLegSeconds = bLegDuration;
+    }
+
     await handleCallCompleted(callId, {
-      duration,
+      aLegSeconds: effectiveALegSeconds,
+      bLegSeconds: effectiveBLegSeconds,
+      dialStatus,
       recordingUrl: body.RecordUrl || body.RecordingUrl || body.recording_url || null,
-      status: body.CallStatus || body.Status || body.call_status || null,
-      bLegUuid: body.BLegUUID || body.b_leg_uuid || null,
+      status: body.CallStatus || body.Status || body.call_status || dialStatus || null,
+      bLegUuid: body.DialBLegUUID || body.BLegUUID || body.b_leg_uuid || null,
     });
     return res.status(200).send("ok");
   } catch (e) {
