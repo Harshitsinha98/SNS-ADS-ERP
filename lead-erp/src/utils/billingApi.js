@@ -147,3 +147,9 @@ export const getWalletBalance = (orgId) => authedGet(`/api/wallet/balance?orgId=
 export const getWalletTransactions = (orgId) => authedGet(`/api/wallet/transactions?orgId=${encodeURIComponent(orgId)}`);
 export const createWalletOrder = (body) => authedPost("/api/wallet/order", body);
 export const verifyWalletPayment = (body) => authedPost("/api/wallet/verify", body);
+
+// ---- WhatsApp Broadcast (bulk template sending) ----
+export const createBroadcast = (body) => authedPost("/api/broadcast/create", body);
+export const getBroadcasts = (orgId) => authedGet(`/api/broadcast/list?orgId=${encodeURIComponent(orgId)}`);
+export const getBroadcastStatus = (broadcastId) => authedGet(`/api/broadcast/status?broadcastId=${encodeURIComponent(broadcastId)}`);
+export const cancelBroadcast = (body) => authedPost("/api/broadcast/cancel", body);

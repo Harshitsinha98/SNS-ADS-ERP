@@ -24,6 +24,7 @@ import { createChatSessionRoutes } from "./chatSession.routes.js";
 import { createOtpRoutes } from "./otp.routes.js";
 import { createBridgeCallRoutes } from "./bridgeCall.routes.js";
 import { createWalletRoutes } from "./wallet.routes.js";
+import { createBroadcastRoutes } from "./broadcast.routes.js";
 import { publicChatMessage } from "../../controllers/publicChat.controller.js";
 
 export function createV1Router() {
@@ -43,6 +44,9 @@ export function createV1Router() {
 
   // Voice Wallet (prepaid top-up via Razorpay)
   router.use("/wallet", createWalletRoutes());
+
+  // WhatsApp Broadcast (bulk template sending)
+  router.use("/broadcast", createBroadcastRoutes());
 
   // WhatsApp management
   router.use("/whatsapp", createWhatsAppRoutes());

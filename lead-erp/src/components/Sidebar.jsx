@@ -19,6 +19,7 @@ import {
   GitBranch,
   Brain,
   Wallet,
+  Radio,
 } from "lucide-react";
 
 const adminLinks = [
@@ -30,6 +31,7 @@ const adminLinks = [
   { to: "/admin/ai-customer-care", label: "AI Customer Care", icon: Brain },
   { to: "/admin/employees", label: "Team", icon: Users },
   { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { to: "/admin/broadcast", label: "Broadcast", icon: Radio },
   { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },
   { to: "/admin/ad-leads", label: "Meta & Google Ads", icon: Megaphone },
   { to: "/admin/billing", label: "Billing", icon: CreditCard },
