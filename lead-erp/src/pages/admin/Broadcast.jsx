@@ -23,6 +23,7 @@ import {
   Area,
   Cell,
 } from "recharts";
+import { downloadCsv } from "../../utils/csv";
 import {
   Send,
   Loader2,
@@ -44,6 +45,8 @@ import {
   Send as SendIcon,
   Zap,
   ChevronRight,
+  Download,
+  IndianRupee as IndianRupeeIcon,
 } from "lucide-react";
 
 const STATUS_OPTIONS = ["New", "Ringing", "Meeting Fixed", "Negotiation", "Follow-up", "Closed-Won", "Lost"];
@@ -162,23 +165,48 @@ function DashboardView({ orgId, onNew, navigate }) {
     );
   }
 
-  const { totals, rates, funnel, topTemplates, timeSeries, recent } = analytics;
+  const { totals, rates, funnel, topTemplates, timeSeries, recent, benchmarks, hourly, bestHour, comparison } = analytics;
 
   const funnelData = [
     { name: "Sent", value: funnel.sent, color: "#3E7CB1" },
     { name: "Delivered", value: funnel.delivered, color: "#2BAE66" },
     { name: "Read", value: funnel.read, color: "#F04E00" },
+    { name: "Replied", value: funnel.replied || 0, color: "#7C3AED" },
     { name: "Failed", value: funnel.failed, color: "#E14B4B" },
   ];
 
+  const exportCsv = () => {
+    const rows = [["Campaign", "Template", "Status", "Recipients", "Sent", "Delivered", "Read", "Replied", "Failed", "Delivery%", "Read%", "Response%", "Cost (INR)"]];
+    comparison.forEach((c) => rows.push([
+      c.name, c.templateName, c.status, c.totalRecipients, c.sent, c.delivered, c.read, c.replied, c.failed,
+      c.deliveryRate, c.readRate, c.responseRate, c.costInr,
+    ]));
+    downloadCsv(rows, `broadcast-report-${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
   return (
     <div className="space-y-6">
-      {/* KPI cards */}
+      {/* KPI cards — row 1 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard icon={SendIcon} label="Total Sent" value={totals.sent.toLocaleString("en-IN")} color="from-blue-500 to-indigo-600" sub={`${totals.broadcasts} broadcasts`} />
-        <KpiCard icon={CheckCheck} label="Delivery Rate" value={`${rates.deliveryRate}%`} color="from-green-500 to-emerald-600" sub={`${totals.delivered.toLocaleString("en-IN")} delivered`} />
-        <KpiCard icon={Eye} label="Read Rate" value={`${rates.readRate}%`} color="from-orange-500 to-amber-500" sub={`${totals.read.toLocaleString("en-IN")} read`} />
-        <KpiCard icon={XCircle} label="Failure Rate" value={`${rates.failureRate}%`} color="from-red-500 to-rose-600" sub={`${totals.failed.toLocaleString("en-IN")} failed`} />
+        <KpiCard icon={CheckCheck} label="Delivery Rate" value={`${rates.deliveryRate}%`} color="from-green-500 to-emerald-600" sub={`${totals.delivered.toLocaleString("en-IN")} delivered`} benchmark={benchmarks?.deliveryRate} higherIsBetter />
+        <KpiCard icon={Eye} label="Read Rate" value={`${rates.readRate}%`} color="from-orange-500 to-amber-500" sub={`${totals.read.toLocaleString("en-IN")} read`} benchmark={benchmarks?.readRate} higherIsBetter />
+        <KpiCard icon={MessageCircle} label="Response Rate" value={`${rates.responseRate}%`} color="from-purple-500 to-fuchsia-600" sub={`${(totals.replied || 0).toLocaleString("en-IN")} replied`} benchmark={benchmarks?.responseRate} higherIsBetter />
+      </div>
+
+      {/* KPI cards — row 2 */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard icon={XCircle} label="Failure Rate" value={`${rates.failureRate}%`} color="from-red-500 to-rose-600" sub={`${totals.failed.toLocaleString("en-IN")} failed`} benchmark={benchmarks?.failureRate} />
+        <KpiCard icon={IndianRupeeIcon} label="Est. Spend" value={`₹${(totals.costInr || 0).toLocaleString("en-IN")}`} color="from-teal-500 to-cyan-600" sub="delivered × category rate" />
+        <KpiCard icon={Users} label="Total Reach" value={(totals.recipients || 0).toLocaleString("en-IN")} color="from-slate-500 to-gray-600" sub="recipients targeted" />
+        <KpiCard icon={Clock} label="Best Time" value={bestHour ? `${String(bestHour.hour).padStart(2, "0")}:00` : "—"} color="from-indigo-500 to-blue-600" sub={bestHour ? `${bestHour.readRate}% read rate` : "not enough data"} />
+      </div>
+
+      {/* Export bar */}
+      <div className="flex justify-end">
+        <button onClick={exportCsv} className="btn btn-secondary text-sm flex items-center gap-1.5">
+          <Download size={14} /> Export Report (CSV)
+        </button>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-6">
@@ -256,43 +284,134 @@ function DashboardView({ orgId, onNew, navigate }) {
           )}
         </div>
 
-        {/* Recent broadcasts */}
+        {/* Best time to send */}
         <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-bold text-base text-ink">Recent Broadcasts</h3>
-          </div>
-          {recent.length === 0 ? (
-            <p className="text-sm text-ink-muted text-center py-8">No broadcasts yet.</p>
+          <h3 className="font-display font-bold text-base text-ink mb-1">Best Time to Send</h3>
+          <p className="text-xs text-ink-muted mb-4">Read rate by hour of day (when broadcasts started)</p>
+          {(!hourly || hourly.every((h) => h.delivered === 0)) ? (
+            <p className="text-sm text-ink-muted text-center py-8">Not enough data yet.</p>
           ) : (
-            <div className="space-y-2">
-              {recent.map((b) => (
-                <button
-                  key={b.id}
-                  onClick={() => navigate(`/admin/broadcast/${b.id}`)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-cream-50 transition-colors text-left"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-ink truncate">{b.name || b.templateName}</p>
-                    <p className="text-xs text-ink-muted">{fmtDate(b.createdAt)}</p>
-                  </div>
-                  {statusBadge(b.status)}
-                  <span className="text-sm text-ink-muted whitespace-nowrap">{b.sent || 0}/{b.totalRecipients}</span>
-                  <ChevronRight size={16} className="text-ink-muted" />
-                </button>
-              ))}
-            </div>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={hourly} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E6E1D6" vertical={false} />
+                <XAxis dataKey="hour" tick={{ fontSize: 9 }} tickFormatter={(h) => `${h}h`} interval={1} />
+                <YAxis tick={{ fontSize: 10 }} unit="%" />
+                <Tooltip formatter={(v) => [`${v}%`, "Read rate"]} labelFormatter={(h) => `${h}:00 – ${h}:59`} />
+                <Bar dataKey="readRate" radius={[4, 4, 0, 0]}>
+                  {hourly.map((h, i) => (
+                    <Cell key={i} fill={bestHour && h.hour === bestHour.hour ? "#F04E00" : "#FBBF7C"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
+      </div>
+
+      {/* Campaign comparison table */}
+      <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 overflow-hidden">
+        <div className="px-6 py-4 border-b border-cream-200 flex items-center justify-between">
+          <h3 className="font-display font-bold text-base text-ink">Campaign Comparison</h3>
+          <span className="text-xs text-ink-muted">Last {comparison.length} campaigns</span>
+        </div>
+        {comparison.length === 0 ? (
+          <p className="text-center text-sm text-ink-muted py-10">No campaigns yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-cream-50">
+                <tr className="text-left text-xs text-ink-muted">
+                  <th className="px-6 py-2.5 font-medium">Campaign</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Recipients</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Delivered</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Delivery %</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Read %</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Response %</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-cream-100">
+                {comparison.map((c) => (
+                  <tr key={c.id} onClick={() => navigate(`/admin/broadcast/${c.id}`)} className="hover:bg-cream-50 cursor-pointer">
+                    <td className="px-6 py-3">
+                      <p className="font-medium text-ink truncate max-w-[200px]">{c.name}</p>
+                      <p className="text-xs text-ink-muted">{fmtDate(c.createdAtMs)}</p>
+                    </td>
+                    <td className="px-3 py-3 text-right text-ink-soft">{c.totalRecipients.toLocaleString("en-IN")}</td>
+                    <td className="px-3 py-3 text-right text-ink-soft">{c.delivered.toLocaleString("en-IN")}</td>
+                    <td className="px-3 py-3 text-right"><RatePill value={c.deliveryRate} good={95} /></td>
+                    <td className="px-3 py-3 text-right"><RatePill value={c.readRate} good={63} /></td>
+                    <td className="px-3 py-3 text-right"><RatePill value={c.responseRate} good={8} /></td>
+                    <td className="px-3 py-3 text-right text-ink-soft">₹{c.costInr.toLocaleString("en-IN")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Recent broadcasts */}
+      <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-display font-bold text-base text-ink">Recent Broadcasts</h3>
+        </div>
+        {recent.length === 0 ? (
+          <p className="text-sm text-ink-muted text-center py-8">No broadcasts yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {recent.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => navigate(`/admin/broadcast/${b.id}`)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-cream-50 transition-colors text-left"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-ink truncate">{b.name || b.templateName}</p>
+                  <p className="text-xs text-ink-muted">{fmtDate(b.createdAt)}</p>
+                </div>
+                {statusBadge(b.status)}
+                <span className="text-sm text-ink-muted whitespace-nowrap">{b.sent || 0}/{b.totalRecipients}</span>
+                <ChevronRight size={16} className="text-ink-muted" />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function KpiCard({ icon: Icon, label, value, color, sub }) {
+function RatePill({ value, good }) {
+  const ok = value >= good;
+  return (
+    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${ok ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+      {value}%
+    </span>
+  );
+}
+
+function KpiCard({ icon: Icon, label, value, color, sub, benchmark, higherIsBetter }) {
+  // Compare the numeric part of `value` against the industry benchmark.
+  let badge = null;
+  if (benchmark != null) {
+    const num = parseFloat(String(value).replace(/[^0-9.]/g, ""));
+    if (!Number.isNaN(num)) {
+      const beatsBenchmark = higherIsBetter ? num >= benchmark : num <= benchmark;
+      badge = (
+        <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${beatsBenchmark ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+          {beatsBenchmark ? "▲" : "▼"} vs {benchmark}% avg
+        </span>
+      );
+    }
+  }
   return (
     <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-5">
-      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center mb-3`}>
-        <Icon className="text-white" size={18} />
+      <div className="flex items-start justify-between mb-3">
+        <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center`}>
+          <Icon className="text-white" size={18} />
+        </div>
+        {badge}
       </div>
       <p className="font-display font-bold text-2xl text-ink">{value}</p>
       <p className="text-sm text-ink-muted">{label}</p>

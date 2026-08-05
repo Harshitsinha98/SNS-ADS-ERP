@@ -95,11 +95,11 @@ export async function recipientsHandler(req, res) {
     if (!broadcastId) return res.status(400).json({ error: "broadcastId is required" });
     const broadcast = await getBroadcastStatus(broadcastId);
     if (!(await requireAdmin(req, broadcast.orgId, res))) return;
-    const recipients = await getBroadcastRecipients(broadcastId, {
+    const result = await getBroadcastRecipients(broadcastId, {
       status: req.query.status || null,
       limit: Number(req.query.limit) || 200,
     });
-    return res.json({ recipients });
+    return res.json(result);
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || "Could not get recipients" });
   }

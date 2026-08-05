@@ -9,6 +9,7 @@ import {
 } from "../../utils/billingApi";
 import { useBilling } from "../../context/BillingContext";
 import { useAuth } from "../../context/AuthContext";
+import { downloadCsv } from "../../utils/csv";
 import {
   ArrowLeft,
   Loader2,
@@ -25,6 +26,10 @@ import {
   Calendar,
   RotateCcw,
   Search,
+  MessageCircle,
+  IndianRupee,
+  Download,
+  AlertTriangle,
 } from "lucide-react";
 
 const fmtDateTime = (ts) => {
@@ -70,6 +75,7 @@ export default function BroadcastDetail() {
 
   const [broadcast, setBroadcast] = useState(null);
   const [recipients, setRecipients] = useState([]);
+  const [failureBreakdown, setFailureBreakdown] = useState({});
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState("");
   const [search, setSearch] = useState("");
@@ -86,6 +92,7 @@ export default function BroadcastDetail() {
       ]);
       setBroadcast(bc);
       setRecipients(Array.isArray(rec.recipients) ? rec.recipients : []);
+      setFailureBreakdown(rec.failureBreakdown || {});
     } catch (e) {
       setMsg(e.message || "Could not load broadcast.");
     } finally {
@@ -143,16 +150,31 @@ export default function BroadcastDetail() {
   const delivered = broadcast.delivered || 0;
   const read = broadcast.read || 0;
   const failed = broadcast.failed || 0;
+  const replied = broadcast.replied || 0;
+  const rates = broadcast.rates || {};
+  const cost = broadcast.estimatedCostInr || 0;
   const pct = (n) => total > 0 ? Math.round((n / total) * 100) : 0;
 
   const filteredRecipients = recipients.filter((r) =>
     !search || (r.name || "").toLowerCase().includes(search.toLowerCase()) || (r.phone || "").includes(search)
   );
 
+  const failureEntries = Object.entries(failureBreakdown).sort((a, b) => b[1] - a[1]);
+
+  const exportRecipients = () => {
+    const rows = [["Name", "Phone", "Status", "Replied", "Error", "Sent At", "Updated At"]];
+    recipients.forEach((r) => rows.push([
+      r.name || "", r.phone || "", r.status || "", r.repliedAt ? "Yes" : "No",
+      r.error || "", r.sentAt || "", r.updatedAt || "",
+    ]));
+    downloadCsv(rows, `broadcast-${broadcastId.slice(0, 8)}-recipients.csv`);
+  };
+
   const funnelSteps = [
     { key: "sent", label: "Sent", value: sent, color: "bg-blue-500", icon: Send },
     { key: "delivered", label: "Delivered", value: delivered, color: "bg-green-500", icon: CheckCheck },
     { key: "read", label: "Read", value: read, color: "bg-orange-500", icon: Eye },
+    { key: "replied", label: "Replied", value: replied, color: "bg-purple-500", icon: MessageCircle },
   ];
 
   return (
@@ -241,12 +263,37 @@ export default function BroadcastDetail() {
 
         {/* Summary tiles */}
         <div className="grid grid-cols-2 gap-4">
-          <MiniStat label="Recipients" value={total} icon={Send} color="text-ink" />
-          <MiniStat label="Sent" value={sent} icon={Send} color="text-blue-600" />
-          <MiniStat label="Delivered" value={delivered} icon={CheckCheck} color="text-green-600" />
-          <MiniStat label="Read" value={read} icon={Eye} color="text-orange-600" />
+          <MiniStat label="Delivery Rate" value={`${rates.deliveryRate || 0}%`} icon={CheckCheck} color="text-green-600" raw />
+          <MiniStat label="Read Rate" value={`${rates.readRate || 0}%`} icon={Eye} color="text-orange-600" raw />
+          <MiniStat label="Response Rate" value={`${rates.responseRate || 0}%`} icon={MessageCircle} color="text-purple-600" raw />
+          <MiniStat label="Est. Spend" value={`₹${cost.toLocaleString("en-IN")}`} icon={IndianRupee} color="text-teal-600" raw />
         </div>
       </div>
+
+      {/* Failure breakdown */}
+      {failureEntries.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 mb-6">
+          <h3 className="font-display font-bold text-base text-ink mb-4 flex items-center gap-2">
+            <AlertTriangle size={16} className="text-red-500" /> Why messages failed
+          </h3>
+          <div className="space-y-3">
+            {failureEntries.map(([reason, count]) => {
+              const maxCount = failureEntries[0][1] || 1;
+              return (
+                <div key={reason}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-ink">{reason}</span>
+                    <span className="text-ink-muted font-medium">{count}</span>
+                  </div>
+                  <div className="w-full bg-cream-200 rounded-full h-2">
+                    <div className="h-2 rounded-full bg-red-400" style={{ width: `${Math.round((count / maxCount) * 100)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Recipients table */}
       <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 overflow-hidden">
@@ -267,6 +314,9 @@ export default function BroadcastDetail() {
               <option value="failed">Failed</option>
               <option value="pending">Pending</option>
             </select>
+            <button onClick={exportRecipients} className="btn btn-secondary text-sm flex items-center gap-1.5">
+              <Download size={14} /> CSV
+            </button>
           </div>
         </div>
 
@@ -295,6 +345,11 @@ export default function BroadcastDetail() {
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${meta.bg} ${meta.color}`}>
                           <Icon size={11} /> {meta.label}
                         </span>
+                        {r.replied && (
+                          <span className="inline-flex items-center gap-1 ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                            <MessageCircle size={11} /> Replied
+                          </span>
+                        )}
                         {r.status === "failed" && r.error && (
                           <span className="block text-[10px] text-red-400 mt-0.5 truncate max-w-[200px]">{r.error}</span>
                         )}
@@ -312,11 +367,11 @@ export default function BroadcastDetail() {
   );
 }
 
-function MiniStat({ label, value, icon: Icon, color }) {
+function MiniStat({ label, value, icon: Icon, color, raw }) {
   return (
     <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-4 flex flex-col justify-center">
       <Icon size={16} className={`${color} mb-1.5`} />
-      <p className="font-display font-bold text-2xl text-ink">{(value || 0).toLocaleString("en-IN")}</p>
+      <p className="font-display font-bold text-2xl text-ink">{raw ? value : (value || 0).toLocaleString("en-IN")}</p>
       <p className="text-xs text-ink-muted">{label}</p>
     </div>
   );

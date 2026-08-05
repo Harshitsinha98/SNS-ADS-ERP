@@ -27,9 +27,36 @@ import { nowIso, orgCollection } from "./helpers.js";
 const BATCH_SIZE = 50;           // messages per batch
 const BATCH_DELAY_MS = 1200;     // delay between batches (~40 msgs/sec safe)
 const MAX_RECIPIENTS = 10000;    // max leads per broadcast
+const REPLY_WINDOW_MS = 72 * 60 * 60 * 1000; // count replies within 72h of a broadcast
 
 // Recipient delivery stages — only ever advance forward.
 const STAGE = { pending: 0, sent: 1, delivered: 2, read: 3, failed: -1 };
+
+// WhatsApp conversation pricing (INR) by template category — used for spend
+// estimation. Meta bills per delivered message on the per-message model.
+// India rates (approx, 2025); override via env if needed.
+const CONVERSATION_RATES_INR = {
+  MARKETING: Number(process.env.WA_RATE_MARKETING_INR) || 0.78,
+  UTILITY: Number(process.env.WA_RATE_UTILITY_INR) || 0.125,
+  AUTHENTICATION: Number(process.env.WA_RATE_AUTH_INR) || 0.125,
+};
+const rateForCategory = (cat) => CONVERSATION_RATES_INR[String(cat || "MARKETING").toUpperCase()] ?? CONVERSATION_RATES_INR.MARKETING;
+
+// Industry benchmarks (median SMB WhatsApp broadcast performance) for the UI to
+// compare against — sourced from public 2025/26 benchmark reports.
+export const BENCHMARKS = { deliveryRate: 95, readRate: 63, responseRate: 8, failureRate: 5 };
+
+// Bucket raw provider/error strings into human failure categories.
+function bucketFailure(error) {
+  const e = String(error || "").toLowerCase();
+  if (!e) return "Other";
+  if (e.includes("not") && (e.includes("exist") || e.includes("valid") || e.includes("whatsapp"))) return "Invalid / no WhatsApp";
+  if (e.includes("opt") || e.includes("consent") || e.includes("blocked")) return "Not opted-in / blocked";
+  if (e.includes("rate") || e.includes("limit") || e.includes("throttl")) return "Rate limited";
+  if (e.includes("template") || e.includes("paused") || e.includes("rejected")) return "Template issue";
+  if (e.includes("reauth") || e.includes("token") || e.includes("expired") || e.includes("connect")) return "Auth / connection";
+  return "Other";
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LEAD RESOLUTION (shared by create + preview)
@@ -133,16 +160,19 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
     delivered: 0,
     read: 0,
     failed: 0,
+    replied: 0,
     createdAt: nowIso(),
     createdAtMs: now,
     startedAt: null,
     completedAt: null,
   });
 
-  // 6. Seed recipient docs in batches
-  for (let i = 0; i < leads.length; i += 450) {
+  // 6. Seed recipient docs + a flat reply-lookup index (so an inbound reply can
+  //    find which recent broadcast a lead belongs to without a collectionGroup
+  //    query). Both written in the same batches.
+  for (let i = 0; i < leads.length; i += 200) {
     const batch = db.batch();
-    leads.slice(i, i + 450).forEach((lead) => {
+    leads.slice(i, i + 200).forEach((lead) => {
       const recipientRef = broadcastRef.collection("recipients").doc(lead.id);
       batch.set(recipientRef, {
         leadId: lead.id,
@@ -154,8 +184,11 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
         providerMessageId: null,
         error: null,
         sentAt: null,
+        repliedAt: null,
         updatedAt: nowIso(),
       });
+      const indexRef = db.collection("broadcastRecipientIndex").doc(`${broadcastId}_${lead.id}`);
+      batch.set(indexRef, { orgId, leadId: lead.id, broadcastId, createdAtMs: now });
     });
     await batch.commit();
   }
@@ -387,6 +420,40 @@ export async function handleBroadcastStatusReceipt(orgId, clientMessageId, provi
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// REPLY / RESPONSE TRACKING
+// Called (fire-and-forget) from inbound WhatsApp processing. Attributes an
+// inbound reply to any recent broadcast this lead was a recipient of, once.
+// ─────────────────────────────────────────────────────────────────────────────
+export async function recordBroadcastReply(orgId, leadId) {
+  if (!orgId || !leadId) return { matched: 0 };
+  const idxSnap = await db.collection("broadcastRecipientIndex")
+    .where("orgId", "==", orgId)
+    .where("leadId", "==", leadId)
+    .limit(20)
+    .get();
+  if (idxSnap.empty) return { matched: 0 };
+
+  const cutoff = Date.now() - REPLY_WINDOW_MS;
+  let matched = 0;
+  for (const idx of idxSnap.docs) {
+    const { broadcastId, createdAtMs } = idx.data();
+    if (!broadcastId || (createdAtMs || 0) < cutoff) continue;
+    const broadcastRef = db.collection("broadcasts").doc(broadcastId);
+    const recipientRef = broadcastRef.collection("recipients").doc(leadId);
+    const counted = await db.runTransaction(async (tx) => {
+      const rSnap = await tx.get(recipientRef);
+      if (!rSnap.exists) return false;
+      if (rSnap.data().repliedAt) return false; // already counted
+      tx.update(recipientRef, { repliedAt: nowIso(), replied: true });
+      tx.update(broadcastRef, { replied: FieldValue.increment(1) });
+      return true;
+    }).catch(() => false);
+    if (counted) matched++;
+  }
+  return { matched };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // RETRY FAILED RECIPIENTS
 // ─────────────────────────────────────────────────────────────────────────────
 export async function retryFailedRecipients(broadcastId, orgId) {
@@ -429,14 +496,37 @@ export async function getBroadcasts(orgId, limit = 20) {
 export async function getBroadcastStatus(broadcastId) {
   const snap = await db.collection("broadcasts").doc(broadcastId).get();
   if (!snap.exists) throw Object.assign(new Error("Broadcast not found"), { status: 404 });
-  return { id: snap.id, ...snap.data() };
+  const b = { id: snap.id, ...snap.data() };
+
+  // Derived, industry-standard rates + estimated spend.
+  const sent = b.sent || 0, delivered = b.delivered || 0, read = b.read || 0, failed = b.failed || 0, replied = b.replied || 0;
+  b.rates = {
+    deliveryRate: sent > 0 ? Math.round((delivered / sent) * 100) : 0,
+    readRate: delivered > 0 ? Math.round((read / delivered) * 100) : 0,
+    responseRate: delivered > 0 ? Math.round((replied / delivered) * 100) : 0,
+    failureRate: (sent + failed) > 0 ? Math.round((failed / (sent + failed)) * 100) : 0,
+  };
+  b.estimatedCostInr = Math.round(delivered * rateForCategory(b.templateCategory) * 100) / 100;
+  return b;
 }
 
 export async function getBroadcastRecipients(broadcastId, { status = null, limit = 200 } = {}) {
   let query = db.collection("broadcasts").doc(broadcastId).collection("recipients");
   if (status) query = query.where("status", "==", status);
   const snap = await query.limit(limit).get();
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const recipients = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  // Failure-reason breakdown for the whole broadcast (separate small read so it
+  // is accurate regardless of the status filter above).
+  const failedSnap = await db.collection("broadcasts").doc(broadcastId).collection("recipients")
+    .where("status", "==", "failed").limit(1000).get();
+  const failureBreakdown = {};
+  failedSnap.docs.forEach((d) => {
+    const bucket = bucketFailure(d.data().error);
+    failureBreakdown[bucket] = (failureBreakdown[bucket] || 0) + 1;
+  });
+
+  return { recipients, failureBreakdown };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -451,48 +541,95 @@ export async function getBroadcastAnalytics(orgId) {
 
   const broadcasts = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  const totals = { broadcasts: broadcasts.length, recipients: 0, sent: 0, delivered: 0, read: 0, failed: 0 };
+  const totals = { broadcasts: broadcasts.length, recipients: 0, sent: 0, delivered: 0, read: 0, failed: 0, replied: 0, costInr: 0 };
   const templateMap = {};
   const dayMap = {};
+  const hourMap = {};   // best-time-to-send: read-rate by hour of day
+  const comparison = []; // per-campaign metric rows
   const DAY_MS = 24 * 60 * 60 * 1000;
   const cutoff = Date.now() - 30 * DAY_MS;
 
   for (const b of broadcasts) {
+    const sent = b.sent || 0, delivered = b.delivered || 0, read = b.read || 0, failed = b.failed || 0, replied = b.replied || 0;
+    const cost = Math.round(delivered * rateForCategory(b.templateCategory) * 100) / 100;
+
     totals.recipients += b.totalRecipients || 0;
-    totals.sent += b.sent || 0;
-    totals.delivered += b.delivered || 0;
-    totals.read += b.read || 0;
-    totals.failed += b.failed || 0;
+    totals.sent += sent;
+    totals.delivered += delivered;
+    totals.read += read;
+    totals.failed += failed;
+    totals.replied += replied;
+    totals.costInr += cost;
 
     // Top templates by sent volume
     const tName = b.templateName || "Unknown";
-    if (!templateMap[tName]) templateMap[tName] = { name: tName, sent: 0, count: 0 };
-    templateMap[tName].sent += b.sent || 0;
+    if (!templateMap[tName]) templateMap[tName] = { name: tName, sent: 0, read: 0, count: 0 };
+    templateMap[tName].sent += sent;
+    templateMap[tName].read += read;
     templateMap[tName].count += 1;
 
     // Time series (last 30 days)
     if ((b.createdAtMs || 0) >= cutoff) {
       const day = new Date(b.createdAtMs).toISOString().slice(0, 10);
-      if (!dayMap[day]) dayMap[day] = { date: day, sent: 0, delivered: 0, read: 0 };
-      dayMap[day].sent += b.sent || 0;
-      dayMap[day].delivered += b.delivered || 0;
-      dayMap[day].read += b.read || 0;
+      if (!dayMap[day]) dayMap[day] = { date: day, sent: 0, delivered: 0, read: 0, replied: 0 };
+      dayMap[day].sent += sent;
+      dayMap[day].delivered += delivered;
+      dayMap[day].read += read;
+      dayMap[day].replied += replied;
     }
+
+    // Best-time-to-send: aggregate read/delivered by the hour the broadcast started
+    const startedMs = b.startedAtMs || b.createdAtMs || 0;
+    if (startedMs) {
+      const hour = new Date(startedMs).getHours();
+      if (!hourMap[hour]) hourMap[hour] = { hour, delivered: 0, read: 0 };
+      hourMap[hour].delivered += delivered;
+      hourMap[hour].read += read;
+    }
+
+    // Per-campaign comparison row
+    comparison.push({
+      id: b.id,
+      name: b.name || b.templateName,
+      templateName: b.templateName,
+      status: b.status,
+      createdAtMs: b.createdAtMs || 0,
+      totalRecipients: b.totalRecipients || 0,
+      sent, delivered, read, failed, replied,
+      costInr: cost,
+      deliveryRate: sent > 0 ? Math.round((delivered / sent) * 100) : 0,
+      readRate: delivered > 0 ? Math.round((read / delivered) * 100) : 0,
+      responseRate: delivered > 0 ? Math.round((replied / delivered) * 100) : 0,
+    });
   }
 
-  const deliveryRate = totals.sent > 0 ? Math.round((totals.delivered / totals.sent) * 100) : 0;
-  const readRate = totals.delivered > 0 ? Math.round((totals.read / totals.delivered) * 100) : 0;
-  const failureRate = (totals.sent + totals.failed) > 0 ? Math.round((totals.failed / (totals.sent + totals.failed)) * 100) : 0;
+  const rates = {
+    deliveryRate: totals.sent > 0 ? Math.round((totals.delivered / totals.sent) * 100) : 0,
+    readRate: totals.delivered > 0 ? Math.round((totals.read / totals.delivered) * 100) : 0,
+    responseRate: totals.delivered > 0 ? Math.round((totals.replied / totals.delivered) * 100) : 0,
+    failureRate: (totals.sent + totals.failed) > 0 ? Math.round((totals.failed / (totals.sent + totals.failed)) * 100) : 0,
+  };
 
   const topTemplates = Object.values(templateMap).sort((a, b) => b.sent - a.sent).slice(0, 5);
   const timeSeries = Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date));
+  const hourly = Array.from({ length: 24 }, (_, h) => {
+    const d = hourMap[h];
+    return { hour: h, readRate: d && d.delivered > 0 ? Math.round((d.read / d.delivered) * 100) : 0, delivered: d?.delivered || 0 };
+  });
+  const bestHour = hourly.filter((h) => h.delivered > 0).sort((a, b) => b.readRate - a.readRate)[0] || null;
+
+  totals.costInr = Math.round(totals.costInr * 100) / 100;
 
   return {
     totals,
-    rates: { deliveryRate, readRate, failureRate },
-    funnel: { sent: totals.sent, delivered: totals.delivered, read: totals.read, failed: totals.failed },
+    rates,
+    benchmarks: BENCHMARKS,
+    funnel: { sent: totals.sent, delivered: totals.delivered, read: totals.read, replied: totals.replied, failed: totals.failed },
     topTemplates,
     timeSeries,
+    hourly,
+    bestHour,
+    comparison: comparison.sort((a, b) => b.createdAtMs - a.createdAtMs).slice(0, 10),
     recent: broadcasts.slice(0, 5),
   };
 }

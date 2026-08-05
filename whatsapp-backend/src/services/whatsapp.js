@@ -19,7 +19,7 @@ import { withLease } from "./lease.js";
 import { logger } from "../middleware/logger.js";
 import { emitWorkflowTrigger } from "./workflow/workflowEngine.js";
 import { triggerAIResponse } from "./ai/aiWhatsAppBridge.js";
-import { handleBroadcastStatusReceipt } from "./broadcast.js";
+import { handleBroadcastStatusReceipt, recordBroadcastReply } from "./broadcast.js";
 
 // ─── Pending Queue ──────────────────────────────────────────────────
 
@@ -274,6 +274,14 @@ export async function processInboundMessage({ orgId, message, contact }) {
       messageTimestampMs: providerTimestampMs,
     });
     await ref.update({ status: "completed", completedAt: nowIso(), result });
+
+    // ── Broadcast response attribution (fire-and-forget) ──
+    // An inbound message from a lead who recently received a broadcast counts
+    // as a reply for that campaign's response-rate metric.
+    if (result.leadId) {
+      recordBroadcastReply(orgId, result.leadId).catch((e) =>
+        logger.warn({ orgId, leadId: result.leadId, err: e.message }, "Broadcast reply attribution failed"));
+    }
 
     // ── AI Customer Care: trigger AI response (fire-and-forget) ──
     // Only triggers for text messages on successfully processed leads.
