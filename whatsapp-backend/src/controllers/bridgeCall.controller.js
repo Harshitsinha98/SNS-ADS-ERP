@@ -70,11 +70,13 @@ export async function statusHandler(req, res) {
     const callId = req.query.callId || req.body?.callId;
     if (!callId) return res.status(200).send("ok");
     const body = req.body || {};
+    const duration = Number(body.Duration || body.duration || body.RecordingDuration || body.BillDuration || 0);
+    logger.info({ callId, body, duration }, "Bridge call status webhook received");
     await handleCallCompleted(callId, {
-      duration: Number(body.Duration || body.RecordingDuration || 0),
-      recordingUrl: body.RecordUrl || body.RecordingUrl || null,
-      status: body.CallStatus || body.Status || null,
-      bLegUuid: body.BLegUUID || null,
+      duration,
+      recordingUrl: body.RecordUrl || body.RecordingUrl || body.recording_url || null,
+      status: body.CallStatus || body.Status || body.call_status || null,
+      bLegUuid: body.BLegUUID || body.b_leg_uuid || null,
     });
     return res.status(200).send("ok");
   } catch (e) {

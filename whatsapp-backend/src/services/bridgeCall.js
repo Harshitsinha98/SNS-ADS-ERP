@@ -139,13 +139,32 @@ async function deductWalletMinutes(orgId, minutes, costInr, callId) {
   const walletRef = db.collection("voiceWallets").doc(orgId);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(walletRef);
-    const wallet = snap.exists ? snap.data() : { balanceMinutes: 0, totalSpentInr: 0 };
+    const wallet = snap.exists ? snap.data() : { balanceMinutes: 0, bridgeMinutes: 0, totalSpentInr: 0 };
+    const newBalance = Math.max(0, (wallet.balanceMinutes || 0) - minutes);
+    const newBridge = Math.max(0, (wallet.bridgeMinutes || 0) - minutes);
     tx.set(walletRef, {
-      orgId, balanceMinutes: Math.max(0, (wallet.balanceMinutes || 0) - minutes),
+      orgId,
+      balanceMinutes: newBalance,
+      bridgeMinutes: newBridge,
       totalSpentInr: (wallet.totalSpentInr || 0) + costInr,
       lastDeductedAt: nowIso(), lastCallId: callId,
     }, { merge: true });
   });
+
+  // Record debit transaction for wallet history
+  await db.collection("walletTransactions").add({
+    orgId,
+    type: "debit",
+    packId: "bridge_call_usage",
+    packName: "Bridge Call",
+    minutes: -minutes,
+    amountInr: costInr,
+    description: `Bridge call usage (${minutes} min${minutes > 1 ? "s" : ""})`,
+    callId,
+    createdAt: nowIso(),
+    timestamp: Date.now(),
+  }).catch(() => {});
+
   await db.collection("bridgeCalls").doc(callId).update({ status: "wallet-deducted" }).catch(() => {});
 }
 
