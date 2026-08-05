@@ -18,6 +18,7 @@ import {
   Workflow,
   GitBranch,
   Brain,
+  Wallet,
 } from "lucide-react";
 
 const adminLinks = [
@@ -32,6 +33,7 @@ const adminLinks = [
   { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },
   { to: "/admin/ad-leads", label: "Meta & Google Ads", icon: Megaphone },
   { to: "/admin/billing", label: "Billing", icon: CreditCard },
+  { to: "/admin/voice-wallet", label: "Voice Wallet", icon: Wallet },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
