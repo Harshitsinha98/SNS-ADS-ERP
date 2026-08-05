@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import Layout from "../../components/Layout";
 import { useBilling } from "../../context/BillingContext";
 import { useAuth } from "../../context/AuthContext";
@@ -26,6 +27,8 @@ import {
   Sparkles,
   TrendingUp,
   Zap,
+  Lock,
+  ArrowRight,
 } from "lucide-react";
 
 // ── Wallet packs from plans.js
@@ -68,9 +71,21 @@ const fmtDate = (ts) => {
     ", " + d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
 };
 
+// ── Plans that unlock each pack type
+const BRIDGE_PLANS = new Set(["growth", "enterprise", "enterprise_plus"]);
+const AI_PLANS = new Set(["enterprise", "enterprise_plus"]);
+
 export default function VoiceWallet() {
-  const { org } = useBilling();
+  const b = useBilling();
+  const { org } = b;
   const { user } = useAuth();
+  const navigate = useNavigate();
+
+  // Plan gating — Starter can't use bridge calls, only Scale+ gets AI Voice Bot
+  const planId = b.planId || "starter";
+  const canBridge = BRIDGE_PLANS.has(planId);
+  const canAI = AI_PLANS.has(planId);
+  const walletLocked = !canBridge && !canAI; // Starter — entire wallet is locked
 
   const [balance, setBalance] = useState({ bridgeMinutes: 0, aiMinutes: 0, totalSpentInr: 0 });
   const [transactions, setTransactions] = useState([]);
@@ -180,6 +195,29 @@ export default function VoiceWallet() {
 
   return (
     <Layout title="Voice Wallet">
+      {/* ── Plan upgrade banner (Starter users) ── */}
+      {walletLocked && (
+        <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shrink-0">
+              <Lock className="text-white" size={22} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-display font-bold text-lg text-ink mb-1">Voice Wallet is available on Growth & above</h3>
+              <p className="text-sm text-ink-soft">
+                Bridge calling and AI Voice Bot are premium features. Upgrade your plan to unlock prepaid voice minutes and start calling leads directly from the CRM.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate("/admin/billing")}
+              className="btn btn-primary whitespace-nowrap flex items-center gap-2"
+            >
+              Upgrade Plan <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Hero balance cards ── */}
       <div className="grid sm:grid-cols-2 gap-5 mb-6">
         <BalanceCard
@@ -241,14 +279,21 @@ export default function VoiceWallet() {
           <h3 className="font-display font-bold text-lg text-ink">Top Up Your Wallet</h3>
         </div>
         <div className="grid sm:grid-cols-2 gap-5">
-          {TOPUP_PACKS.map((pack) => (
-            <TopUpCard
-              key={pack.id}
-              pack={pack}
-              busy={busy === pack.id}
-              onTopUp={() => handleTopUp(pack)}
-            />
-          ))}
+          {TOPUP_PACKS.map((pack) => {
+            const packAllowed = pack.id === "voice_bridge_pack" ? canBridge : canAI;
+            const requiredPlan = pack.id === "voice_bridge_pack" ? "Growth" : "Scale";
+            return (
+              <TopUpCard
+                key={pack.id}
+                pack={pack}
+                busy={busy === pack.id}
+                locked={!packAllowed}
+                requiredPlan={requiredPlan}
+                onTopUp={() => handleTopUp(pack)}
+                onUpgrade={() => navigate("/admin/billing")}
+              />
+            );
+          })}
         </div>
         <p className="text-xs text-ink-muted mt-3 flex items-center gap-1.5">
           <Sparkles size={12} className="text-orange-400" />
@@ -313,10 +358,10 @@ function BalanceCard({ icon: Icon, label, balance, rate, gradient, loading }) {
   );
 }
 
-function TopUpCard({ pack, busy, onTopUp }) {
+function TopUpCard({ pack, busy, locked, requiredPlan, onTopUp, onUpgrade }) {
   const Icon = pack.icon;
   return (
-    <div className={`rounded-2xl border ${pack.borderColor} ${pack.bgLight} p-6 flex flex-col`}>
+    <div className={`rounded-2xl border ${pack.borderColor} ${pack.bgLight} p-6 flex flex-col ${locked ? "opacity-70" : ""}`}>
       <div className="flex items-center gap-3 mb-3">
         <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${pack.color} flex items-center justify-center`}>
           <Icon className="text-white" size={18} />
@@ -331,17 +376,26 @@ function TopUpCard({ pack, busy, onTopUp }) {
         <span className="text-sm text-ink-muted">/ {pack.minutes.toLocaleString("en-IN")} mins</span>
       </div>
       <p className="text-xs text-ink-muted mb-4">Effective rate: {pack.rate}</p>
-      <button
-        onClick={onTopUp}
-        disabled={busy}
-        className="mt-auto btn btn-primary w-full flex items-center justify-center gap-2"
-      >
-        {busy ? (
-          <><Loader2 size={16} className="animate-spin" /> Processing...</>
-        ) : (
-          <><Plus size={16} /> Top Up Now</>
-        )}
-      </button>
+      {locked ? (
+        <button
+          onClick={onUpgrade}
+          className="mt-auto btn w-full flex items-center justify-center gap-2 bg-cream-200 text-ink-muted hover:bg-cream-300 hover:text-ink transition-colors"
+        >
+          <Lock size={14} /> Requires {requiredPlan}+ plan
+        </button>
+      ) : (
+        <button
+          onClick={onTopUp}
+          disabled={busy}
+          className="mt-auto btn btn-primary w-full flex items-center justify-center gap-2"
+        >
+          {busy ? (
+            <><Loader2 size={16} className="animate-spin" /> Processing...</>
+          ) : (
+            <><Plus size={16} /> Top Up Now</>
+          )}
+        </button>
+      )}
     </div>
   );
 }

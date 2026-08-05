@@ -25,6 +25,7 @@ const PACKS = {
     price: 1999,        // INR
     minutes: 1000,
     field: "bridgeMinutes",
+    requiredPlans: new Set(["growth", "enterprise", "enterprise_plus"]),
   },
   voice_ai_pack: {
     id: "voice_ai_pack",
@@ -32,6 +33,7 @@ const PACKS = {
     price: 3999,
     minutes: 500,
     field: "aiMinutes",
+    requiredPlans: new Set(["enterprise", "enterprise_plus"]),
   },
 };
 
@@ -86,6 +88,18 @@ export async function getWalletTransactions(orgId, limit = 50) {
 export async function createWalletOrder({ orgId, packId }) {
   const pack = PACKS[packId];
   if (!pack) throw Object.assign(new Error("Invalid pack"), { status: 400 });
+
+  // Plan gate — verify org is on a plan that allows this pack
+  const orgSnap = await db.collection("organizations").doc(orgId).get();
+  if (!orgSnap.exists) throw Object.assign(new Error("Organization not found"), { status: 404 });
+  const orgPlanId = orgSnap.data().planId || "starter";
+  if (!pack.requiredPlans.has(orgPlanId)) {
+    const planNames = [...pack.requiredPlans].map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(", ");
+    throw Object.assign(
+      new Error(`Voice wallet top-up requires a ${planNames} plan. Please upgrade.`),
+      { status: 403, code: "plan_required" }
+    );
+  }
 
   const rzp = await getRazorpay();
   if (!rzp) throw Object.assign(new Error("Razorpay is not configured"), { status: 503 });
