@@ -92,6 +92,7 @@ app.use("/api/whatsapp/templates", createWhatsAppTemplatesRouter(db, {
 // ── Legacy inline routes now handled by v1 controllers ──
 // These are mounted at their original paths for backward compatibility.
 import { requireAuth } from "./middleware/auth.js";
+import { getBalance, getTransactions, createOrder, verifyPayment } from "./controllers/wallet.controller.js";
 import {
   connectWhatsApp,
   getWhatsAppStatus,
@@ -110,6 +111,12 @@ app.post("/api/whatsapp/messages", requireAuth, sendMessage);
 app.post("/api/whatsapp/sync-now", requireAuth, syncNow);
 app.post("/api/subscription/run-lifecycle", requireAuth, runLifecycle);
 app.post("/api/follow-ups/run-automation", requireAuth, runAutomation);
+
+// ── Voice Wallet (legacy paths — frontend calls /api/wallet/*) ──
+app.get("/api/wallet/balance", requireAuth, getBalance);
+app.get("/api/wallet/transactions", requireAuth, getTransactions);
+app.post("/api/wallet/order", requireAuth, createOrder);
+app.post("/api/wallet/verify", requireAuth, verifyPayment);
 
 // ── Root ──
 app.get("/", rootCheck);
