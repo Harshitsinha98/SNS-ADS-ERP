@@ -1,322 +1,520 @@
-import { Link } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import Layout from "../../components/Layout";
-import StatCard from "../../components/StatCard";
 import StatusPie from "../../components/charts/PieChart";
-import ConvBar from "../../components/charts/BarChart";
 import { useData } from "../../context/DataContext";
+import { useAuth } from "../../context/AuthContext";
+import { useBilling } from "../../context/BillingContext";
+import { getBroadcastAnalytics } from "../../utils/billingApi";
 import { daysSince, fmtMoney, fmtDate } from "../../utils/helpers";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
 import {
   IndianRupee,
   Layers,
   AlertTriangle,
-  ArrowUpRight,
-  Sparkles,
-  CalendarDays,
-  CircleDollarSign,
+  UserPlus,
+  CalendarClock,
+  CalendarX2,
+  Target,
+  Timer,
+  TrendingUp,
+  Send,
+  CheckCheck,
+  Eye,
+  MessageCircle,
+  ArrowRight,
+  Activity as ActivityIcon,
+  Users,
+  Flame,
 } from "lucide-react";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const CLOSED = ["Closed-Won", "Lost"];
+
+// "3d late" / "5h late" / "just now" — avoids showing "0d late" for recent misses.
+const lateLabel = (dueAt) => {
+  const ms = Date.now() - new Date(dueAt).getTime();
+  if (ms < 0) return "due soon";
+  const days = Math.floor(ms / DAY_MS);
+  if (days >= 1) return `${days}d late`;
+  const hours = Math.floor(ms / (60 * 60 * 1000));
+  if (hours >= 1) return `${hours}h late`;
+  return "just now";
+};
+
 export default function Dashboard() {
-  const { leads, users, activity, financials } = useData();
-  const active = leads.filter((l) => !l.blacklisted);
+  const { leads, users, activity, financials, followUpTasks } = useData();
+  const { user } = useAuth();
+  const { org } = useBilling();
+  const navigate = useNavigate();
+  const orgId = org?.id || user?.activeOrgId;
 
-  const total = active.length;
-  const converted = active.filter((l) => l.status === "Closed-Won").length;
-  const lost = active.filter((l) => l.status === "Lost").length;
-  const activeLeads = total - converted - lost;
+  const [waStats, setWaStats] = useState(null);
 
-  const revenueOf = (lead) => financials[lead.id]?.revenue || 0;
+  // WhatsApp broadcast engagement — optional, fails silently if unavailable.
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    getBroadcastAnalytics(orgId)
+      .then((d) => { if (!cancelled) setWaStats(d); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [orgId]);
 
-  const wonValue = active
-    .filter((l) => l.status === "Closed-Won")
-    .reduce((sum, l) => sum + revenueOf(l), 0);
+  const m = useMemo(() => {
+    const active = leads.filter((l) => !l.blacklisted);
+    const revenueOf = (lead) => financials[lead.id]?.revenue || 0;
 
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-  const revenueThisMonth = active
-    .filter((l) => l.status === "Closed-Won")
-    .reduce((sum, lead) => {
-      const revenueUpdatedAt = financials[lead.id]?.revenueUpdatedAt;
-      return revenueUpdatedAt && new Date(revenueUpdatedAt) >= monthStart
-        ? sum + revenueOf(lead)
-        : sum;
+    const won = active.filter((l) => l.status === "Closed-Won");
+    const lost = active.filter((l) => l.status === "Lost");
+    const open = active.filter((l) => !CLOSED.includes(l.status));
+
+    // ── Today's pulse ──
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(todayStart.getTime() + DAY_MS);
+    const now = new Date();
+
+    const newToday = active.filter((l) => l.createdAt && new Date(l.createdAt) >= todayStart).length;
+    const openTasks = (followUpTasks || []).filter((t) => t.status === "open");
+    const dueToday = openTasks.filter((t) => {
+      const d = new Date(t.dueAt);
+      return d >= now && d < tomorrow;
+    });
+    const overdue = openTasks
+      .filter((t) => new Date(t.dueAt) < now)
+      .sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
+    const untouched = open
+      .filter((l) => daysSince(l.lastUpdated) >= 3)
+      .sort((a, b) => daysSince(b.lastUpdated) - daysSince(a.lastUpdated));
+
+    // ── Pipeline health ──
+    const conversionRate = active.length ? Math.round((won.length / active.length) * 100) : 0;
+    const avgDaysToClose = won.length
+      ? Math.round(won.reduce((s, l) => s + Math.max(0, (new Date(l.lastUpdated) - new Date(l.createdAt)) / DAY_MS), 0) / won.length)
+      : 0;
+    const hotLeads = open.filter((l) => l.priority === "Hot").length;
+
+    // ── Revenue (only surfaced when actually tracked) ──
+    const wonValue = won.reduce((s, l) => s + revenueOf(l), 0);
+    const pipelineValue = open.reduce((s, l) => s + revenueOf(l), 0);
+    const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+    const revenueThisMonth = won.reduce((s, l) => {
+      const at = financials[l.id]?.revenueUpdatedAt;
+      return at && new Date(at) >= monthStart ? s + revenueOf(l) : s;
     }, 0);
-  const averageWonDeal = converted ? wonValue / converted : 0;
-  const wonLeads = active.filter((lead) => lead.status === "Closed-Won");
-  const wonWithRevenue = wonLeads.filter((lead) => Number(revenueOf(lead)) > 0);
-  const wonMissingRevenue = wonLeads.filter((lead) => Number(revenueOf(lead)) <= 0);
-  const revenueCoverage = converted ? Math.round((wonWithRevenue.length / converted) * 100) : 0;
+    const hasRevenue = wonValue > 0 || pipelineValue > 0;
+    const wonMissingRevenue = won.filter((l) => revenueOf(l) <= 0);
 
-  const openValue = active
-    .filter((l) => !["Closed-Won", "Lost"].includes(l.status))
-    .reduce((sum, l) => sum + revenueOf(l), 0);
-
-  const slaBreaches = active.filter(
-    (l) =>
-      !["Closed-Won", "Lost"].includes(l.status) && daysSince(l.lastUpdated) >= 3
-  );
-
-  const statusData = [...new Set(active.map((l) => l.status))].map((s) => ({
-    name: s,
-    value: active.filter((l) => l.status === s).length,
-  }));
-
-  const leaderboard = users
-    .filter((u) => u.role === "employee")
-    .map((u) => {
-      const assigned = active.filter((lead) => lead.assignedTo === u.id);
-      const wonLeads = assigned.filter((lead) => lead.status === "Closed-Won");
-      return {
-        name: u.name || "Unassigned",
-        value: wonLeads.reduce((sum, lead) => sum + revenueOf(lead), 0),
-        wins: wonLeads.length,
-        pipeline: assigned
-          .filter((lead) => !["Closed-Won", "Lost"].includes(lead.status))
-          .reduce((sum, lead) => sum + revenueOf(lead), 0),
-        conversion: assigned.length ? ((wonLeads.length / assigned.length) * 100).toFixed(1) : "0.0",
-      };
-    })
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5);
-
-  const sourceMap = {};
-  active.forEach((l) => {
-    const src = l.source || "Unknown";
-    if (!sourceMap[src]) sourceMap[src] = { source: src, total: 0, won: 0, revenue: 0 };
-    sourceMap[src].total++;
-    if (l.status === "Closed-Won") {
-      sourceMap[src].won++;
-      sourceMap[src].revenue += revenueOf(l);
+    // ── 14-day lead inflow trend ──
+    const trend = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(todayStart.getTime() - i * DAY_MS);
+      const next = new Date(d.getTime() + DAY_MS);
+      const created = active.filter((l) => l.createdAt && new Date(l.createdAt) >= d && new Date(l.createdAt) < next).length;
+      const closedWon = active.filter((l) => l.status === "Closed-Won" && l.lastUpdated && new Date(l.lastUpdated) >= d && new Date(l.lastUpdated) < next).length;
+      trend.push({
+        date: d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+        leads: created,
+        won: closedWon,
+      });
     }
-  });
-  const sources = Object.values(sourceMap)
-    .map((s) => ({
-      ...s,
-      rate: s.total ? ((s.won / s.total) * 100).toFixed(1) : 0,
-    }))
-    .sort((a, b) => b.revenue - a.revenue);
+
+    const statusData = [...new Set(active.map((l) => l.status))].map((s) => ({
+      name: s,
+      value: active.filter((l) => l.status === s).length,
+    }));
+
+    // ── Team performance (lead-first, revenue optional) ──
+    const team = users
+      .filter((u) => u.role === "employee")
+      .map((u) => {
+        const assigned = active.filter((l) => l.assignedTo === u.id);
+        const uWon = assigned.filter((l) => l.status === "Closed-Won");
+        const uOpen = assigned.filter((l) => !CLOSED.includes(l.status));
+        return {
+          id: u.id,
+          name: u.name || "Unnamed",
+          assigned: assigned.length,
+          open: uOpen.length,
+          wins: uWon.length,
+          conversion: assigned.length ? Math.round((uWon.length / assigned.length) * 100) : 0,
+          stale: uOpen.filter((l) => daysSince(l.lastUpdated) >= 3).length,
+          revenue: uWon.reduce((s, l) => s + revenueOf(l), 0),
+        };
+      })
+      .sort((a, b) => (b.revenue - a.revenue) || (b.wins - a.wins) || (b.assigned - a.assigned));
+
+    // ── Source performance ──
+    const srcMap = {};
+    active.forEach((l) => {
+      const src = l.source || "Unknown";
+      if (!srcMap[src]) srcMap[src] = { source: src, total: 0, won: 0, revenue: 0 };
+      srcMap[src].total++;
+      if (l.status === "Closed-Won") { srcMap[src].won++; srcMap[src].revenue += revenueOf(l); }
+    });
+    const sources = Object.values(srcMap)
+      .map((s) => ({ ...s, rate: s.total ? Math.round((s.won / s.total) * 100) : 0 }))
+      .sort((a, b) => (b.revenue - a.revenue) || (b.total - a.total));
+
+    return {
+      total: active.length, open: open.length, won: won.length, lost: lost.length,
+      newToday, dueToday, overdue, untouched,
+      conversionRate, avgDaysToClose, hotLeads,
+      wonValue, pipelineValue, revenueThisMonth, hasRevenue, wonMissingRevenue,
+      trend, statusData, team, sources,
+    };
+  }, [leads, users, financials, followUpTasks]);
+
+  const waTotals = waStats?.totals;
+  const waRates = waStats?.rates;
+  const showWhatsApp = Boolean(waTotals && waTotals.sent > 0);
 
   return (
     <Layout title="Business Command Center">
-      {/* Hero Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="Revenue Won"
-          value={fmtMoney(wonValue)}
-          tone="ok"
-          icon={IndianRupee}
+      {/* ═══ TODAY'S PULSE — what needs attention right now ═══ */}
+      <SectionLabel icon={Flame} text="Today's Pulse" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+        <PulseCard
+          label="New Leads Today" value={m.newToday} icon={UserPlus} tone="primary"
+          onClick={() => navigate("/admin/leads")}
         />
-        <StatCard
-          label="Revenue This Month"
-          value={fmtMoney(revenueThisMonth)}
-          tone="signal"
-          icon={CalendarDays}
+        <PulseCard
+          label="Due Today" value={m.dueToday.length} icon={CalendarClock} tone="info"
+          sub="follow-ups" onClick={() => navigate("/admin/follow-ups")}
         />
-        <StatCard
-          label="Average Won Deal"
-          value={fmtMoney(averageWonDeal)}
-          tone="info"
-          icon={CircleDollarSign}
+        <PulseCard
+          label="Overdue" value={m.overdue.length} icon={CalendarX2}
+          tone={m.overdue.length > 0 ? "danger" : "ok"} sub="follow-ups"
+          onClick={() => navigate("/admin/follow-ups")}
         />
-        <StatCard
-          label="Pipeline Value"
-          value={fmtMoney(openValue)}
-          tone="danger"
-          icon={Layers}
+        <PulseCard
+          label="Untouched 3d+" value={m.untouched.length} icon={AlertTriangle}
+          tone={m.untouched.length > 0 ? "warn" : "ok"} sub="SLA risk"
+          onClick={() => navigate("/admin/follow-ups")}
         />
       </div>
 
-      <section className="mb-6 rounded-2xl border border-success-200 bg-gradient-to-r from-success-50 via-white to-emerald-50 p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div><p className="eyebrow text-success-700">Connected deal revenue</p><h2 className="mt-1 text-xl font-bold text-ink">₹ values flow from each won lead into this dashboard</h2><p className="mt-1 text-sm text-ink-soft">Revenue is stored in a separate admin-only lead record and powers won revenue, monthly revenue, pipeline value, team performance, and source reporting.</p></div>
-          <div className="grid grid-cols-2 gap-2 sm:flex"><RevenueMetric label="Captured" value={`${revenueCoverage}%`} /><RevenueMetric label="Won deals tracked" value={`${wonWithRevenue.length}/${converted}`} /><RevenueMetric label="Needs value" value={wonMissingRevenue.length} danger /></div>
-        </div>
-        {wonMissingRevenue.length > 0 && <div className="mt-4 flex flex-wrap gap-2"><span className="text-xs font-medium text-success-800">Add revenue to these won deals:</span>{wonMissingRevenue.slice(0, 4).map((lead) => <Link key={lead.id} to={`/admin/leads/${lead.id}`} className="rounded-full border border-success-200 bg-white px-3 py-1 text-xs font-medium text-success-800 hover:bg-success-100">{lead.name || "Lead"}</Link>)}{wonMissingRevenue.length > 4 && <span className="rounded-full bg-white px-3 py-1 text-xs text-success-800">+{wonMissingRevenue.length - 4} more</span>}</div>}
-      </section>
-
-      {/* Lead Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-card border border-gray-100 p-4">
-          <p className="text-xs font-medium text-gray-500 mb-1">Total Leads</p>
-          <p className="text-2xl font-bold text-gray-800 num">{total}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-card border border-gray-100 p-4">
-          <p className="text-xs font-medium text-gray-500 mb-1">Active</p>
-          <p className="text-2xl font-bold text-primary-600 num">{activeLeads}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-card border border-gray-100 p-4">
-          <p className="text-xs font-medium text-gray-500 mb-1">Converted</p>
-          <p className="text-2xl font-bold text-success-600 num">{converted}</p>
-        </div>
-        <div className="bg-white rounded-xl shadow-card border border-gray-100 p-4">
-          <p className="text-xs font-medium text-gray-500 mb-1">Lost</p>
-          <p className="text-2xl font-bold text-danger-600 num">{lost}</p>
-        </div>
+      {/* ═══ PIPELINE HEALTH ═══ */}
+      <SectionLabel icon={Target} text="Pipeline Health" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+        <PulseCard label="Active Pipeline" value={m.open} icon={Layers} tone="primary" sub={`of ${m.total} total leads`} onClick={() => navigate("/admin/leads")} />
+        <PulseCard label="Conversion Rate" value={`${m.conversionRate}%`} icon={TrendingUp} tone="ok" sub={`${m.won} won · ${m.lost} lost`} />
+        <PulseCard label="Avg Days to Close" value={m.avgDaysToClose || "—"} icon={Timer} tone="signal" sub={m.won ? `across ${m.won} won deals` : "no wins yet"} />
+        <PulseCard label="Hot Leads" value={m.hotLeads} icon={Flame} tone="danger" sub="high priority, open" onClick={() => navigate("/admin/leads")} />
       </div>
 
-      {/* SLA Alerts */}
-      {slaBreaches.length > 0 && (
-        <div className="bg-gradient-to-r from-danger-50 to-warning-50 rounded-xl border border-danger-100 p-5 mb-6">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-danger-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-5 h-5 text-danger-600" />
+      {/* ═══ WHATSAPP ENGAGEMENT (only when broadcasts exist) ═══ */}
+      {showWhatsApp && (
+        <>
+          <SectionLabel icon={MessageCircle} text="WhatsApp Engagement" action={{ label: "Broadcast dashboard", to: "/admin/broadcast" }} />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+            <PulseCard label="Messages Sent" value={waTotals.sent.toLocaleString("en-IN")} icon={Send} tone="info" sub={`${waTotals.broadcasts} campaigns`} onClick={() => navigate("/admin/broadcast")} />
+            <PulseCard label="Delivery Rate" value={`${waRates.deliveryRate}%`} icon={CheckCheck} tone="ok" sub={`${waTotals.delivered.toLocaleString("en-IN")} delivered`} />
+            <PulseCard label="Read Rate" value={`${waRates.readRate}%`} icon={Eye} tone="primary" sub={`${waTotals.read.toLocaleString("en-IN")} read`} />
+            <PulseCard label="Response Rate" value={`${waRates.responseRate}%`} icon={MessageCircle} tone="signal" sub={`${(waTotals.replied || 0).toLocaleString("en-IN")} replied`} />
+          </div>
+        </>
+      )}
+
+      {/* ═══ REVENUE (only when actually tracked) ═══ */}
+      {m.hasRevenue && (
+        <>
+          <SectionLabel icon={IndianRupee} text="Revenue" />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7">
+            <PulseCard label="Revenue Won" value={fmtMoney(m.wonValue)} icon={IndianRupee} tone="ok" />
+            <PulseCard label="This Month" value={fmtMoney(m.revenueThisMonth)} icon={CalendarClock} tone="info" />
+            <PulseCard label="Open Pipeline Value" value={fmtMoney(m.pipelineValue)} icon={Layers} tone="signal" />
+          </div>
+        </>
+      )}
+
+      {/* ═══ ACTION CENTER — the single most useful block ═══ */}
+      {(m.overdue.length > 0 || m.untouched.length > 0 || m.wonMissingRevenue.length > 0) && (
+        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 mb-7">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-danger-50 flex items-center justify-center">
+              <AlertTriangle size={16} className="text-danger-600" />
             </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-danger-700 mb-2">
-                SLA Escalation — {slaBreaches.length} untouched leads
-              </h3>
-              <ul className="space-y-2">
-                {slaBreaches.slice(0, 5).map((l) => (
-                  <li
-                    key={l.id}
-                    className="flex items-center justify-between text-sm bg-white/50 rounded-lg px-3 py-2"
-                  >
-                    <span className="font-medium text-gray-800">{l.name}</span>
-                    <span className="text-danger-600 font-mono text-xs">
-                      {daysSince(l.lastUpdated)}d idle
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <h3 className="font-display font-bold text-base text-ink">Needs Your Attention</h3>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Overdue follow-ups */}
+            {m.overdue.length > 0 && (
+              <ActionList
+                title={`Overdue follow-ups (${m.overdue.length})`}
+                to="/admin/follow-ups"
+                items={m.overdue.slice(0, 5).map((t) => ({
+                  key: t.id,
+                  primary: t.leadName || t.title || "Follow-up",
+                  secondary: t.assignedToName || "Unassigned",
+                  badge: lateLabel(t.dueAt),
+                  tone: "danger",
+                  link: t.leadId ? `/admin/leads/${t.leadId}` : "/admin/follow-ups",
+                }))}
+              />
+            )}
+
+            {/* Untouched leads */}
+            {m.untouched.length > 0 && (
+              <ActionList
+                title={`Untouched leads (${m.untouched.length})`}
+                to="/admin/leads"
+                items={m.untouched.slice(0, 5).map((l) => ({
+                  key: l.id,
+                  primary: l.name || "Lead",
+                  secondary: l.assignedToName || "Unassigned",
+                  badge: `${daysSince(l.lastUpdated)}d idle`,
+                  tone: "warn",
+                  link: `/admin/leads/${l.id}`,
+                }))}
+              />
+            )}
+
+            {/* Won deals missing revenue */}
+            {m.wonMissingRevenue.length > 0 && (
+              <ActionList
+                title={`Won deals missing revenue (${m.wonMissingRevenue.length})`}
+                to="/admin/leads"
+                items={m.wonMissingRevenue.slice(0, 5).map((l) => ({
+                  key: l.id,
+                  primary: l.name || "Lead",
+                  secondary: "Add deal value",
+                  badge: "no ₹",
+                  tone: "info",
+                  link: `/admin/leads/${l.id}`,
+                }))}
+              />
+            )}
           </div>
         </div>
       )}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-xl shadow-card border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800">Lead Status Distribution</h3>
-            <ArrowUpRight className="w-4 h-4 text-gray-400" />
-          </div>
-          <StatusPie data={statusData} />
+      {/* ═══ TRENDS ═══ */}
+      <div className="grid lg:grid-cols-3 gap-6 mb-7">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
+          <h3 className="font-display font-bold text-base text-ink mb-1">Lead Inflow (Last 14 Days)</h3>
+          <p className="text-xs text-ink-muted mb-4">New leads captured vs deals won</p>
+          <ResponsiveContainer width="100%" height={250}>
+            <AreaChart data={m.trend} margin={{ top: 5, right: 5, left: -22, bottom: 0 }}>
+              <defs>
+                <linearGradient id="dLeads" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#F04E00" stopOpacity={0.28} />
+                  <stop offset="95%" stopColor="#F04E00" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="dWon" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#2BAE66" stopOpacity={0.28} />
+                  <stop offset="95%" stopColor="#2BAE66" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E6E1D6" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={1} />
+              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+              <Tooltip />
+              <Area type="monotone" dataKey="leads" name="New leads" stroke="#F04E00" fill="url(#dLeads)" strokeWidth={2} />
+              <Area type="monotone" dataKey="won" name="Won" stroke="#2BAE66" fill="url(#dWon)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
-        <div className="bg-white rounded-xl shadow-card border border-gray-100 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800">Revenue by Employee</h3>
-            <Sparkles className="w-4 h-4 text-accent-500" />
-          </div>
-          <ConvBar data={leaderboard} />
+
+        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
+          <h3 className="font-display font-bold text-base text-ink mb-1">Status Distribution</h3>
+          <p className="text-xs text-ink-muted mb-2">Where your pipeline sits</p>
+          {m.statusData.length === 0
+            ? <p className="text-sm text-ink-muted text-center py-16">No leads yet.</p>
+            : <StatusPie data={m.statusData} />}
         </div>
       </div>
 
-      {/* Employee Revenue Table */}
-      <div className="bg-white rounded-xl shadow-card border border-gray-100 p-6 mb-6 overflow-hidden">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-semibold text-gray-800">Employee Revenue Performance</h3>
-            <p className="text-xs text-gray-500 mt-1">Won revenue, open pipeline and conversion from assigned leads.</p>
+      {/* ═══ TEAM + SOURCE ═══ */}
+      <div className="grid lg:grid-cols-2 gap-6 mb-7">
+        {/* Team performance */}
+        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 overflow-hidden">
+          <div className="px-6 py-4 border-b border-cream-200 flex items-center gap-2">
+            <Users size={16} className="text-orange-500" />
+            <h3 className="font-display font-bold text-base text-ink">Team Performance</h3>
           </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[620px]">
-            <thead><tr className="border-b border-gray-100">
-              <th className="text-left py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">Employee</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">Won deals</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">Won revenue</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">Pipeline</th>
-              <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">Conversion</th>
-            </tr></thead>
-            <tbody>
-              {leaderboard.map((employee) => (
-                <tr key={employee.name} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
-                  <td className="py-3 px-4 font-medium text-gray-800">{employee.name}</td>
-                  <td className="py-3 px-4 text-right font-mono text-success-600">{employee.wins}</td>
-                  <td className="py-3 px-4 text-right font-mono font-medium text-gray-800">{fmtMoney(employee.value)}</td>
-                  <td className="py-3 px-4 text-right font-mono text-gray-600">{fmtMoney(employee.pipeline)}</td>
-                  <td className="py-3 px-4 text-right font-mono text-gray-600">{employee.conversion}%</td>
-                </tr>
-              ))}
-              {leaderboard.length === 0 && <tr><td colSpan="5" className="py-6 text-center text-gray-400">Add and assign employees to see revenue performance.</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Source Performance Table */}
-      <div className="bg-white rounded-xl shadow-card border border-gray-100 p-6 mb-6 overflow-hidden">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-800">Lead Source Performance</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">
-                  Source
-                </th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">
-                  Leads
-                </th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">
-                  Won
-                </th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">
-                  Rate
-                </th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-500 text-xs uppercase tracking-wider">
-                  Revenue
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sources.map((s, i) => (
-                <tr
-                  key={s.source}
-                  className={`border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors ${
-                    i === 0 ? "bg-primary-50/30" : ""
-                  }`}
-                >
-                  <td className="py-3 px-4 font-medium text-gray-800">{s.source}</td>
-                  <td className="py-3 px-4 text-right text-gray-600 font-mono">
-                    {s.total}
-                  </td>
-                  <td className="py-3 px-4 text-right text-success-600 font-mono font-medium">
-                    {s.won}
-                  </td>
-                  <td className="py-3 px-4 text-right text-gray-600 font-mono">
-                    {s.rate}%
-                  </td>
-                  <td className="py-3 px-4 text-right text-gray-800 font-mono font-medium">
-                    {fmtMoney(s.revenue)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="bg-white rounded-xl shadow-card border border-gray-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-800">Recent Activity</h3>
-        </div>
-        <ul className="space-y-3 max-h-80 overflow-y-auto">
-          {activity.length === 0 && (
-            <li className="text-sm text-gray-400 text-center py-8">
-              No activity yet
-            </li>
+          {m.team.length === 0 ? (
+            <p className="text-center text-sm text-ink-muted py-10">Add team members to see performance.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-cream-50">
+                  <tr className="text-xs text-ink-muted">
+                    <th className="text-left px-6 py-2.5 font-medium">Employee</th>
+                    <th className="text-right px-3 py-2.5 font-medium">Open</th>
+                    <th className="text-right px-3 py-2.5 font-medium">Won</th>
+                    <th className="text-right px-3 py-2.5 font-medium">Conv.</th>
+                    <th className="text-right px-6 py-2.5 font-medium">Stale</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-cream-100">
+                  {m.team.slice(0, 6).map((e) => (
+                    <tr key={e.id} className="hover:bg-cream-50">
+                      <td className="px-6 py-3">
+                        <p className="font-medium text-ink truncate max-w-[140px]">{e.name}</p>
+                        {m.hasRevenue && e.revenue > 0 && <p className="text-xs text-success-600">{fmtMoney(e.revenue)}</p>}
+                      </td>
+                      <td className="px-3 py-3 text-right num text-ink-soft">{e.open}</td>
+                      <td className="px-3 py-3 text-right num text-success-600 font-medium">{e.wins}</td>
+                      <td className="px-3 py-3 text-right">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${e.conversion >= 20 ? "bg-green-100 text-green-700" : "bg-cream-200 text-ink-soft"}`}>
+                          {e.conversion}%
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-right num">
+                        <span className={e.stale > 0 ? "text-danger-600 font-medium" : "text-ink-muted"}>{e.stale}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-          {activity.slice(0, 20).map((a) => (
-            <li
-              key={a.id}
-              className="flex items-start gap-3 text-sm border-l-2 border-primary-200 pl-4 py-1"
-            >
-              <span className="text-gray-700 flex-1">{a.text}</span>
-              <span className="text-xs text-gray-400 font-mono whitespace-nowrap">
-                {fmtDate(a.at)}
-              </span>
-            </li>
-          ))}
-        </ul>
+        </div>
+
+        {/* Source performance */}
+        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 overflow-hidden">
+          <div className="px-6 py-4 border-b border-cream-200 flex items-center gap-2">
+            <Target size={16} className="text-orange-500" />
+            <h3 className="font-display font-bold text-base text-ink">Lead Source Performance</h3>
+          </div>
+          {m.sources.length === 0 ? (
+            <p className="text-center text-sm text-ink-muted py-10">No leads yet.</p>
+          ) : (
+            <div className="divide-y divide-cream-100">
+              {m.sources.slice(0, 6).map((s) => {
+                const max = m.sources[0].total || 1;
+                return (
+                  <div key={s.source} className="px-6 py-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm font-medium text-ink">{s.source}</span>
+                      <span className="text-xs text-ink-muted">
+                        <span className="num text-ink-soft">{s.total}</span> leads ·{" "}
+                        <span className="text-success-600 font-medium num">{s.won}</span> won ·{" "}
+                        <span className="num">{s.rate}%</span>
+                        {m.hasRevenue && s.revenue > 0 && <> · <span className="text-ink font-medium">{fmtMoney(s.revenue)}</span></>}
+                      </span>
+                    </div>
+                    <div className="w-full bg-cream-200 rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full bg-gradient-to-r from-orange-400 to-amber-500" style={{ width: `${Math.round((s.total / max) * 100)}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ═══ RECENT ACTIVITY ═══ */}
+      <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <ActivityIcon size={16} className="text-orange-500" />
+          <h3 className="font-display font-bold text-base text-ink">Recent Activity</h3>
+        </div>
+        {activity.length === 0 ? (
+          <p className="text-sm text-ink-muted text-center py-8">No activity yet.</p>
+        ) : (
+          <ul className="space-y-2.5 max-h-72 overflow-y-auto">
+            {activity.slice(0, 15).map((a) => (
+              <li key={a.id} className="flex items-start gap-3 text-sm border-l-2 border-orange-200 pl-4 py-0.5">
+                <span className="text-ink-soft flex-1">{a.text}</span>
+                <span className="text-xs text-ink-muted num whitespace-nowrap">{fmtDate(a.at)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </Layout>
   );
 }
 
+/* ─────────────── UI primitives ─────────────── */
 
-function RevenueMetric({ label, value, danger = false }) {
-  return <div className={`rounded-xl border px-3 py-2 text-center ${danger ? "border-warning-200 bg-warning-50 text-warning-800" : "border-success-200 bg-white text-success-800"}`}><p className="text-[10px] font-semibold uppercase tracking-wide">{label}</p><p className="num mt-1 text-lg font-bold">{value}</p></div>;
+function SectionLabel({ icon: Icon, text, action }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <Icon size={15} className="text-orange-500" />
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">{text}</h2>
+      </div>
+      {action && (
+        <Link to={action.to} className="text-xs font-medium text-orange-600 hover:text-orange-700 flex items-center gap-1">
+          {action.label} <ArrowRight size={12} />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+const TONES = {
+  primary: { bar: "bg-orange-500", bg: "bg-orange-50", fg: "text-orange-600" },
+  ok: { bar: "bg-green-500", bg: "bg-green-50", fg: "text-green-600" },
+  danger: { bar: "bg-red-500", bg: "bg-red-50", fg: "text-red-600" },
+  warn: { bar: "bg-amber-500", bg: "bg-amber-50", fg: "text-amber-600" },
+  info: { bar: "bg-blue-500", bg: "bg-blue-50", fg: "text-blue-600" },
+  signal: { bar: "bg-purple-500", bg: "bg-purple-50", fg: "text-purple-600" },
+};
+
+function PulseCard({ label, value, icon: Icon, tone = "primary", sub, onClick }) {
+  const t = TONES[tone] || TONES.primary;
+  return (
+    <div
+      onClick={onClick}
+      className={`bg-white rounded-xl shadow-card border border-cream-300/60 p-4 relative overflow-hidden transition-all ${
+        onClick ? "cursor-pointer hover:shadow-card-hover hover:border-orange-200" : ""
+      }`}
+    >
+      <span className={`absolute left-0 top-0 bottom-0 w-[3px] ${t.bar}`} />
+      <div className="flex items-start justify-between mb-2">
+        <div className={`w-9 h-9 ${t.bg} rounded-lg flex items-center justify-center`}>
+          <Icon size={16} className={t.fg} />
+        </div>
+        {onClick && <ArrowRight size={13} className="text-ink-muted/50" />}
+      </div>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted mb-0.5">{label}</p>
+      <p className="text-2xl font-display font-bold text-ink num leading-tight">{value}</p>
+      {sub && <p className="text-[11px] text-ink-muted mt-0.5 truncate">{sub}</p>}
+    </div>
+  );
+}
+
+function ActionList({ title, items, to }) {
+  const toneMap = {
+    danger: "border-danger-100 bg-danger-50/50 text-danger-700",
+    warn: "border-warning-200 bg-warning-50/50 text-warning-700",
+    info: "border-blue-100 bg-blue-50/50 text-blue-700",
+  };
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-ink">{title}</p>
+        <Link to={to} className="text-xs text-orange-600 hover:text-orange-700">View all</Link>
+      </div>
+      <div className="space-y-1.5">
+        {items.map((it) => (
+          <Link
+            key={it.key}
+            to={it.link}
+            className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 hover:brightness-95 transition ${toneMap[it.tone] || toneMap.info}`}
+          >
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-ink truncate">{it.primary}</p>
+              <p className="text-[11px] opacity-80 truncate">{it.secondary}</p>
+            </div>
+            <span className="text-[11px] font-mono font-medium whitespace-nowrap">{it.badge}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
 }
