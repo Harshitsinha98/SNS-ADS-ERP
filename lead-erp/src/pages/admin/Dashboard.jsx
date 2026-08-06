@@ -34,6 +34,7 @@ import {
   Activity as ActivityIcon,
   Users,
   Flame,
+  Megaphone,
 } from "lucide-react";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -175,7 +176,8 @@ export default function Dashboard() {
 
   const waTotals = waStats?.totals;
   const waRates = waStats?.rates;
-  const showWhatsApp = Boolean(waTotals && waTotals.sent > 0);
+  const waBench = waStats?.benchmarks;
+  const hasBroadcasts = Boolean(waTotals && waTotals.sent > 0);
 
   return (
     <Layout title="Business Command Center">
@@ -211,15 +213,154 @@ export default function Dashboard() {
         <PulseCard label="Hot Leads" value={m.hotLeads} icon={Flame} tone="danger" sub="high priority, open" onClick={() => navigate("/admin/leads")} />
       </div>
 
-      {/* ═══ WHATSAPP ENGAGEMENT (only when broadcasts exist) ═══ */}
-      {showWhatsApp && (
+      {/* ═══ WHATSAPP BROADCAST ═══ */}
+      <SectionLabel
+        icon={MessageCircle}
+        text="WhatsApp Broadcast"
+        action={{ label: hasBroadcasts ? "Full broadcast dashboard" : "Create broadcast", to: "/admin/broadcast" }}
+      />
+
+      {!hasBroadcasts ? (
+        /* Empty state — keeps the capability discoverable */
+        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 mb-7 flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shrink-0">
+            <Megaphone className="text-white" size={22} />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-display font-bold text-base text-ink">No broadcasts sent yet</h3>
+            <p className="text-sm text-ink-muted mt-0.5">
+              Reach all {m.total} of your leads at once with an approved WhatsApp template. Delivery, read and
+              response rates will appear here automatically.
+            </p>
+          </div>
+          <Link to="/admin/broadcast" className="btn btn-primary text-sm whitespace-nowrap flex items-center gap-1.5">
+            <Send size={15} /> Send first broadcast
+          </Link>
+        </div>
+      ) : (
         <>
-          <SectionLabel icon={MessageCircle} text="WhatsApp Engagement" action={{ label: "Broadcast dashboard", to: "/admin/broadcast" }} />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
-            <PulseCard label="Messages Sent" value={waTotals.sent.toLocaleString("en-IN")} icon={Send} tone="info" sub={`${waTotals.broadcasts} campaigns`} onClick={() => navigate("/admin/broadcast")} />
-            <PulseCard label="Delivery Rate" value={`${waRates.deliveryRate}%`} icon={CheckCheck} tone="ok" sub={`${waTotals.delivered.toLocaleString("en-IN")} delivered`} />
-            <PulseCard label="Read Rate" value={`${waRates.readRate}%`} icon={Eye} tone="primary" sub={`${waTotals.read.toLocaleString("en-IN")} read`} />
-            <PulseCard label="Response Rate" value={`${waRates.responseRate}%`} icon={MessageCircle} tone="signal" sub={`${(waTotals.replied || 0).toLocaleString("en-IN")} replied`} />
+          {/* Engagement KPIs with industry benchmark comparison */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <PulseCard
+              label="Messages Sent" value={waTotals.sent.toLocaleString("en-IN")} icon={Send} tone="info"
+              sub={`across ${waTotals.broadcasts} campaigns`} onClick={() => navigate("/admin/broadcast")}
+            />
+            <PulseCard
+              label="Delivery Rate" value={`${waRates.deliveryRate}%`} icon={CheckCheck} tone="ok"
+              sub={`${waTotals.delivered.toLocaleString("en-IN")} delivered`}
+              benchmark={waBench?.deliveryRate} higherIsBetter
+            />
+            <PulseCard
+              label="Read Rate" value={`${waRates.readRate}%`} icon={Eye} tone="primary"
+              sub={`${waTotals.read.toLocaleString("en-IN")} read`}
+              benchmark={waBench?.readRate} higherIsBetter
+            />
+            <PulseCard
+              label="Response Rate" value={`${waRates.responseRate}%`} icon={MessageCircle} tone="signal"
+              sub={`${(waTotals.replied || 0).toLocaleString("en-IN")} replied`}
+              benchmark={waBench?.responseRate} higherIsBetter
+            />
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-4 mb-7">
+            {/* Delivery funnel */}
+            <div className="lg:col-span-2 bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-display font-bold text-base text-ink">Message Delivery Funnel</h3>
+                <span className="text-xs text-ink-muted">all campaigns</span>
+              </div>
+              <div className="space-y-3">
+                {[
+                  { label: "Sent", value: waTotals.sent, color: "bg-blue-500" },
+                  { label: "Delivered", value: waTotals.delivered, color: "bg-green-500" },
+                  { label: "Read", value: waTotals.read, color: "bg-orange-500" },
+                  { label: "Replied", value: waTotals.replied || 0, color: "bg-purple-500" },
+                ].map((s) => {
+                  const pct = waTotals.sent > 0 ? Math.round((s.value / waTotals.sent) * 100) : 0;
+                  return (
+                    <div key={s.label}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm text-ink">{s.label}</span>
+                        <span className="text-sm text-ink-soft">
+                          <span className="num font-semibold text-ink">{s.value.toLocaleString("en-IN")}</span>
+                          <span className="text-ink-muted"> · {pct}%</span>
+                        </span>
+                      </div>
+                      <div className="w-full bg-cream-200 rounded-full h-2">
+                        <div className={`h-2 rounded-full ${s.color} transition-all`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                {waTotals.failed > 0 && (
+                  <div className="pt-2 border-t border-cream-200 flex items-center justify-between text-sm">
+                    <span className="text-danger-600 flex items-center gap-1.5">
+                      <AlertTriangle size={14} /> Failed
+                    </span>
+                    <span className="num font-semibold text-danger-600">
+                      {waTotals.failed.toLocaleString("en-IN")} ({waRates.failureRate}%)
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Spend + best time + recent campaigns */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <PulseCard
+                  label="Est. Spend" value={`₹${(waTotals.costInr || 0).toLocaleString("en-IN")}`}
+                  icon={IndianRupee} tone="ok"
+                />
+                <PulseCard
+                  label="Best Time"
+                  value={waStats?.bestHour ? `${String(waStats.bestHour.hour).padStart(2, "0")}:00` : "—"}
+                  icon={Timer} tone="info"
+                  sub={waStats?.bestHour ? `${waStats.bestHour.readRate}% read` : "need more data"}
+                />
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Recent Campaigns</h4>
+                  <Link to="/admin/broadcast" className="text-xs text-orange-600 hover:text-orange-700">All</Link>
+                </div>
+                {(waStats?.recent || []).length === 0 ? (
+                  <p className="text-sm text-ink-muted">No campaigns yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {waStats.recent.slice(0, 4).map((b) => {
+                      const done = (b.sent || 0) + (b.failed || 0);
+                      const pct = b.totalRecipients > 0 ? Math.round((done / b.totalRecipients) * 100) : 0;
+                      const live = b.status === "processing" || b.status === "queued";
+                      return (
+                        <Link
+                          key={b.id}
+                          to={`/admin/broadcast/${b.id}`}
+                          className="block rounded-lg border border-cream-200 px-3 py-2 hover:bg-cream-50 transition"
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <p className="text-sm font-medium text-ink truncate">{b.name || b.templateName}</p>
+                            {live
+                              ? <span className="text-[10px] font-medium text-blue-600 whitespace-nowrap animate-pulse">● live</span>
+                              : <span className="text-[10px] text-ink-muted num whitespace-nowrap">{b.read || 0} read</span>}
+                          </div>
+                          {live ? (
+                            <div className="w-full bg-cream-200 rounded-full h-1">
+                              <div className="h-1 rounded-full bg-gradient-to-r from-orange-400 to-amber-500" style={{ width: `${pct}%` }} />
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-ink-muted num">
+                              {(b.sent || 0).toLocaleString("en-IN")} sent · {(b.delivered || 0).toLocaleString("en-IN")} delivered
+                            </p>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </>
       )}
@@ -465,8 +606,28 @@ const TONES = {
   signal: { bar: "bg-purple-500", bg: "bg-purple-50", fg: "text-purple-600" },
 };
 
-function PulseCard({ label, value, icon: Icon, tone = "primary", sub, onClick }) {
+function PulseCard({ label, value, icon: Icon, tone = "primary", sub, onClick, benchmark, higherIsBetter }) {
   const t = TONES[tone] || TONES.primary;
+
+  // Optional "vs industry average" badge for rate-style metrics.
+  let badge = null;
+  if (benchmark != null) {
+    const num = parseFloat(String(value).replace(/[^0-9.]/g, ""));
+    if (!Number.isNaN(num)) {
+      const beats = higherIsBetter ? num >= benchmark : num <= benchmark;
+      badge = (
+        <span
+          title={`Industry average: ${benchmark}%`}
+          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+            beats ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+          }`}
+        >
+          {beats ? "▲" : "▼"} {benchmark}% avg
+        </span>
+      );
+    }
+  }
+
   return (
     <div
       onClick={onClick}
@@ -479,7 +640,7 @@ function PulseCard({ label, value, icon: Icon, tone = "primary", sub, onClick })
         <div className={`w-9 h-9 ${t.bg} rounded-lg flex items-center justify-center`}>
           <Icon size={16} className={t.fg} />
         </div>
-        {onClick && <ArrowRight size={13} className="text-ink-muted/50" />}
+        {badge || (onClick && <ArrowRight size={13} className="text-ink-muted/50" />)}
       </div>
       <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted mb-0.5">{label}</p>
       <p className="text-2xl font-display font-bold text-ink num leading-tight">{value}</p>
