@@ -64,6 +64,7 @@ function DataFacade({ children }) {
     reassignLead: leads.reassignLead,
     reassignAllLeads: leads.reassignAllLeads,
     blacklistLead: leads.blacklistLead,
+    deleteLead: leads.deleteLead,
     addBulkLeads: leads.addBulkLeads,
     addManualLead: leads.addManualLead,
     createWebsiteLeadIntakeKey: leads.createWebsiteLeadIntakeKey,

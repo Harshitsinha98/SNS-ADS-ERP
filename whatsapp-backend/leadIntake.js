@@ -318,6 +318,76 @@ export async function createLeadFromIntake({ db, orgId, input, source, origin, a
   }
 }
 
+// Firestore does not cascade-delete subcollections. Every doc under
+// leads/{leadId}/{subcollectionName} must be batch-deleted explicitly before
+// the parent lead document itself is removed.
+async function deleteSubcollection(leadRef, subcollectionName) {
+  const BATCH_LIMIT = 450;
+  while (true) {
+    const snap = await leadRef.collection(subcollectionName).limit(BATCH_LIMIT).get();
+    if (snap.empty) return;
+    const batch = leadRef.firestore.batch();
+    snap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+    await batch.commit();
+    if (snap.size < BATCH_LIMIT) return;
+  }
+}
+
+// Hard delete: irreversibly removes the lead document plus every subcollection
+// (notes, private/revenue, WhatsApp messages, AI chat sessions), its live
+// follow-up task, and the unique phone/email/external-id dedup index entries
+// that would otherwise keep pointing at a lead that no longer exists.
+export async function hardDeleteLead({ db, orgId, leadId, actorId, actorName }) {
+  const orgRef = db.collection("organizations").doc(orgId);
+  const leadRef = orgRef.collection("leads").doc(leadId);
+  const taskRef = orgRef.collection("followUpTasks").doc(leadId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 140));
+
+  const leadSnap = await leadRef.get();
+  if (!leadSnap.exists) {
+    const error = new Error("Lead not found");
+    error.status = 404;
+    throw error;
+  }
+  const lead = leadSnap.data();
+
+  // Subcollections are unbounded in size, so they're cleared with their own
+  // batched deletes outside the single lead-removal transaction below.
+  await Promise.all([
+    deleteSubcollection(leadRef, "notes"),
+    deleteSubcollection(leadRef, "private"),
+    deleteSubcollection(leadRef, "messages"),
+    deleteSubcollection(leadRef, "chatSessions"),
+  ]);
+
+  const deletedAt = nowIso();
+  await db.runTransaction(async (tx) => {
+    const dedupRefs = leadDedupEntries(lead).map((entry) =>
+      orgRef.collection("leadDedup").doc(hashValue(`${entry.type}:${entry.value}`))
+    );
+    const dedupSnaps = await Promise.all(dedupRefs.map((ref) => tx.get(ref)));
+
+    tx.delete(leadRef);
+    tx.delete(taskRef);
+    dedupSnaps.forEach((snap, i) => {
+      // Only remove a dedup entry if it still points at THIS lead — a stale
+      // entry pointing at a different (newer) lead must survive.
+      if (snap.exists && snap.data()?.leadId === leadId) tx.delete(dedupRefs[i]);
+    });
+    tx.create(orgRef.collection("activity").doc(), {
+      text: `🗑️ Lead permanently deleted: ${lead.name || leadId} (${lead.phone || lead.email || "no contact"})`,
+      at: deletedAt,
+      orgId,
+      actorId,
+      leadId,
+      source: "lead_delete",
+    });
+    // Hard delete does not decrement leadsUsed — it reflects leads consumed
+    // this billing cycle, mirroring blacklist's existing (no-decrement) behavior.
+  });
+
+  return { ok: true, leadId, deletedAt };
+}
+
 export default function createLeadIntakeRouter(db, {
   publicBackendUrl = "",
   publicFrontendUrl = "",
@@ -441,6 +511,25 @@ export default function createLeadIntakeRouter(db, {
       turnstileSiteKey: turnstileSiteKey || null,
     };
   }
+
+  // Irreversible hard delete — org admin/owner only. The frontend must show
+  // a destructive confirmation before calling this; the backend has no undo.
+  router.post("/:leadId/delete", requireAuth, requireOrgAdmin, async (req, res) => {
+    try {
+      const leadId = String(req.params.leadId || "").trim();
+      if (!leadId) return res.status(400).json({ error: "Lead is required" });
+      const result = await hardDeleteLead({
+        db,
+        orgId: req.orgId,
+        leadId,
+        actorId: req.authUser.uid,
+        actorName: req.authUser.name || req.authUser.phone_number || "Admin",
+      });
+      return res.json(result);
+    } catch (error) {
+      return res.status(error.status || 500).json({ error: error.message || "Could not delete lead" });
+    }
+  });
 
   router.post("/manual", requireAuth, requireOrgAdmin, async (req, res) => {
     try {

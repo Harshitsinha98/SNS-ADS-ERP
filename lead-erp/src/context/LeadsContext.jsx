@@ -24,6 +24,7 @@ import {
   reassignBulkLeads, scheduleFollowUpTask, completeFollowUpTask,
   updateFollowUpLeadStatus, reassignFollowUpLead,
   triggerWhatsAppSync as requestWhatsAppSync,
+  deleteLead as requestDeleteLead,
 } from "../utils/billingApi";
 
 const LeadsContext = createContext();
@@ -278,6 +279,14 @@ export function LeadsProvider({ children }) {
 
   const blacklistLead = (id) => { updateLead(id, { blacklisted: true, status: "Lost" }); };
 
+  // Irreversible — the caller (UI) is responsible for confirming with the
+  // user before invoking this. The backend performs the actual hard delete
+  // (notes/messages/revenue/dedup-index cleanup); there is no client-side undo.
+  const deleteLead = async (id) => {
+    if (!user?.activeOrgId) throw new Error("No active organization selected");
+    return requestDeleteLead(id, { orgId: user.activeOrgId });
+  };
+
   const addBulkLeads = async (rows, assigner, importId) => {
     if (!user?.activeOrgId) return 0;
     try {
@@ -320,7 +329,7 @@ export function LeadsProvider({ children }) {
       leads, followUpTasks, whatsappTemplates, financials, allLeadsLoaded,
       updateLead, addNote, addWorknote, updateLeadStatus, updatePriority,
       updateFollowUpDate, updateLeadRevenue, reassignLead, reassignAllLeads,
-      blacklistLead, addBulkLeads, addManualLead, createWebsiteLeadIntakeKey,
+      blacklistLead, deleteLead, addBulkLeads, addManualLead, createWebsiteLeadIntakeKey,
       scheduleFollowUp, completeFollowUp, triggerWhatsAppSync,
     }}>
       {children}

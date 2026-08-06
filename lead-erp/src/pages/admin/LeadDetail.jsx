@@ -5,7 +5,7 @@ import { db } from "../../firebase";
 import Layout from "../../components/Layout";
 import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
-import { CheckCircle, Phone, PhoneOff, PhoneCall, Loader2 } from "lucide-react";
+import { CheckCircle, Phone, PhoneOff, PhoneCall, Loader2, Trash2, AlertTriangle, X } from "lucide-react";
 import { fmtDuration } from "../../utils/helpers";
 import { useBridgeCall } from "../../hooks/useBridgeCall";
 import Timeline from "../../components/Timeline";
@@ -23,7 +23,7 @@ export default function LeadDetail() {
   const {
     leads, users, settings,
     updateLeadStatus, addWorknote,
-    reassignLead, updateLeadRevenue, updatePriority, addNote
+    reassignLead, updateLeadRevenue, updatePriority, addNote, deleteLead,
   } = useData();
 
   const orgId = user?.activeOrgId;
@@ -42,6 +42,11 @@ export default function LeadDetail() {
   const [elapsed, setElapsed] = useState(0);
   const [showWorknoteModal, setShowWorknoteModal] = useState(false);
   const [pendingDuration, setPendingDuration] = useState(0);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   useEffect(() => {
     if (!id || !orgId) return undefined;
@@ -96,6 +101,27 @@ export default function LeadDetail() {
     } finally {
       setRevenueSaving(false);
     }
+  };
+
+  const handleDeleteLead = async () => {
+    if (deleteConfirmText.trim().toUpperCase() !== "DELETE") return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteLead(lead.id);
+      navigate("/admin/leads");
+    } catch (error) {
+      console.error("Delete lead error:", error);
+      setDeleteError(error.message || "Could not delete this lead. Please try again.");
+      setDeleting(false);
+    }
+  };
+
+  const closeDeleteModal = () => {
+    if (deleting) return;
+    setShowDeleteModal(false);
+    setDeleteConfirmText("");
+    setDeleteError("");
   };
 
   const startCall = () => {
@@ -228,6 +254,17 @@ export default function LeadDetail() {
                 <p className="text-[10px] text-green-600 mt-1">Separate admin-only record. Employees have zero DB-level access.</p>
               </div>
             )}
+
+            {isOrgAdmin && (
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="w-full flex items-center justify-center gap-2 text-red-600 border border-red-200 rounded-md p-2.5 text-sm font-medium hover:bg-red-50 transition"
+                >
+                  <Trash2 size={15} /> Delete Lead
+                </button>
+              </div>
+            )}
           </div>
 
           <WhatsAppConversation lead={lead} />
@@ -277,6 +314,62 @@ export default function LeadDetail() {
             )}
 
             <button onClick={saveCallLog} className="w-full bg-blue-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-blue-700">Save call log</button>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl border border-red-100 max-w-md w-full p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="text-red-600" size={22} />
+              </div>
+              <button onClick={closeDeleteModal} disabled={deleting} className="text-gray-400 hover:text-gray-600 disabled:opacity-40">
+                <X size={20} />
+              </button>
+            </div>
+
+            <h3 className="font-bold text-lg text-gray-900 mb-1">Delete "{lead.name}"?</h3>
+            <p className="text-sm text-red-600 font-semibold mb-3">This action is permanent and cannot be undone.</p>
+
+            <p className="text-sm text-gray-600 mb-2">Deleting this lead will permanently remove:</p>
+            <ul className="space-y-1.5 mb-4 text-sm text-gray-600">
+              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" /> All worknotes, call logs, and activity history</li>
+              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" /> The full WhatsApp conversation with this lead</li>
+              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" /> Any recorded deal revenue on this lead</li>
+              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" /> Its open follow-up task, if any</li>
+            </ul>
+
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <label className="block text-xs font-semibold text-red-700 mb-1.5">
+                Type <span className="font-mono">DELETE</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                autoFocus
+                disabled={deleting}
+                placeholder="DELETE"
+                className="w-full border border-red-300 rounded-md p-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-300 disabled:opacity-60"
+              />
+            </div>
+
+            {deleteError && <p className="text-xs text-red-600 mb-3">{deleteError}</p>}
+
+            <div className="flex gap-3">
+              <button onClick={closeDeleteModal} disabled={deleting} className="flex-1 border border-gray-200 text-gray-700 rounded-md p-2.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-60">
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteLead}
+                disabled={deleting || deleteConfirmText.trim().toUpperCase() !== "DELETE"}
+                className="flex-1 bg-red-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {deleting ? <><Loader2 size={15} className="animate-spin" /> Deleting…</> : <><Trash2 size={15} /> Permanently delete</>}
+              </button>
+            </div>
           </div>
         </div>
       )}

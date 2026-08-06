@@ -118,6 +118,7 @@ export const schedulePlanDowngrade = (body) => authedPost("/api/billing/subscrip
 export const cancelPlanDowngrade = (body) => authedPost("/api/billing/subscription/cancel-downgrade", body);
 export const importBulkLeads = (body) => authedPost("/api/billing/leads/bulk-import", body);
 export const createManualLead = (body) => authedPost("/api/leads/manual", body);
+export const deleteLead = (leadId, body) => authedPost(`/api/leads/${encodeURIComponent(leadId)}/delete`, body);
 export const rotateWebsiteLeadIntakeKey = (body) => authedPost("/api/leads/website-key", body);
 export const getWebsiteLeadIntegration = (orgId) => authedGet(`/api/leads/integrations?orgId=${encodeURIComponent(orgId)}`);
 export const createWebsiteLeadIntegration = (body) => authedPost("/api/leads/integrations", body);
