@@ -35,8 +35,61 @@ const TONE_OPTIONS = [
   { value: "sales", label: "Sales-focused", desc: "Persuasive and conversion-driven" },
 ];
 
+// Mirrors DEFAULT_QUALIFICATION_QUESTIONS on the backend. Shown (and saved on
+// first edit) when the org has not customised the flow yet.
+const DEFAULT_QUESTIONS = [
+  { id: "name", field: "name", type: "text", question: "Hi! 👋 Thanks for reaching out. Before we begin — may I know your name?" },
+  {
+    id: "interest", field: "requirement", type: "buttons",
+    question: "Great to meet you! What can we help you with today?",
+    options: [
+      { id: "pricing", title: "Pricing" },
+      { id: "products", title: "Product info" },
+      { id: "support", title: "Support" },
+    ],
+  },
+  {
+    id: "timeline", type: "buttons",
+    question: "Got it. When are you looking to move forward?",
+    options: [
+      { id: "immediately", title: "Immediately" },
+      { id: "this_month", title: "This month" },
+      { id: "exploring", title: "Just exploring" },
+    ],
+  },
+];
+
+const slugId = (text, fallback) =>
+  String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 30) || fallback;
+
 
 function SettingsTab({ config, setConfig, saving, onSave }) {
+  // Editing any question materializes the defaults into saved config, so what
+  // the admin sees on screen is exactly what runs.
+  const currentQuestions = () =>
+    config.qualificationQuestions?.length ? config.qualificationQuestions : DEFAULT_QUESTIONS;
+
+  const writeQuestions = (questions) =>
+    setConfig((c) => ({ ...c, qualificationQuestions: questions }));
+
+  const updateQuestion = (index, patch) => {
+    const next = currentQuestions().map((q, i) => {
+      if (i !== index) return q;
+      const merged = { ...q, ...patch };
+      // Keep a stable id so in-flight leads mid-flow don't lose their place.
+      if (!merged.id) merged.id = slugId(merged.question, `q${index + 1}`);
+      return merged;
+    });
+    writeQuestions(next);
+  };
+
+  const removeQuestion = (index) => writeQuestions(currentQuestions().filter((_, i) => i !== index));
+
+  const addQuestion = () => writeQuestions([
+    ...currentQuestions(),
+    { id: `q${currentQuestions().length + 1}_${Date.now().toString(36)}`, type: "text", question: "", field: "" },
+  ]);
+
   return (
     <div className="space-y-6">
       <div className="card p-6">
@@ -121,6 +174,131 @@ function SettingsTab({ config, setConfig, saving, onSave }) {
             <label className="text-sm text-ink-soft">Only reply outside working hours (AI as after-hours support)</label>
           </div>
         </div>
+      </div>
+
+      <div className="card p-6 space-y-4">
+        <div>
+          <h3 className="font-semibold text-ink">Lead Qualification</h3>
+          <p className="text-sm text-ink-muted">
+            Before answering questions, AI can collect the customer's name and what they need — asked one
+            at a time using tappable WhatsApp buttons.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <input type="checkbox" checked={config.qualificationEnabled || false}
+            onChange={(e) => setConfig((c) => ({ ...c, qualificationEnabled: e.target.checked }))}
+            className="rounded border-cream-300" />
+          <label className="text-sm text-ink-soft">Ask qualifying questions to new leads</label>
+        </div>
+
+        {config.qualificationEnabled && (
+          <>
+            <div className="rounded-xl bg-blue-50 border border-blue-100 p-3">
+              <p className="text-xs text-blue-700">
+                Questions are asked in order, once per lead. A customer can tap an option or type their own
+                answer — both advance the flow. Once complete, AI switches to normally answering questions.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-ink-soft uppercase tracking-wide">Questions</p>
+              {(config.qualificationQuestions?.length ? config.qualificationQuestions : DEFAULT_QUESTIONS).map((q, i) => (
+                <div key={i} className="rounded-xl border border-cream-200 p-3 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-2 text-xs font-mono text-ink-muted">{i + 1}</span>
+                    <input
+                      value={q.question || ""}
+                      onChange={(e) => updateQuestion(i, { question: e.target.value })}
+                      placeholder="Question to ask"
+                      className="flex-1 rounded-lg border border-cream-200 px-3 py-2 text-sm"
+                    />
+                    <button onClick={() => removeQuestion(i)} title="Remove question"
+                      className="mt-1 text-ink-muted hover:text-danger-600 px-1">✕</button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pl-6">
+                    <select value={q.type || "text"} onChange={(e) => updateQuestion(i, { type: e.target.value })}
+                      className="rounded-lg border border-cream-200 px-2 py-1.5 text-xs">
+                      <option value="text">Free text answer</option>
+                      <option value="buttons">Buttons (max 3)</option>
+                      <option value="list">Menu list (max 10)</option>
+                    </select>
+
+                    <select value={q.field || ""} onChange={(e) => updateQuestion(i, { field: e.target.value })}
+                      className="rounded-lg border border-cream-200 px-2 py-1.5 text-xs">
+                      <option value="">Don't save to lead</option>
+                      <option value="name">Save as lead name</option>
+                      <option value="email">Save as email</option>
+                      <option value="requirement">Save as requirement</option>
+                      <option value="city">Save as city</option>
+                      <option value="company">Save as company</option>
+                    </select>
+                  </div>
+
+                  {(q.type === "buttons" || q.type === "list") && (
+                    <div className="pl-6">
+                      <input
+                        value={(q.options || []).map((o) => o.title).join(", ")}
+                        onChange={(e) => updateQuestion(i, {
+                          options: e.target.value.split(",").map((t) => t.trim()).filter(Boolean)
+                            .map((title) => ({ id: title.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 30), title })),
+                        })}
+                        placeholder="Options, comma separated — e.g. Pricing, Product info, Support"
+                        className="w-full rounded-lg border border-cream-200 px-3 py-2 text-xs"
+                      />
+                      <p className="text-[11px] text-ink-muted mt-1">
+                        WhatsApp allows 3 buttons (20 chars each) or 10 menu rows (24 chars each).
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <button onClick={addQuestion}
+                className="text-sm text-orange-600 hover:text-orange-700 font-medium">
+                + Add question
+              </button>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-ink-soft">Message after qualification completes</label>
+              <input value={config.qualificationCompleteMessage || ""}
+                onChange={(e) => setConfig((c) => ({ ...c, qualificationCompleteMessage: e.target.value }))}
+                className="mt-1 w-full rounded-lg border border-cream-200 px-3 py-2 text-sm"
+                placeholder="Thank you! Go ahead and ask me anything — I'm here to help." />
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="card p-6 space-y-4">
+        <div>
+          <h3 className="font-semibold text-ink">Agent Handover</h3>
+          <p className="text-sm text-ink-muted">
+            When a team member takes over a chat, let the customer know who they're now talking to.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <input type="checkbox" checked={config.agentIntroEnabled !== false}
+            onChange={(e) => setConfig((c) => ({ ...c, agentIntroEnabled: e.target.checked }))}
+            className="rounded border-cream-300" />
+          <label className="text-sm text-ink-soft">Tell the customer the agent's name on takeover</label>
+        </div>
+
+        {config.agentIntroEnabled !== false && (
+          <div>
+            <label className="text-sm font-medium text-ink-soft">Handover message</label>
+            <input value={config.agentIntroTemplate ?? "👤 {agent} from our team is now assisting you."}
+              onChange={(e) => setConfig((c) => ({ ...c, agentIntroTemplate: e.target.value }))}
+              className="mt-1 w-full rounded-lg border border-cream-200 px-3 py-2 text-sm" />
+            <p className="text-xs text-ink-muted mt-1">
+              Use <code className="font-mono">{"{agent}"}</code> where the agent's name should appear.
+              Only sent if the customer messaged within the last 24 hours (WhatsApp policy).
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="card p-6 space-y-4">

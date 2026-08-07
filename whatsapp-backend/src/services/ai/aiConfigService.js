@@ -40,6 +40,15 @@ const DEFAULT_AI_CONFIG = {
   catalogueLink: "", // WhatsApp catalogue link (wa.me/c/...)
   websiteUrl: "", // Business website URL
   categoryPages: [], // [{name: "Earrings", url: "/collections/earrings"}, ...]
+  // Lead qualification — a scripted question flow that runs before the
+  // answering AI, collecting the customer's name and needs up front.
+  // Empty qualificationQuestions falls back to DEFAULT_QUALIFICATION_QUESTIONS.
+  qualificationEnabled: false,
+  qualificationQuestions: [], // [{id, question, type: text|buttons|list, field?, options?: [{id,title}]}]
+  qualificationCompleteMessage: "",
+  // Show the handling agent's name to the customer on human takeover.
+  agentIntroEnabled: true,
+  agentIntroTemplate: "👤 {agent} from our team is now assisting you.",
 };
 
 // ─── AI Config CRUD ─────────────────────────────────────────────────
@@ -68,6 +77,8 @@ export async function updateAIConfig(orgId, updates, updatedBy) {
     "excludedIntents", "escalationKeywords", "welcomeMessage",
     "fallbackMessage", "autoReplyEnabled",
     "catalogueMode", "catalogueLink", "websiteUrl", "categoryPages",
+    "qualificationEnabled", "qualificationQuestions", "qualificationCompleteMessage",
+    "agentIntroEnabled", "agentIntroTemplate",
   ];
 
   const sanitized = {};

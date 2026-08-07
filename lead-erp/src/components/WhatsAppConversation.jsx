@@ -165,8 +165,24 @@ export default function WhatsAppConversation({ lead, showConversation = true }) 
         ) : messages.map((message) => (
           <div key={message.id} className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${message.direction === "outbound" ? "ml-auto bg-teal-600 text-white" : "bg-white border text-gray-800"}`}>
             <p className="whitespace-pre-wrap break-words">{message.text || `[${message.type || "message"}]`}</p>
+
+            {/* Interactive sends: show the options the customer was offered */}
+            {message.type === "interactive" && (message.interactiveOptions?.length > 0) && (
+              <div className="mt-2 space-y-1">
+                {message.interactiveOptions.map((opt, i) => (
+                  <div key={opt.id || i}
+                    className={`rounded border px-2 py-1 text-[11px] ${message.direction === "outbound" ? "border-teal-300/60 bg-teal-500/30" : "border-gray-200 bg-gray-50"}`}>
+                    {opt.title}
+                    {opt.description && <span className="opacity-70"> — {opt.description}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <p className={`mt-1 text-[10px] ${message.direction === "outbound" ? "text-teal-100" : "text-gray-400"}`}>
-              {message.direction === "outbound" ? `${message.type === "template" ? "Template · " : ""}${message.status === "sent" ? "Sent" : message.status}` : "Customer"} · {formatTime(message.at || message.sentAt || message.receivedAt)}
+              {message.direction === "outbound"
+                ? `${message.type === "template" ? "Template · " : message.type === "interactive" ? `${message.interactiveType === "list" ? "Menu" : "Buttons"} · ` : ""}${message.status === "sent" ? "Sent" : message.status}`
+                : "Customer"} · {formatTime(message.at || message.sentAt || message.receivedAt)}
             </p>
           </div>
         ))}

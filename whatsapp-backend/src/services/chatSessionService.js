@@ -20,6 +20,7 @@ import { nowIso, orgCollection } from "./helpers.js";
 import { aiConfig } from "../config/env.js";
 import { logger } from "../middleware/logger.js";
 import { checkQuota } from "../billing/quotaEnforcement.js";
+import { sendPlainText } from "./whatsappInteractive.js";
 
 // ─── Session CRUD ───────────────────────────────────────────────────
 
@@ -74,6 +75,39 @@ export async function createChatSession(orgId, leadId, { employeeId, employeeNam
     activeChatSessionId: ref.id,
     activeChatSessionEmployee: employeeId,
   });
+
+  // ── Tell the CUSTOMER which agent is now handling their chat ──
+  // Free-form sends are only allowed inside WhatsApp's 24-hour service window
+  // (i.e. the customer messaged us recently). A takeover on a cold lead is
+  // skipped rather than failing the takeover itself.
+  try {
+    const leadForIntro = await orgCollection(db, orgId, "leads").doc(leadId).get();
+    const leadData = leadForIntro.exists ? leadForIntro.data() : {};
+    const configSnap = await orgCollection(db, orgId, "aiConfig").doc("settings").get();
+    const introConfig = configSnap.exists ? configSnap.data() : {};
+    const introEnabled = introConfig.agentIntroEnabled !== false;
+    const withinServiceWindow =
+      Number(leadData.lastWhatsAppInboundAtMs || 0) > Date.now() - 24 * 60 * 60 * 1000;
+
+    if (introEnabled && withinServiceWindow && leadData.phone) {
+      const template = introConfig.agentIntroTemplate
+        || "👤 {agent} from our team is now assisting you.";
+      const introText = template.replace(/\{agent\}/g, employeeName || "A team member");
+      await sendPlainText({
+        orgId,
+        leadId,
+        phone: leadData.phone,
+        text: introText,
+        source: "agent_intro",
+        senderName: employeeName || "Agent",
+        noteLabel: "Customer notified of agent",
+        idPrefix: "intro",
+        dispatchType: "agent_intro",
+      });
+    }
+  } catch (introErr) {
+    logger.warn({ orgId, leadId, err: introErr.message }, "Agent intro message failed (non-critical)");
+  }
 
   // ── Notify the assigned employee about the new chat ──
   try {

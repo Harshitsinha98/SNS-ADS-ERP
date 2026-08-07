@@ -25,6 +25,8 @@ import { metaGraphRequest, decryptWhatsAppToken } from "../meta.js";
 import { logger } from "../../middleware/logger.js";
 import { emitWorkflowTrigger } from "../workflow/workflowEngine.js";
 import { isAIActiveForLead, createChatSession } from "../chatSessionService.js";
+import { runQualification } from "./qualificationService.js";
+import { sendInteractiveList } from "../whatsappInteractive.js";
 
 /**
  * Send a WhatsApp image message with caption (for product photos).
@@ -198,13 +200,33 @@ async function notifyEscalation({ orgId, leadId, assignedTo, reason, customerMes
  * This function is FIRE-AND-FORGET — it never throws back to the caller.
  * Any failure is logged and the conversation falls back to human handling.
  */
-export async function triggerAIResponse({ orgId, leadId, phone, customerName, customerMessage }) {
+export async function triggerAIResponse({ orgId, leadId, phone, customerName, customerMessage, interactiveReply = null }) {
   try {
     // Check if AI is disabled for this lead (human session active)
     const aiActive = await isAIActiveForLead(orgId, leadId);
     if (!aiActive) {
       logger.info({ orgId, leadId }, "AI skipped — human session active for this lead");
       return { action: "skip", reason: "human_session_active" };
+    }
+
+    // ── Lead qualification runs first ──
+    // While a lead is still being qualified, the scripted flow owns the
+    // conversation. It is deterministic on purpose, so it deliberately
+    // bypasses the intent/confidence gates below. Once complete it never
+    // runs again for this lead and the answering AI takes over.
+    const orgConfigSnap = await orgCollection(db, orgId, "aiConfig").doc("settings").get();
+    const orgConfig = orgConfigSnap.exists ? orgConfigSnap.data() : {};
+
+    if (orgConfig.enabled === true && orgConfig.qualificationEnabled === true) {
+      const qualification = await runQualification({
+        orgId, leadId, phone,
+        message: customerMessage,
+        interactiveReply,
+        config: orgConfig,
+      });
+      if (qualification.handled) {
+        return { action: "qualify", ...qualification };
+      }
     }
 
     const aiResult = await processWithAI({
@@ -224,27 +246,45 @@ export async function triggerAIResponse({ orgId, leadId, phone, customerName, cu
           text: aiResult.response,
         });
 
-        // If intent is product_inquiry, also send product images
-        if (aiResult.intent === "product_inquiry") {
+        // If intent is product_inquiry, follow up with the catalogue.
+        if (aiResult.intent === "product_inquiry" && orgConfig.catalogueMode === "product_db") {
           try {
-            const configSnap = await orgCollection(db, orgId, "aiConfig").doc("settings").get();
-            const orgAiConfig = configSnap.exists ? configSnap.data() : {};
-            if (orgAiConfig.catalogueMode === "product_db") {
-              const products = await searchProductsForAI(orgId, {});
-              for (const product of products.slice(0, 3)) {
-                if (product.imageUrl) {
-                  await sendAIWhatsAppImage({
-                    orgId,
-                    leadId,
-                    phone,
-                    imageUrl: product.imageUrl,
-                    caption: `${product.name} — ₹${Number(product.price).toLocaleString("en-IN")}${product.description ? `\n${product.description.slice(0, 200)}` : ""}`,
-                  });
-                }
+            const products = await searchProductsForAI(orgId, {});
+            const listed = products.slice(0, 10);
+
+            // A tappable list is the WhatsApp-native catalogue experience —
+            // the customer picks a product instead of typing its name.
+            if (listed.length > 0) {
+              await sendInteractiveList({
+                orgId, leadId, phone,
+                bodyText: "Here's what we have — tap to see details on any item.",
+                buttonLabel: "View catalogue",
+                sections: [{
+                  title: "Our products",
+                  rows: listed.map((p) => ({
+                    id: `product:${p.id}`,
+                    title: p.name,
+                    description: `₹${Number(p.price || 0).toLocaleString("en-IN")}${p.description ? ` — ${p.description}` : ""}`,
+                  })),
+                }],
+                noteLabel: "AI sent catalogue",
+              });
+            }
+
+            // Images still go out for the top few so the chat is visual.
+            for (const product of listed.slice(0, 3)) {
+              if (product.imageUrl) {
+                await sendAIWhatsAppImage({
+                  orgId,
+                  leadId,
+                  phone,
+                  imageUrl: product.imageUrl,
+                  caption: `${product.name} — ₹${Number(product.price).toLocaleString("en-IN")}${product.description ? `\n${product.description.slice(0, 200)}` : ""}`,
+                });
               }
             }
           } catch (imgError) {
-            logger.warn({ orgId, error: imgError.message }, "Product image send failed (non-critical)");
+            logger.warn({ orgId, error: imgError.message }, "Catalogue send failed (non-critical)");
           }
         }
 

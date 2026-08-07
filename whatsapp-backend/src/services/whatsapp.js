@@ -20,6 +20,7 @@ import { logger } from "../middleware/logger.js";
 import { emitWorkflowTrigger } from "./workflow/workflowEngine.js";
 import { triggerAIResponse } from "./ai/aiWhatsAppBridge.js";
 import { handleBroadcastStatusReceipt, recordBroadcastReply } from "./broadcast.js";
+import { parseInteractiveReply } from "./whatsappInteractive.js";
 
 // ─── Pending Queue ──────────────────────────────────────────────────
 
@@ -263,12 +264,22 @@ export async function processInboundMessage({ orgId, message, contact }) {
     throw new Error("WhatsApp message is still being processed; retry delivery");
   }
   const ref = db.collection("whatsappMessageEvents").doc(safeDocId(messageId));
+
+  // A tapped reply button / list row carries no `text` body. Normalize it to
+  // the option's human-readable title so the rest of the pipeline (lead
+  // requirement, notes, AI prompt) treats it exactly like a typed reply,
+  // while `interactiveReply.id` keeps the machine-readable payload.
+  const interactiveReply = parseInteractiveReply(message);
+  const inboundText = message.text?.body
+    || (interactiveReply?.title || "")
+    || `[${message.type || "Unsupported"} message]`;
+
   try {
     const result = await importWhatsAppLead({
       orgId,
       phone: message.from,
       name: contact?.profile?.name || "WhatsApp Lead",
-      requirement: message.text?.body || `[${message.type || "Unsupported"} message]`,
+      requirement: inboundText,
       messageId,
       messageType: message.type || "unknown",
       messageTimestampMs: providerTimestampMs,
@@ -284,15 +295,18 @@ export async function processInboundMessage({ orgId, message, contact }) {
     }
 
     // ── AI Customer Care: trigger AI response (fire-and-forget) ──
-    // Only triggers for text messages on successfully processed leads.
-    // AI decision (auto-reply vs escalate vs skip) is handled internally.
-    if ((result.status === "created" || result.status === "duplicate") && message.type === "text" && message.text?.body) {
+    // Triggers for typed text AND for tapped reply buttons / list rows, since
+    // a button tap is a real customer answer that must advance the flow.
+    // AI decision (qualify vs auto-reply vs escalate vs skip) is internal.
+    const aiEligible = Boolean(message.text?.body) || Boolean(interactiveReply?.title);
+    if ((result.status === "created" || result.status === "duplicate") && aiEligible) {
       triggerAIResponse({
         orgId,
         leadId: result.leadId,
         phone: message.from,
         customerName: contact?.profile?.name || null,
-        customerMessage: message.text.body,
+        customerMessage: inboundText,
+        interactiveReply,
       }).catch((aiError) => logger.warn({ orgId, error: aiError.message }, "AI trigger fire-and-forget failed"));
     }
 

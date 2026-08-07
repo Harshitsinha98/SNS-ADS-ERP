@@ -371,6 +371,24 @@ export default function Conversations() {
                           : "bg-white border border-cream-200 text-ink rounded-tl-md shadow-sm"
                       }`}>
                         <p className="whitespace-pre-wrap break-words">{msg.text || `[${msg.type || "message"}]`}</p>
+
+                        {/* Interactive sends: show the options the customer was offered */}
+                        {msg.type === "interactive" && (msg.interactiveOptions?.length > 0) && (
+                          <div className="mt-2 space-y-1">
+                            {msg.interactiveOptions.map((opt, i) => (
+                              <div key={opt.id || i}
+                                className={`rounded border px-2 py-1 text-[11px] ${
+                                  msg.source === "ai_customer_care"
+                                    ? "border-purple-200 bg-purple-50"
+                                    : "border-teal-300/60 bg-teal-500/30"
+                                }`}>
+                                {opt.title}
+                                {opt.description && <span className="opacity-70"> — {opt.description}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         <p className={`mt-1 text-[10px] ${msg.direction === "outbound" ? (msg.source === "ai_customer_care" ? "text-purple-500" : "text-teal-100") : "text-ink-muted"}`}>
                           {msg.direction === "outbound" ? (msg.source === "ai_customer_care" ? "AI" : "You") : "Customer"} · {formatTime(msg.at || msg.sentAt)}
                         </p>
