@@ -44,6 +44,19 @@ export const reassignSession = (orgId, leadId, newEmployeeId, newEmployeeName) =
 export const reEnableAI = (orgId, leadId) =>
   sessionPost("/api/v1/chat-sessions/re-enable-ai", { orgId, leadId });
 
+// Team Inbox actions
+export const claimConversation = (orgId, leadId) =>
+  sessionPost("/api/v1/chat-sessions/claim", { orgId, leadId });
+
+export const releaseConversation = (orgId, leadId, summary) =>
+  sessionPost("/api/v1/chat-sessions/release", { orgId, leadId, summary });
+
+export const markConversationRead = (orgId, leadId) =>
+  sessionPost("/api/v1/chat-sessions/mark-read", { orgId, leadId });
+
+export const rebuildInbox = (orgId) =>
+  sessionPost("/api/v1/chat-sessions/rebuild-index", { orgId });
+
 // Queries
 export const getActiveSession = (orgId, leadId) =>
   sessionGet(`/api/v1/chat-sessions/active?orgId=${orgId}&leadId=${leadId}`);

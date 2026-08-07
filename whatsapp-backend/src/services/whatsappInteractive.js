@@ -20,6 +20,7 @@ import { db } from "../bootstrap/firebase.js";
 import { nowIso, safeDocId, orgCollection } from "./helpers.js";
 import { metaGraphRequest, decryptWhatsAppToken } from "./meta.js";
 import { logger } from "../middleware/logger.js";
+import { recordOutboundConversation } from "./conversationIndexService.js";
 
 // Meta's documented limits for interactive messages.
 const LIMITS = {
@@ -105,6 +106,17 @@ async function dispatch({
       type: dispatchType,
       status: "sent",
       sentAt: nowIso(),
+    }).catch(() => {});
+
+    // Team Inbox projection — keeps AI/interactive replies in the inbox
+    // ordering and clears the unread badge like any other reply.
+    recordOutboundConversation({
+      orgId, leadId,
+      text: previewText,
+      messageType: messageFields?.type || "text",
+      senderName: senderName || "AI Customer Care",
+      source: source || null,
+      atMs: Date.now(),
     }).catch(() => {});
 
     logger.info({ orgId, leadId, messageId: clientMessageId, dispatchType },

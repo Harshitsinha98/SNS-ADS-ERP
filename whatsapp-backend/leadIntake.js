@@ -360,6 +360,9 @@ export async function hardDeleteLead({ db, orgId, leadId, actorId, actorName }) 
   ]);
 
   const deletedAt = nowIso();
+  // Drop the Team Inbox summary so a deleted lead cannot linger in the inbox.
+  await orgRef.collection("conversations").doc(leadId).delete().catch(() => {});
+
   await db.runTransaction(async (tx) => {
     const dedupRefs = leadDedupEntries(lead).map((entry) =>
       orgRef.collection("leadDedup").doc(hashValue(`${entry.type}:${entry.value}`))

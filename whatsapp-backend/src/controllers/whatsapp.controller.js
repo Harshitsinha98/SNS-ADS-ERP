@@ -30,6 +30,7 @@ import {
   withLease,
   processPendingQueue,
 } from "../services/index.js";
+import { recordOutboundConversation } from "../services/conversationIndexService.js";
 
 // ─── Connect WhatsApp Business ──────────────────────────────────────
 
@@ -280,7 +281,13 @@ export async function sendMessage(req, res) {
       ]);
       if (!leadSnap.exists) throw Object.assign(new Error("Lead not found"), { status: 404 });
       const lead = leadSnap.data();
-      if (membership.role === "employee" && lead.assignedTo !== req.authUser.uid) {
+      // An employee may reply if the lead is theirs OR if they currently hold
+      // its chat session — claiming a conversation from the Team Inbox
+      // deliberately does not transfer lead ownership, so the session is what
+      // grants reply access.
+      const isAssignee = lead.assignedTo === req.authUser.uid;
+      const holdsSession = lead.activeChatSessionEmployee === req.authUser.uid;
+      if (membership.role === "employee" && !isAssignee && !holdsSession) {
         throw Object.assign(new Error("This lead is not assigned to you"), { status: 403 });
       }
       if (!credentialSnap.exists) throw Object.assign(new Error("Connect WhatsApp Business before sending a reply"), { status: 409 });
@@ -383,6 +390,12 @@ export async function sendMessage(req, res) {
       at: nowIso(),
       auditType: "employee_reply",
     }).catch(() => {}); // non-critical — never fail the send
+
+    // ── Team Inbox projection: an agent reply clears the unread badge ──
+    recordOutboundConversation({
+      orgId, leadId, text, messageType: "text",
+      senderName, atMs: Date.now(),
+    }).catch(() => {});
 
     return res.json({ ok: true, messageId: clientMessageId, providerMessageId });
   } catch (error) {

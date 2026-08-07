@@ -131,7 +131,13 @@ service cloud.firestore {
           allow read: if isAdmin(orgId)
             || (isActiveMember(orgId)
               && get(leadPath(orgId, leadId)).data.assignedTo == request.auth.uid
-              && get(leadPath(orgId, leadId)).data.aiEnabled == false);
+              && get(leadPath(orgId, leadId)).data.aiEnabled == false)
+            // Team Inbox: claiming a conversation grants transcript access for
+            // as long as the claimer holds its session. Claiming does not
+            // transfer lead ownership, so the session — not assignedTo — is
+            // what authorizes access here. Access ends when the session ends.
+            || (isActiveMember(orgId)
+              && get(leadPath(orgId, leadId)).data.activeChatSessionEmployee == request.auth.uid);
           allow write: if false;
         }
       }
@@ -267,6 +273,18 @@ service cloud.firestore {
       // Daily AI usage aggregates — admin-visible for the analytics tab.
       match /aiUsage/{dateId} {
         allow read: if isAdmin(orgId) || isPlatformAdmin();
+        allow write: if false;
+      }
+
+      // Team Inbox read model. This is a summary projection only — customer
+      // name/phone, the last message preview, unread count, and who is
+      // handling the chat. The whole team can read it because an inbox is a
+      // shared work queue: an agent must be able to see that an unclaimed
+      // conversation is waiting. Full transcripts remain gated by the
+      // messages rule above (assignee or session holder only).
+      // Backend-authored exclusively.
+      match /conversations/{leadId} {
+        allow read: if isActiveMember(orgId);
         allow write: if false;
       }
 

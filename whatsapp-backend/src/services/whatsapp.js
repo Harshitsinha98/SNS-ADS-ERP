@@ -21,6 +21,7 @@ import { emitWorkflowTrigger } from "./workflow/workflowEngine.js";
 import { triggerAIResponse } from "./ai/aiWhatsAppBridge.js";
 import { handleBroadcastStatusReceipt, recordBroadcastReply } from "./broadcast.js";
 import { parseInteractiveReply } from "./whatsappInteractive.js";
+import { recordInboundConversation } from "./conversationIndexService.js";
 
 // ─── Pending Queue ──────────────────────────────────────────────────
 
@@ -292,6 +293,30 @@ export async function processInboundMessage({ orgId, message, contact }) {
     if (result.leadId) {
       recordBroadcastReply(orgId, result.leadId).catch((e) =>
         logger.warn({ orgId, leadId: result.leadId, err: e.message }, "Broadcast reply attribution failed"));
+    }
+
+    // ── Team Inbox projection (fire-and-forget) ──
+    // Bumps the unread badge and moves this conversation to the top of the
+    // shared inbox. Read the lead once so the summary carries current
+    // ownership/AI state without the inbox needing extra per-row reads.
+    if (result.leadId) {
+      (async () => {
+        const leadSnap = await orgCollection(db, orgId, "leads").doc(result.leadId).get();
+        const lead = leadSnap.exists ? leadSnap.data() : {};
+        await recordInboundConversation({
+          orgId,
+          leadId: result.leadId,
+          leadName: lead.name || contact?.profile?.name || message.from,
+          phone: lead.phone || message.from,
+          text: inboundText,
+          messageType: message.type || "text",
+          atMs: providerTimestampMs,
+          assignedTo: lead.assignedTo ?? null,
+          assignedToName: lead.assignedToName ?? null,
+          status: lead.status || null,
+        });
+      })().catch((e) =>
+        logger.warn({ orgId, leadId: result.leadId, err: e.message }, "Conversation index update failed"));
     }
 
     // ── AI Customer Care: trigger AI response (fire-and-forget) ──

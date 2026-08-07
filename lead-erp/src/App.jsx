@@ -18,6 +18,7 @@ import Billing from "./pages/admin/Billing";
 import VoiceWallet from "./pages/admin/VoiceWallet";
 import Broadcast from "./pages/admin/Broadcast";
 import BroadcastDetail from "./pages/admin/BroadcastDetail";
+import TeamInbox from "./pages/TeamInbox";
 import WhatsApp from "./pages/admin/WhatsApp";
 import WebsiteLeadIntegration from "./pages/admin/WebsiteLeadIntegration";
 import WebsiteLeadForm from "./pages/public/WebsiteLeadForm";
@@ -84,6 +85,7 @@ export default function App() {
         <Route path="/admin/settings" element={<ProtectedRoute role="admin"><Settings /></ProtectedRoute>} />
         <Route path="/admin/billing" element={<ProtectedRoute role="admin"><Billing /></ProtectedRoute>} />
         <Route path="/admin/voice-wallet" element={<ProtectedRoute role="admin"><VoiceWallet /></ProtectedRoute>} />
+        <Route path="/admin/inbox" element={<ProtectedRoute role="admin"><TeamInbox /></ProtectedRoute>} />
         <Route path="/admin/broadcast" element={<ProtectedRoute role="admin"><Broadcast /></ProtectedRoute>} />
         <Route path="/admin/broadcast/:broadcastId" element={<ProtectedRoute role="admin"><BroadcastDetail /></ProtectedRoute>} />
         <Route path="/admin/whatsapp" element={<ProtectedRoute role="admin"><WhatsApp /></ProtectedRoute>} />
@@ -118,6 +120,7 @@ export default function App() {
         <Route path="/app" element={<ProtectedRoute role="employee"><Workspace /></ProtectedRoute>} />
         <Route path="/app/leads" element={<ProtectedRoute role="employee"><MyLeads /></ProtectedRoute>} />
         <Route path="/app/lead/:id" element={<ProtectedRoute role="employee"><LeadAction /></ProtectedRoute>} />
+        <Route path="/app/inbox" element={<ProtectedRoute role="employee"><TeamInbox /></ProtectedRoute>} />
         <Route path="/app/conversations" element={<ProtectedRoute role="employee"><Conversations /></ProtectedRoute>} />
         <Route path="/app/tasks" element={<ProtectedRoute role="employee"><Tasks /></ProtectedRoute>} />
 

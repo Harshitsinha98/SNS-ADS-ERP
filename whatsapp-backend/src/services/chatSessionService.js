@@ -21,6 +21,7 @@ import { aiConfig } from "../config/env.js";
 import { logger } from "../middleware/logger.js";
 import { checkQuota } from "../billing/quotaEnforcement.js";
 import { sendPlainText } from "./whatsappInteractive.js";
+import { syncConversationOwnership } from "./conversationIndexService.js";
 
 // ─── Session CRUD ───────────────────────────────────────────────────
 
@@ -75,6 +76,17 @@ export async function createChatSession(orgId, leadId, { employeeId, employeeNam
     activeChatSessionId: ref.id,
     activeChatSessionEmployee: employeeId,
   });
+
+  // Mirror onto the Team Inbox summary so the list immediately shows who is
+  // handling this chat. Deliberately does NOT touch lead.assignedTo — claiming
+  // a conversation grants reply access without transferring lead ownership.
+  syncConversationOwnership({
+    orgId, leadId,
+    aiEnabled: false,
+    activeChatSessionId: ref.id,
+    activeChatSessionEmployee: employeeId,
+    activeChatSessionEmployeeName: employeeName || "Agent",
+  }).catch(() => {});
 
   // ── Tell the CUSTOMER which agent is now handling their chat ──
   // Free-form sends are only allowed inside WhatsApp's 24-hour service window
@@ -186,6 +198,13 @@ export async function endSession(orgId, leadId, sessionId, resolution = "resolve
     activeChatSessionEmployee: null,
   });
 
+  syncConversationOwnership({
+    orgId, leadId,
+    activeChatSessionId: null,
+    activeChatSessionEmployee: null,
+    activeChatSessionEmployeeName: null,
+  }).catch(() => {});
+
   logger.info({ orgId, leadId, sessionId, resolution }, "Chat session ended");
   return { ended: true, sessionId, resolution };
 }
@@ -207,6 +226,14 @@ export async function reEnableAI(orgId, leadId) {
     activeChatSessionId: null,
     activeChatSessionEmployee: null,
   });
+
+  syncConversationOwnership({
+    orgId, leadId,
+    aiEnabled: true,
+    activeChatSessionId: null,
+    activeChatSessionEmployee: null,
+    activeChatSessionEmployeeName: null,
+  }).catch(() => {});
 
   logger.info({ orgId, leadId }, "AI re-enabled for lead");
   return { aiEnabled: true };

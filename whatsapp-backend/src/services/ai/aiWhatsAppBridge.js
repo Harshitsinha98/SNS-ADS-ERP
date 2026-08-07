@@ -27,6 +27,7 @@ import { emitWorkflowTrigger } from "../workflow/workflowEngine.js";
 import { isAIActiveForLead, createChatSession } from "../chatSessionService.js";
 import { runQualification } from "./qualificationService.js";
 import { sendInteractiveList } from "../whatsappInteractive.js";
+import { recordOutboundConversation } from "../conversationIndexService.js";
 
 /**
  * Send a WhatsApp image message with caption (for product photos).
@@ -159,6 +160,12 @@ async function sendAIWhatsAppReply({ orgId, leadId, phone, text }) {
       status: "sent",
       sentAt: nowIso(),
     });
+
+    // Team Inbox projection — an AI reply also counts as the chat being answered.
+    recordOutboundConversation({
+      orgId, leadId, text, messageType: "text",
+      senderName: "AI Customer Care", source: "ai_customer_care", atMs: Date.now(),
+    }).catch(() => {});
 
     logger.info({ orgId, leadId, messageId: clientMessageId }, "AI WhatsApp reply sent");
     return { sent: true, messageId: clientMessageId };

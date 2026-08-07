@@ -14,6 +14,12 @@ import {
   listSessions,
   getSessionMessages,
 } from "../services/chatSessionService.js";
+import {
+  markConversationRead,
+  rebuildConversationIndex,
+} from "../services/conversationIndexService.js";
+import { db } from "../bootstrap/firebase.js";
+import { orgCollection } from "../services/helpers.js";
 import { logger } from "../middleware/logger.js";
 
 /**
@@ -38,6 +44,122 @@ export async function takeOver(req, res) {
   } catch (error) {
     logger.error({ error: error.message }, "takeOver failed");
     return res.status(400).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/v1/chat-sessions/claim
+ * Team Inbox: an agent picks up a conversation from the shared queue.
+ *
+ * Unlike /takeover this guards against two agents grabbing the same chat —
+ * if another agent already holds an active session, only an admin may take it.
+ * Claiming grants reply access via the session; it deliberately does NOT
+ * reassign the lead, so ownership and reporting stay intact.
+ */
+export async function claimConversation(req, res) {
+  try {
+    const { orgId, leadId } = req.body;
+    if (!orgId || !leadId) return res.status(400).json({ error: "orgId and leadId are required" });
+
+    const membership = await getActiveMembership(req.authUser.uid, orgId);
+    if (!membership) return res.status(403).json({ error: "Not a member of this organization" });
+
+    const leadSnap = await orgCollection(db, orgId, "leads").doc(leadId).get();
+    if (!leadSnap.exists) return res.status(404).json({ error: "Lead not found" });
+    const lead = leadSnap.data();
+
+    const holder = lead.activeChatSessionEmployee || null;
+    if (holder && holder !== req.authUser.uid) {
+      const isAdmin = await isOrgAdmin(req.authUser.uid, orgId);
+      if (!isAdmin) {
+        return res.status(409).json({
+          error: `${lead.activeChatSessionEmployeeName || "Another agent"} is already handling this chat`,
+          code: "already_claimed",
+        });
+      }
+    }
+
+    // Already mine — nothing to do, treat as success so the UI is idempotent.
+    if (holder === req.authUser.uid && lead.activeChatSessionId) {
+      return res.json({ id: lead.activeChatSessionId, alreadyClaimed: true });
+    }
+
+    const session = await createChatSession(orgId, leadId, {
+      employeeId: req.authUser.uid,
+      employeeName: membership.displayName || "Agent",
+      reason: "inbox_claim",
+    });
+
+    return res.status(201).json(session);
+  } catch (error) {
+    logger.error({ error: error.message }, "claimConversation failed");
+    return res.status(error.code === "plan_limit" ? 402 : 400).json({ error: error.message, code: error.code });
+  }
+}
+
+/**
+ * POST /api/v1/chat-sessions/release
+ * Hand a claimed conversation back to the queue without needing a sessionId.
+ * Only the holder or an admin may release.
+ */
+export async function releaseConversation(req, res) {
+  try {
+    const { orgId, leadId, summary } = req.body;
+    if (!orgId || !leadId) return res.status(400).json({ error: "orgId and leadId are required" });
+
+    const membership = await getActiveMembership(req.authUser.uid, orgId);
+    if (!membership) return res.status(403).json({ error: "Not a member of this organization" });
+
+    const active = await getActiveSession(orgId, leadId);
+    if (!active) return res.json({ ended: false, reason: "no_active_session" });
+
+    if (active.employeeId !== req.authUser.uid && !(await isOrgAdmin(req.authUser.uid, orgId))) {
+      return res.status(403).json({ error: "Only the handling agent or an admin can release this chat" });
+    }
+
+    const result = await endSession(orgId, leadId, active.id, "resolved", summary || null);
+    return res.json(result);
+  } catch (error) {
+    logger.error({ error: error.message }, "releaseConversation failed");
+    return res.status(400).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/v1/chat-sessions/mark-read
+ * Clear the Team Inbox unread badge when an agent opens a conversation.
+ */
+export async function markRead(req, res) {
+  try {
+    const { orgId, leadId } = req.body;
+    if (!orgId || !leadId) return res.status(400).json({ error: "orgId and leadId are required" });
+
+    const membership = await getActiveMembership(req.authUser.uid, orgId);
+    if (!membership) return res.status(403).json({ error: "Not a member of this organization" });
+
+    const result = await markConversationRead(orgId, leadId);
+    return res.json(result);
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * POST /api/v1/chat-sessions/rebuild-index
+ * Backfill the Team Inbox for conversations that predate the index (admin only).
+ */
+export async function rebuildIndex(req, res) {
+  try {
+    const { orgId } = req.body;
+    if (!orgId) return res.status(400).json({ error: "orgId is required" });
+    if (!(await isOrgAdmin(req.authUser.uid, orgId))) {
+      return res.status(403).json({ error: "Organization admin access required" });
+    }
+    const result = await rebuildConversationIndex(orgId);
+    return res.json(result);
+  } catch (error) {
+    logger.error({ error: error.message }, "rebuildIndex failed");
+    return res.status(500).json({ error: error.message });
   }
 }
 

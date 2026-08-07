@@ -30,6 +30,7 @@ const adminLinks = [
   { to: "/admin/workflows", label: "Workflows", icon: GitBranch },
   { to: "/admin/ai-customer-care", label: "AI Customer Care", icon: Brain },
   { to: "/admin/employees", label: "Team", icon: Users },
+  { to: "/admin/inbox", label: "Team Inbox", icon: Inbox },
   { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/admin/broadcast", label: "Broadcast", icon: Radio },
   { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },
@@ -41,6 +42,7 @@ const adminLinks = [
 
 const empLinks = [
   { to: "/app", label: "Workspace", end: true, icon: LayoutDashboard },
+  { to: "/app/inbox", label: "Team Inbox", icon: Inbox },
   { to: "/app/leads", label: "My Leads", icon: Inbox },
   { to: "/app/conversations", label: "My Conversations", icon: MessageCircle },
   { to: "/app/tasks", label: "My Follow-ups", icon: ClipboardList },

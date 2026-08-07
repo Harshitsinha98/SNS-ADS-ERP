@@ -313,6 +313,30 @@
       ]
     },
     {
+      "collectionGroup": "conversations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assignedTo", "order": "ASCENDING" },
+        { "fieldPath": "lastMessageAtMs", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "conversations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "activeChatSessionEmployee", "order": "ASCENDING" },
+        { "fieldPath": "lastMessageAtMs", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "conversations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "unreadCount", "order": "DESCENDING" },
+        { "fieldPath": "lastMessageAtMs", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "walletTransactions",
       "queryScope": "COLLECTION",
       "fields": [
