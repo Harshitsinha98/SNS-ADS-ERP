@@ -49,20 +49,7 @@
         { "fieldPath": "at", "order": "DESCENDING" }
       ]
     },
-    {
-      "collectionGroup": "activity",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "at", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "activity",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "at", "order": "DESCENDING" }
-      ]
-    },
+
     {
       "collectionGroup": "followUpTasks",
       "queryScope": "COLLECTION_GROUP",
@@ -258,20 +245,7 @@
         { "fieldPath": "priority", "order": "DESCENDING" }
       ]
     },
-    {
-      "collectionGroup": "aiUsage",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "date", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "messages",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "source", "order": "ASCENDING" }
-      ]
-    },
+
     {
       "collectionGroup": "leads",
       "queryScope": "COLLECTION",
