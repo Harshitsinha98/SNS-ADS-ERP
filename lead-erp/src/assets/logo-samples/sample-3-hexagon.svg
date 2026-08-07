@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="grad3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fb923c"/>
+      <stop offset="50%" style="stop-color:#f97316"/>
+      <stop offset="100%" style="stop-color:#c2410c"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .hex { animation: hexIn 0.7s ease-out forwards; transform-origin: center; opacity: 0; }
+    .hex-letter { animation: letterIn 0.4s ease-out 0.5s forwards; opacity: 0; }
+    .shimmer { animation: shimmer 4s ease-in-out infinite; }
+    @keyframes hexIn { from { opacity:0; transform:rotate(-30deg) scale(0.5); } to { opacity:1; transform:rotate(0) scale(1); } }
+    @keyframes letterIn { from { opacity:0; } to { opacity:1; } }
+    @keyframes shimmer { 0%,100% { opacity:1; } 50% { opacity:0.85; } }
+  </style>
+  <polygon class="hex shimmer" points="32,4 56,18 56,46 32,60 8,46 8,18" fill="url(#grad3)"/>
+  <text class="hex-letter" x="32" y="41" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="26" font-weight="700" fill="white">C</text>
+</svg>

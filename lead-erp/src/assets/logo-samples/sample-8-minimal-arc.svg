@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="grad8" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fb923c"/>
+      <stop offset="100%" style="stop-color:#c2410c"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .arc8 { stroke-dasharray: 80; stroke-dashoffset: 80; animation: drawArc 1s ease-out forwards; }
+    .inner-dot { opacity:0; animation: dotPop 0.3s ease-out 0.8s forwards; transform-origin:center; }
+    .text8 { opacity:0; animation: textIn 0.4s ease-out 1s forwards; }
+    .idle { animation: rotate8 12s linear infinite; transform-origin: 32px 32px; }
+    @keyframes drawArc { to { stroke-dashoffset: 0; } }
+    @keyframes dotPop { from { opacity:0; transform:scale(0); } to { opacity:1; transform:scale(1); } }
+    @keyframes textIn { to { opacity:1; } }
+    @keyframes rotate8 { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+  </style>
+  <g class="idle">
+    <path class="arc8" d="M32,8 A24,24 0 1,1 14,49" fill="none" stroke="url(#grad8)" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <circle class="inner-dot" cx="32" cy="32" r="8" fill="url(#grad8)"/>
+  <text class="text8" x="32" y="37" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="700" fill="white">C</text>
+</svg>

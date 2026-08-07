@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="grad4" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fdba74"/>
+      <stop offset="100%" style="stop-color:#ea580c"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .bar { opacity: 0; animation: slideRight 0.4s ease-out forwards; }
+    .b1 { animation-delay: 0.1s; }
+    .b2 { animation-delay: 0.25s; }
+    .b3 { animation-delay: 0.4s; }
+    .b4 { animation-delay: 0.55s; }
+    .brand-text { opacity: 0; animation: fadeUp 0.4s ease-out 0.7s forwards; }
+    @keyframes slideRight { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:translateX(0); } }
+    @keyframes fadeUp { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:translateY(0); } }
+  </style>
+  <rect class="bar b1" x="12" y="12" width="36" height="7" rx="3.5" fill="#fdba74"/>
+  <rect class="bar b2" x="12" y="23" width="40" height="7" rx="3.5" fill="#fb923c"/>
+  <rect class="bar b3" x="12" y="34" width="32" height="7" rx="3.5" fill="#f97316"/>
+  <rect class="bar b4" x="12" y="45" width="44" height="7" rx="3.5" fill="#ea580c"/>
+  <text class="brand-text" x="32" y="62" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="6" font-weight="600" fill="#ea580c" letter-spacing="2">CODESKATE</text>
+</svg>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Codeskate Logo Samples</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #1a1a2e; min-height:100vh; padding:40px 20px; }
+  h1 { text-align:center; color:#fff; font-size:24px; margin-bottom:10px; }
+  .subtitle { text-align:center; color:#999; font-size:14px; margin-bottom:40px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:24px; max-width:1200px; margin:0 auto; }
+  .card { background:#fff; border-radius:16px; padding:32px; text-align:center; transition: transform 0.2s, box-shadow 0.2s; }
+  .card:hover { transform:translateY(-4px); box-shadow: 0 20px 60px rgba(249,115,22,0.15); }
+  .card h3 { margin-top:20px; font-size:14px; color:#333; font-weight:600; }
+  .card p { margin-top:6px; font-size:12px; color:#888; }
+  .logo-wrap { width:80px; height:80px; margin:0 auto; }
+  .logo-wrap svg { width:100%; height:100%; }
+  .sizes { display:flex; align-items:center; justify-content:center; gap:16px; margin-top:16px; padding-top:16px; border-top:1px solid #f0f0f0; }
+  .sizes svg { opacity:0.7; }
+  .badge { display:inline-block; background:#fff3e0; color:#e65100; font-size:10px; font-weight:600; padding:3px 8px; border-radius:20px; margin-top:12px; }
+</style>
+</head>
+<body>
+<h1>Codeskate Logo Samples</h1>
+<p class="subtitle">8 animated SVG logos - simple, elegant, orange brand. Click to refresh animations.</p>
+<div class="grid">
+
+  <div class="card" onclick="this.innerHTML=this.innerHTML">
+    <div class="logo-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#f97316"/><stop offset="100%" style="stop-color:#ea580c"/></linearGradient></defs><style>.box1{animation:fadeScale1 .6s ease-out forwards;transform-origin:center;opacity:0}.letter1{animation:slideUp1 .5s ease-out .3s forwards;opacity:0}.glow1{animation:pulse1 3s ease-in-out infinite}@keyframes fadeScale1{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}@keyframes slideUp1{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}@keyframes pulse1{0%,100%{opacity:.15}50%{opacity:.35}}</style><rect class="glow1" x="4" y="4" width="56" height="56" rx="16" fill="url(#g1)" opacity=".15"/><rect class="box1" x="8" y="8" width="48" height="48" rx="14" fill="url(#g1)"/><text class="letter1" x="32" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="700" fill="white">C</text></svg>
+    </div>
+    <h3>1. Rounded Monogram</h3>
+    <p>Soft rounded square + bold "C" with glow pulse</p>
+    <span class="badge">Clean & Versatile</span>
+  </div>
+
+  <div class="card" onclick="this.innerHTML=this.innerHTML">
+    <div class="logo-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#f97316"/><stop offset="100%" style="stop-color:#dc2626"/></linearGradient></defs><style>.ring2{animation:drawRing2 1s ease-out forwards;stroke-dasharray:150;stroke-dashoffset:150}.dot2{opacity:0;animation:popIn2 .3s ease-out forwards}.d2a{animation-delay:.8s}.d2b{animation-delay:1s}.d2c{animation-delay:1.2s}.cc2{animation:fadeIn2 .5s ease-out .5s forwards;opacity:0}@keyframes drawRing2{to{stroke-dashoffset:0}}@keyframes popIn2{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}@keyframes fadeIn2{to{opacity:1}}</style><circle class="ring2" cx="32" cy="32" r="26" fill="none" stroke="url(#g2)" stroke-width="3" stroke-linecap="round"/><circle class="dot2 d2a" cx="32" cy="6" r="3" fill="#f97316"/><circle class="dot2 d2b" cx="54" cy="44" r="3" fill="#ea580c"/><circle class="dot2 d2c" cx="10" cy="44" r="3" fill="#dc2626"/><text class="cc2" x="32" y="40" text-anchor="middle" font-family="system-ui,sans-serif" font-size="24" font-weight="700" fill="url(#g2)">C</text></svg>
+    </div>
+    <h3>2. Circle + Dots</h3>
+    <p>Ring draws in, 3 accent dots pop, "C" fades</p>
+    <span class="badge">Connected & Modern</span>
+  </div>
+
+  <div class="card" onclick="this.innerHTML=this.innerHTML">
+    <div class="logo-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#fb923c"/><stop offset="50%" style="stop-color:#f97316"/><stop offset="100%" style="stop-color:#c2410c"/></linearGradient></defs><style>.hex3{animation:hexIn3 .7s ease-out forwards;transform-origin:center;opacity:0}.hl3{animation:letterIn3 .4s ease-out .5s forwards;opacity:0}.shim3{animation:shimmer3 4s ease-in-out infinite}@keyframes hexIn3{from{opacity:0;transform:rotate(-30deg) scale(.5)}to{opacity:1;transform:rotate(0) scale(1)}}@keyframes letterIn3{from{opacity:0}to{opacity:1}}@keyframes shimmer3{0%,100%{opacity:1}50%{opacity:.85}}</style><polygon class="hex3 shim3" points="32,4 56,18 56,46 32,60 8,46 8,18" fill="url(#g3)"/><text class="hl3" x="32" y="41" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" font-weight="700" fill="white">C</text></svg>
+    </div>
+    <h3>3. Hexagon</h3>
+    <p>Rotates in with shimmer breathing effect</p>
+    <span class="badge">Tech & Premium</span>
+  </div>
+
+  <div class="card" onclick="this.innerHTML=this.innerHTML">
+    <div class="logo-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g4" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#fdba74"/><stop offset="100%" style="stop-color:#ea580c"/></linearGradient></defs><style>.bar4{opacity:0;animation:slideR4 .4s ease-out forwards}.b4a{animation-delay:.1s}.b4b{animation-delay:.25s}.b4c{animation-delay:.4s}.b4d{animation-delay:.55s}@keyframes slideR4{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}</style><rect class="bar4 b4a" x="12" y="14" width="36" height="7" rx="3.5" fill="#fdba74"/><rect class="bar4 b4b" x="12" y="25" width="40" height="7" rx="3.5" fill="#fb923c"/><rect class="bar4 b4c" x="12" y="36" width="32" height="7" rx="3.5" fill="#f97316"/><rect class="bar4 b4d" x="12" y="47" width="44" height="7" rx="3.5" fill="#ea580c"/></svg>
+    </div>
+    <h3>4. Stacked Bars</h3>
+    <p>Bars slide in sequentially - light to dark gradient</p>
+    <span class="badge">Data & Growth</span>
+  </div>
+
+  <div class="card" onclick="this.innerHTML=this.innerHTML">
+    <div class="logo-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g5a" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#f97316"/><stop offset="100%" style="stop-color:#ea580c"/></linearGradient><linearGradient id="g5b" x1="100%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#fdba74"/><stop offset="100%" style="stop-color:#f97316"/></linearGradient></defs><style>.dl5{opacity:0;animation:foldL5 .5s ease-out .1s forwards;transform-origin:32px 32px}.dr5{opacity:0;animation:foldR5 .5s ease-out .1s forwards;transform-origin:32px 32px}.dt5{opacity:0;animation:popL5 .3s ease-out .6s forwards}.br5{animation:breathe5 4s ease-in-out infinite}@keyframes foldL5{from{opacity:0;transform:rotateY(90deg)}to{opacity:1;transform:rotateY(0)}}@keyframes foldR5{from{opacity:0;transform:rotateY(-90deg)}to{opacity:1;transform:rotateY(0)}}@keyframes popL5{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}@keyframes breathe5{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}</style><g class="br5"><polygon class="dl5" points="32,6 6,32 32,58" fill="url(#g5a)"/><polygon class="dr5" points="32,6 58,32 32,58" fill="url(#g5b)"/><text class="dt5" x="32" y="40" text-anchor="middle" font-family="system-ui,sans-serif" font-size="22" font-weight="700" fill="white">C</text></g></svg>
+    </div>
+    <h3>5. Diamond</h3>
+    <p>Two halves fold open with gentle breathing</p>
+    <span class="badge">Bold & Dynamic</span>
+  </div>
+
+  <div class="card" onclick="this.innerHTML=this.innerHTML">
+    <div class="logo-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g6" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#f97316"/><stop offset="100%" style="stop-color:#dc2626"/></linearGradient></defs><style>.core6{animation:coreIn6 .5s ease-out forwards;opacity:0;transform-origin:center}.orb6{fill:none;stroke:#f97316;stroke-width:1.5;opacity:.3;animation:spin6 8s linear infinite;transform-origin:32px 32px}.od6{animation:orbM6 4s linear infinite;transform-origin:32px 32px}.lt6{animation:fadeIn6 .4s ease-out .4s forwards;opacity:0}@keyframes coreIn6{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}@keyframes spin6{from{transform:rotate(0)}to{transform:rotate(360deg)}}@keyframes orbM6{from{transform:rotate(0) translateX(22px) rotate(0)}to{transform:rotate(360deg) translateX(22px) rotate(-360deg)}}@keyframes fadeIn6{to{opacity:1}}</style><ellipse class="orb6" cx="32" cy="32" rx="26" ry="12" transform="rotate(-20 32 32)"/><ellipse class="orb6" cx="32" cy="32" rx="26" ry="12" transform="rotate(40 32 32)" style="animation-direction:reverse"/><circle class="core6" cx="32" cy="32" r="16" fill="url(#g6)"/><g class="od6"><circle cx="54" cy="32" r="3" fill="#fdba74"/></g><text class="lt6" x="32" y="38" text-anchor="middle" font-family="system-ui,sans-serif" font-size="16" font-weight="700" fill="white">C</text></svg>
+    </div>
+    <h3>6. Orbit</h3>
+    <p>Spinning orbital rings with a satellite dot</p>
+    <span class="badge">AI & Innovation</span>
+  </div>
+
+  <div class="card" onclick="this.innerHTML=this.innerHTML">
+    <div class="logo-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g7" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#f97316"/><stop offset="100%" style="stop-color:#ea580c"/></linearGradient></defs><style>.bg7{animation:bgIn7 .5s ease-out forwards;opacity:0;transform-origin:center}.wv7{animation:waveM7 3s ease-in-out infinite;opacity:.15}.wv7b{animation:waveM7 3s ease-in-out 1.5s infinite;opacity:.1}.lt7{animation:rise7 .4s ease-out .3s forwards;opacity:0}@keyframes bgIn7{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}@keyframes waveM7{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}@keyframes rise7{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}</style><rect class="bg7" x="6" y="6" width="52" height="52" rx="16" fill="url(#g7)"/><path class="wv7" d="M6,38 Q19,30 32,38 Q45,46 58,38 L58,58 Q58,64 52,58 L12,58 Q6,58 6,52 Z" fill="white"/><path class="wv7b" d="M6,42 Q19,34 32,42 Q45,50 58,42 L58,58 Q58,64 52,58 L12,58 Q6,58 6,52 Z" fill="white"/><text class="lt7" x="32" y="38" text-anchor="middle" font-family="system-ui,sans-serif" font-size="24" font-weight="700" fill="white">C</text></svg>
+    </div>
+    <h3>7. Wave</h3>
+    <p>Rounded card with floating wave accent</p>
+    <span class="badge">Calm & Trustworthy</span>
+  </div>
+
+  <div class="card" onclick="this.innerHTML=this.innerHTML">
+    <div class="logo-wrap">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g8" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#fb923c"/><stop offset="100%" style="stop-color:#c2410c"/></linearGradient></defs><style>.arc8{stroke-dasharray:80;stroke-dashoffset:80;animation:drawA8 1s ease-out forwards}.idot8{opacity:0;animation:dotP8 .3s ease-out .8s forwards;transform-origin:center}.tx8{opacity:0;animation:txIn8 .4s ease-out 1s forwards}.idle8{animation:rot8 12s linear infinite;transform-origin:32px 32px}@keyframes drawA8{to{stroke-dashoffset:0}}@keyframes dotP8{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}@keyframes txIn8{to{opacity:1}}@keyframes rot8{from{transform:rotate(0)}to{transform:rotate(360deg)}}</style><g class="idle8"><path class="arc8" d="M32,8 A24,24 0 1,1 14,49" fill="none" stroke="url(#g8)" stroke-width="4" stroke-linecap="round"/></g><circle class="idot8" cx="32" cy="32" r="8" fill="url(#g8)"/><text class="tx8" x="32" y="37" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="700" fill="white">C</text></svg>
+    </div>
+    <h3>8. Minimal Arc</h3>
+    <p>Spinning open arc + center dot (loading-style)</p>
+    <span class="badge">Minimal & Techy</span>
+  </div>
+
+</div>
+<p style="text-align:center;color:#666;margin-top:40px;font-size:12px;">Click any card to replay animation | All logos are pure SVG + CSS (no JS needed)</p>
+</body>
+</html>

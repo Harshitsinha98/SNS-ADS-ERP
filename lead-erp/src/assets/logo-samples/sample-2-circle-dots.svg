@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f97316"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .ring { animation: drawRing 1s ease-out forwards; stroke-dasharray: 150; stroke-dashoffset: 150; }
+    .dot { opacity: 0; animation: popIn 0.3s ease-out forwards; }
+    .d1 { animation-delay: 0.8s; }
+    .d2 { animation-delay: 1.0s; }
+    .d3 { animation-delay: 1.2s; }
+    .center-c { animation: fadeIn 0.5s ease-out 0.5s forwards; opacity: 0; }
+    @keyframes drawRing { to { stroke-dashoffset: 0; } }
+    @keyframes popIn { from { opacity:0; transform:scale(0); } to { opacity:1; transform:scale(1); } }
+    @keyframes fadeIn { to { opacity: 1; } }
+  </style>
+  <circle class="ring" cx="32" cy="32" r="26" fill="none" stroke="url(#grad2)" stroke-width="3" stroke-linecap="round"/>
+  <circle class="dot d1" cx="32" cy="6" r="3" fill="#f97316" transform-origin="32 6"/>
+  <circle class="dot d2" cx="54" cy="44" r="3" fill="#ea580c" transform-origin="54 44"/>
+  <circle class="dot d3" cx="10" cy="44" r="3" fill="#dc2626" transform-origin="10 44"/>
+  <text class="center-c" x="32" y="40" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" fill="url(#grad2)">C</text>
+</svg>

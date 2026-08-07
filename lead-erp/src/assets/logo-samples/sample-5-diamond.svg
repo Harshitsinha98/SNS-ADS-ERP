@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="grad5a" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f97316"/>
+      <stop offset="100%" style="stop-color:#ea580c"/>
+    </linearGradient>
+    <linearGradient id="grad5b" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fdba74"/>
+      <stop offset="100%" style="stop-color:#f97316"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .diamond-left { opacity:0; animation: foldLeft 0.5s ease-out 0.1s forwards; transform-origin: 32px 32px; }
+    .diamond-right { opacity:0; animation: foldRight 0.5s ease-out 0.1s forwards; transform-origin: 32px 32px; }
+    .diamond-letter { opacity:0; animation: popLetter 0.3s ease-out 0.6s forwards; }
+    .breathe { animation: breathe 4s ease-in-out infinite; }
+    @keyframes foldLeft { from { opacity:0; transform:rotateY(90deg); } to { opacity:1; transform:rotateY(0); } }
+    @keyframes foldRight { from { opacity:0; transform:rotateY(-90deg); } to { opacity:1; transform:rotateY(0); } }
+    @keyframes popLetter { from { opacity:0; transform:scale(0.5); } to { opacity:1; transform:scale(1); } }
+    @keyframes breathe { 0%,100% { transform:scale(1); } 50% { transform:scale(1.03); } }
+  </style>
+  <g class="breathe">
+    <polygon class="diamond-left" points="32,6 6,32 32,58" fill="url(#grad5a)"/>
+    <polygon class="diamond-right" points="32,6 58,32 32,58" fill="url(#grad5b)"/>
+    <text class="diamond-letter" x="32" y="40" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="white" transform-origin="32 34">C</text>
+  </g>
+</svg>

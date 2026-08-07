@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="grad6" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f97316"/>
+      <stop offset="100%" style="stop-color:#dc2626"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .core { animation: coreIn 0.5s ease-out forwards; opacity:0; transform-origin:center; }
+    .orbit-ring { fill:none; stroke:#f97316; stroke-width:1.5; opacity:0.3; animation: spin 8s linear infinite; transform-origin:center; }
+    .orbit-dot { animation: orbitMove 4s linear infinite; }
+    .letter6 { animation: fadeIn6 0.4s ease-out 0.4s forwards; opacity:0; }
+    @keyframes coreIn { from { opacity:0; transform:scale(0); } to { opacity:1; transform:scale(1); } }
+    @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+    @keyframes orbitMove { from { transform:rotate(0deg) translateX(22px) rotate(0deg); } to { transform:rotate(360deg) translateX(22px) rotate(-360deg); } }
+    @keyframes fadeIn6 { to { opacity:1; } }
+  </style>
+  <ellipse class="orbit-ring" cx="32" cy="32" rx="26" ry="12" transform="rotate(-20 32 32)"/>
+  <ellipse class="orbit-ring" cx="32" cy="32" rx="26" ry="12" transform="rotate(40 32 32)" style="animation-direction:reverse;"/>
+  <circle class="core" cx="32" cy="32" r="16" fill="url(#grad6)"/>
+  <g style="transform-origin:32px 32px" class="orbit-dot">
+    <circle cx="32" cy="32" r="3" fill="#fdba74" transform="translate(22, 0)"/>
+  </g>
+  <text class="letter6" x="32" y="38" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="700" fill="white">C</text>
+</svg>
