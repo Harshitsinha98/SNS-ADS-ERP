@@ -12,12 +12,12 @@
  *   animate boolean draw the stroke in once on mount (default false)
  *   className string extra classes on the tile wrapper
  */
-export default function SkateMark({ size = 40, animate = false, className = "" }) {
+export default function SkateMark({ size = 40, animate = true, className = "" }) {
   const radius = Math.round(size * 0.28); // rounded-square corner radius
 
   return (
     <span
-      className={`inline-flex items-center justify-center bg-gradient-orange shadow-glow ${className}`}
+      className={`inline-flex items-center justify-center bg-gradient-orange shadow-glow ${animate ? "sk-tile" : ""} ${className}`}
       style={{ width: size, height: size, borderRadius: radius }}
       aria-hidden="true"
     >
