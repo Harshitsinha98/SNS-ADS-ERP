@@ -589,10 +589,14 @@ function AnalyticsTab({ orgId }) {
           <p className="text-xl font-bold text-ink">{stats.totals?.autoReplies || 0}</p>
           <p className="text-[11px] text-ink-muted">AI Replies Sent</p>
         </div>
+        {/* Escalations, not infrastructure cost — token spend is the platform's
+            operating cost, not something the customer is billed for, so showing
+            it here was misleading. Customers are metered by their plan's
+            monthly AI reply allowance instead. */}
         <div className="card p-4 text-center">
           <Clock size={20} className="mx-auto text-purple-500 mb-1" />
-          <p className="text-xl font-bold text-ink">{stats.estimatedCost?.inr ? `₹${stats.estimatedCost.inr}` : "₹0"}</p>
-          <p className="text-[11px] text-ink-muted">Est. Cost (30d)</p>
+          <p className="text-xl font-bold text-ink">{stats.totals?.escalations || 0}</p>
+          <p className="text-[11px] text-ink-muted">Sent to Agent</p>
         </div>
       </div>
 
