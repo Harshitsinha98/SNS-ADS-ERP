@@ -145,7 +145,7 @@ export default function LeadAction() {
             <button onClick={endCall} className="w-full flex items-center justify-center gap-2 bg-danger-600 text-white rounded-md p-2.5 text-sm font-medium animate-pulse">
               <PhoneOff size={15} /> End call · {fmtDuration(elapsed)}
             </button>
-          ) : null}}
+          ) : null}
           <button onClick={quickWhatsApp} className="w-full flex items-center justify-center gap-2 bg-success-50 text-success-700 border border-success-200 rounded-md p-2.5 text-sm font-medium mt-2 hover:bg-success-100 transition-colors">
             <MessageCircle size={15} /> Open WhatsApp
           </button>
