@@ -1,6 +1,6 @@
 import SkateMark from "./SkateMark";
 
-export default function Logo({ size = "md", onDark = false, animate = false }) {
+export default function Logo({ size = "md", onDark = false, animate = true }) {
   const px = size === "lg" ? 44 : size === "sm" ? 32 : 36;
   const text = size === "lg" ? "text-2xl" : size === "sm" ? "text-lg" : "text-xl";
 
