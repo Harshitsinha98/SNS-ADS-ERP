@@ -44,7 +44,7 @@ export default function PlatformLogin() {
     if (otp.length < 6) { setError("Enter the 6-digit OTP"); return; }
     setLoading(true);
     setError("");
-    const result = await verifyOtp(confirmation, otp);
+    const result = await verifyOtp(confirmation, otp, phone.replace(/\D/g, "").slice(-10));
     setLoading(false);
     if (!result.ok) setError(result.error);
     // If successful, the auth state change will trigger usePlatformAuth
