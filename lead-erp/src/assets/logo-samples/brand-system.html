@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CodeSkate — Brand System (3 businesses)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#0f0f18;color:#eee;min-height:100vh;padding:44px 20px}
+  h1{text-align:center;font-size:26px;font-weight:700;color:#fff;margin-bottom:6px}
+  .sub{text-align:center;color:#8a8aa0;font-size:14px;margin-bottom:40px;max-width:640px;margin-left:auto;margin-right:auto;line-height:1.5}
+  .block{max-width:1000px;margin:0 auto 36px}
+  .label{font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#f97316;margin-bottom:14px}
+  .master{background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:40px;display:flex;align-items:center;justify-content:center;gap:16px}
+  .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:760px){.row3{grid-template-columns:1fr}}
+  .prod{background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:30px 22px;text-align:center;transition:transform .25s,box-shadow .25s}
+  .prod:hover{transform:translateY(-5px);box-shadow:0 18px 46px rgba(249,115,22,.16)}
+  .lrow{display:flex;align-items:center;justify-content:center;gap:11px;min-height:52px}
+  .tile{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .tile svg{width:24px;height:24px}
+  .wm{font-size:22px;font-weight:800;letter-spacing:-.5px;line-height:1;white-space:nowrap}
+  .wm .c{color:#fff}.wm .s{color:#f97316}
+  .wm.dark .c{color:#1a1a2e}
+  .ptag{font-size:11px;font-weight:700;letter-spacing:3px;margin-left:2px}
+  .pname{margin-top:16px;font-size:13px;font-weight:700;color:#fff}
+  .pdesc{margin-top:4px;font-size:11.5px;color:#9a9ab0;line-height:1.4}
+  .lightbar{display:flex;align-items:center;justify-content:center;gap:11px;background:#fff;border-radius:12px;padding:16px;margin-top:16px}
+  .lightbar .tile{width:36px;height:36px}.lightbar .tile svg{width:20px;height:20px}.lightbar .wm{font-size:19px}
+  .note{max-width:1000px;margin:30px auto 0;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);border-radius:14px;padding:20px 24px;font-size:13px;color:#d8d8e5;line-height:1.6}
+  .note b{color:#fdba74}
+  .icons-inline{display:inline-flex;gap:6px;vertical-align:middle}
+</style>
+</head>
+<body>
+<h1>CodeSkate — One Brand, Three Businesses</h1>
+<p class="sub">A single master mark carries trust across your agency, CRM, and Voice AI. Each product just adds its own name. This is how Zoho, Google & Microsoft scale multiple products cheaply.</p>
+
+<!-- MASTER -->
+<div class="block">
+  <div class="label">Master Brand (agency / parent / everywhere)</div>
+  <div class="master">
+    <div class="tile" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+      <svg viewBox="0 0 24 24"><path d="M18.5 6.2 A8.5 8.5 0 1 0 18.5 17.8" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>
+    </div>
+    <div class="wm" style="font-size:32px"><span class="c">Code</span><span class="s">Skate</span></div>
+  </div>
+</div>
+
+<!-- PRODUCTS -->
+<div class="block">
+  <div class="label">Product Lockups (same mark + product name)</div>
+  <div class="row3">
+
+    <!-- Studio / Agency -->
+    <div class="prod">
+      <div class="lrow">
+        <div class="tile" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+          <svg viewBox="0 0 24 24"><path d="M18.5 6.2 A8.5 8.5 0 1 0 18.5 17.8" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="wm"><span class="c">Code</span><span class="s">Skate</span></div>
+      </div>
+      <div style="margin-top:6px"><span class="ptag" style="color:#f97316">STUDIO</span></div>
+      <div class="lightbar">
+        <div class="tile" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+          <svg viewBox="0 0 24 24"><path d="M18.5 6.2 A8.5 8.5 0 1 0 18.5 17.8" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="wm dark"><span class="c">Code</span><span class="s">Skate</span></div>
+        <span class="ptag" style="color:#ea580c">STUDIO</span>
+      </div>
+      <div class="pname">Agency — Web, Ads & Marketing</div>
+      <div class="pdesc">Your services arm. "Studio" reads as a creative agency.</div>
+    </div>
+
+    <!-- CRM -->
+    <div class="prod">
+      <div class="lrow">
+        <div class="tile" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+          <svg viewBox="0 0 24 24"><path d="M18.5 6.2 A8.5 8.5 0 1 0 18.5 17.8" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="wm"><span class="c">Code</span><span class="s">Skate</span></div>
+      </div>
+      <div style="margin-top:6px"><span class="ptag" style="color:#f97316">CRM</span></div>
+      <div class="lightbar">
+        <div class="tile" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+          <svg viewBox="0 0 24 24"><path d="M18.5 6.2 A8.5 8.5 0 1 0 18.5 17.8" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="wm dark"><span class="c">Code</span><span class="s">Skate</span></div>
+        <span class="ptag" style="color:#ea580c">CRM</span>
+      </div>
+      <div class="pname">WhatsApp CRM SaaS</div>
+      <div class="pdesc">This product. Chat bubble can appear inside the app UI.</div>
+    </div>
+
+    <!-- Voice -->
+    <div class="prod">
+      <div class="lrow">
+        <div class="tile" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+          <svg viewBox="0 0 24 24"><path d="M18.5 6.2 A8.5 8.5 0 1 0 18.5 17.8" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="wm"><span class="c">Code</span><span class="s">Skate</span></div>
+      </div>
+      <div style="margin-top:6px"><span class="ptag" style="color:#f97316">VOICE</span></div>
+      <div class="lightbar">
+        <div class="tile" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+          <svg viewBox="0 0 24 24"><path d="M18.5 6.2 A8.5 8.5 0 1 0 18.5 17.8" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="wm dark"><span class="c">Code</span><span class="s">Skate</span></div>
+        <span class="ptag" style="color:#ea580c">VOICE</span>
+      </div>
+      <div class="pname">Voice AI & Calling SaaS</div>
+      <div class="pdesc">Future product. Voice waveform icon inside its app.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MASTER MARK OPTIONS -->
+<div class="block">
+  <div class="label">Master icon — 3 abstract options (neutral across all 3 businesses)</div>
+  <div class="row3">
+    <div class="prod">
+      <div class="lrow">
+        <div class="tile" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+          <svg viewBox="0 0 24 24"><path d="M18.5 6.2 A8.5 8.5 0 1 0 18.5 17.8" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="wm"><span class="c">Code</span><span class="s">Skate</span></div>
+      </div>
+      <div class="pname">Option 1 — Open "C" Arc</div>
+      <div class="pdesc">Abstract C, works for any product. Modern, minimal.</div>
+    </div>
+    <div class="prod">
+      <div class="lrow">
+        <div class="tile" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+          <svg viewBox="0 0 24 24"><text x="12" y="18.5" text-anchor="middle" font-family="Georgia,serif" font-size="19" font-weight="700" fill="#fff">C</text></svg>
+        </div>
+        <div class="wm"><span class="c">Code</span><span class="s">Skate</span></div>
+      </div>
+      <div class="pname">Option 2 — Serif "C"</div>
+      <div class="pdesc">Classic monogram. Premium, timeless, trustworthy.</div>
+    </div>
+    <div class="prod">
+      <div class="lrow">
+        <div class="tile" style="background:linear-gradient(135deg,#fb923c,#ea580c)">
+          <svg viewBox="0 0 24 24"><path d="M12 3 L20 7.5 L20 16.5 L12 21 L4 16.5 L4 7.5 Z" fill="none" stroke="#fff" stroke-width="2.4"/><path d="M15.5 9 A4.5 4.5 0 1 0 15.5 15" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>
+        </div>
+        <div class="wm"><span class="c">Code</span><span class="s">Skate</span></div>
+      </div>
+      <div class="pname">Option 3 — Hex + C</div>
+      <div class="pdesc">Tech/platform feel. Good for a multi-product company.</div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <b>Recommendation:</b> Keep your orange tile + "Code<span style="color:#f97316">Skate</span>" wordmark exactly as-is — it's already good. Replace only the lightning bolt with an <b>abstract "C" mark</b> (Option 1 or 2 above) so the SAME logo works for the agency, CRM, and Voice AI. Then each business just appends its name: <b>CodeSkate Studio</b>, <b>CodeSkate CRM</b>, <b>CodeSkate Voice</b>. Keep the chat bubble &amp; voice-wave as <b>in-app product icons</b>, not the master logo. One brand = shared trust + easy cross-sell + cheaper marketing.
+</div>
+<p style="text-align:center;color:#55556a;margin-top:32px;font-size:12px">One master mark · three product lockups · shown on dark & light</p>
+</body>
+</html>
