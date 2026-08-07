@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { Zap, Globe, Mail, Send, MessageCircle } from "lucide-react";
+import { Globe, Mail, Send, MessageCircle } from "lucide-react";
+import SkateMark from "./SkateMark";
 
 export default function MarketingFooter() {
   return (
@@ -11,9 +12,7 @@ export default function MarketingFooter() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           <div className="col-span-2 md:col-span-1">
             <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-gradient-orange flex items-center justify-center shadow-glow">
-                <Zap size={18} className="text-white" fill="currentColor" strokeWidth={1.5} />
-              </div>
+              <SkateMark size={36} />
               <span className="font-display font-bold text-xl text-white">
                 Codeskate <span className="text-orange-400">CRM</span>
               </span>

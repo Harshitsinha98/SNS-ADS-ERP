@@ -130,7 +130,7 @@ export default function Login() {
       <div id="recaptcha-container" />
 
       <div className="w-full max-w-md relative z-10">
-        <div className="flex justify-center mb-8"><Link to="/"><Logo size="lg" /></Link></div>
+        <div className="flex justify-center mb-8"><Link to="/"><Logo size="lg" animate /></Link></div>
 
         {/* Role mismatch / no-account screen */}
         {roleError ? (

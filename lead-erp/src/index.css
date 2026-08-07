@@ -126,3 +126,15 @@
     }
   }
 }
+
+
+/* CodeSkate Signature-C mark: one-time draw-in reveal */
+@keyframes sk-draw {
+  from { stroke-dashoffset: 78; }
+  to { stroke-dashoffset: 0; }
+}
+.sk-draw {
+  stroke-dasharray: 78;
+  stroke-dashoffset: 78;
+  animation: sk-draw 1s cubic-bezier(0.35, 0, 0.2, 1) 0.1s forwards;
+}
