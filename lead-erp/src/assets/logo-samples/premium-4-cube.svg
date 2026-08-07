@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <defs>
+    <linearGradient id="pg4t" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fdba74"/><stop offset="100%" stop-color="#fb923c"/></linearGradient>
+    <linearGradient id="pg4l" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#ea580c"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
+    <linearGradient id="pg4r" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#f97316"/><stop offset="100%" stop-color="#9a3412"/></linearGradient>
+  </defs>
+  <style>.p4t{opacity:0;animation:p4top .5s ease-out .1s forwards}.p4l{opacity:0;animation:p4left .5s ease-out .3s forwards}.p4r{opacity:0;animation:p4right .5s ease-out .3s forwards}@keyframes p4top{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}@keyframes p4left{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}@keyframes p4right{from{opacity:0;transform:translateX(8px)}to{opacity:1;transform:translateX(0)}}</style>
+  <polygon class="p4t" points="40,14 62,26 40,38 18,26" fill="url(#pg4t)"/>
+  <polygon class="p4l" points="18,26 40,38 40,64 18,52" fill="url(#pg4l)"/>
+  <polygon class="p4r" points="62,26 40,38 40,64 62,52" fill="url(#pg4r)"/>
+</svg>

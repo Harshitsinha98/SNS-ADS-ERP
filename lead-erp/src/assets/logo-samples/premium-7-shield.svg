@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <defs>
+    <linearGradient id="pg7" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#9a3412"/></linearGradient>
+    <linearGradient id="sheen7" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#fff" stop-opacity="0"/><stop offset="50%" stop-color="#fff" stop-opacity="0.5"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <clipPath id="clip7"><path d="M40,12 L64,20 L64,42 Q64,60 40,68 Q16,60 16,42 L16,20 Z"/></clipPath>
+  </defs>
+  <style>.p7s{animation:p7in .7s cubic-bezier(.2,.8,.2,1) forwards;opacity:0;transform-origin:center}.p7l{opacity:0;animation:p7let .5s ease-out .4s forwards}.p7sh{animation:p7sweep 4s ease-in-out 1s infinite}@keyframes p7in{from{opacity:0;transform:scale(.6) translateY(6px)}to{opacity:1;transform:scale(1) translateY(0)}}@keyframes p7let{to{opacity:1}}@keyframes p7sweep{0%{transform:translateX(-60px)}40%,100%{transform:translateX(60px)}}</style>
+  <path class="p7s" d="M40,12 L64,20 L64,42 Q64,60 40,68 Q16,60 16,42 L16,20 Z" fill="url(#pg7)"/>
+  <g clip-path="url(#clip7)"><rect class="p7sh" x="0" y="0" width="26" height="80" fill="url(#sheen7)"/></g>
+  <text class="p7l" x="40" y="48" text-anchor="middle" font-family="Georgia, serif" font-size="26" font-weight="700" fill="white">C</text>
+</svg>

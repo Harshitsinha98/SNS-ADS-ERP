@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <defs>
+    <linearGradient id="pg1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#fb923c"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
+    <linearGradient id="sheen1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#fff" stop-opacity="0"/><stop offset="50%" stop-color="#fff" stop-opacity="0.55"/><stop offset="100%" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <clipPath id="clip1"><rect x="14" y="14" width="52" height="52" rx="16"/></clipPath>
+  </defs>
+  <style>.p1box{animation:p1in .7s cubic-bezier(.2,.8,.2,1) forwards;transform-origin:center;opacity:0}.p1l{animation:p1let .5s ease-out .35s forwards;opacity:0}.p1sh{animation:p1sweep 3.5s ease-in-out .8s infinite}@keyframes p1in{from{opacity:0;transform:scale(.6) rotate(-8deg)}to{opacity:1;transform:scale(1) rotate(0)}}@keyframes p1let{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}@keyframes p1sweep{0%{transform:translateX(-70px)}35%,100%{transform:translateX(70px)}}</style>
+  <rect class="p1box" x="14" y="14" width="52" height="52" rx="16" fill="url(#pg1)"/>
+  <g clip-path="url(#clip1)"><rect class="p1sh" x="0" y="0" width="34" height="80" fill="url(#sheen1)"/></g>
+  <text class="p1l" x="40" y="52" text-anchor="middle" font-family="Georgia, serif" font-size="34" font-weight="700" fill="white">C</text>
+</svg>
