@@ -66,6 +66,11 @@ export async function getBillingConfig() {
 
 export const createRazorpayOrder = (body) => authedPost("/api/billing/razorpay/order", body);
 export const verifyRazorpayPayment = (body) => authedPost("/api/billing/razorpay/verify", body);
+
+// ---- add-on packs (extra AI replies, seats, leads, ...) ----
+export const createAddOnOrder = (body) => authedPost("/api/billing/razorpay/addon/order", body);
+export const verifyAddOnPayment = (body) => authedPost("/api/billing/razorpay/addon/verify", body);
+export const getQuotaStatus = (orgId) => authedGet(`/api/billing/quota-status?orgId=${encodeURIComponent(orgId)}`);
 export const getPayuHash = (body) => authedPost("/api/billing/payu/hash", body);
 
 // ---- paid SIGNUP (no org yet — backend provisions after payment) ----

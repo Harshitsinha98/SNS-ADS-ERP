@@ -38,6 +38,7 @@ import AnalyticsPage from "./pages/platform/AnalyticsPage";
 import InfrastructurePage from "./pages/platform/InfrastructurePage";
 import WhatsAppOpsPage from "./pages/platform/WhatsAppOpsPage";
 import AiUsagePage from "./pages/platform/AiUsagePage";
+import TenantUsagePage from "./pages/platform/TenantUsagePage";
 import AuditLogsPage from "./pages/platform/AuditLogsPage";
 import FeatureFlagsPage from "./pages/platform/FeatureFlagsPage";
 import SettingsPage from "./pages/platform/SettingsPage";
@@ -108,6 +109,7 @@ export default function App() {
         <Route path="/platform/analytics" element={<AnalyticsPage />} />
         <Route path="/platform/infrastructure" element={<InfrastructurePage />} />
         <Route path="/platform/whatsapp" element={<WhatsAppOpsPage />} />
+        <Route path="/platform/tenant-usage" element={<TenantUsagePage />} />
         <Route path="/platform/ai-usage" element={<AiUsagePage />} />
         <Route path="/platform/audit-logs" element={<AuditLogsPage />} />
         <Route path="/platform/feature-flags" element={<FeatureFlagsPage />} />

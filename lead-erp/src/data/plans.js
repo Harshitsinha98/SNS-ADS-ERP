@@ -21,7 +21,7 @@ export const PLANS = [
       { text: "1,000 leads / month", included: true },
       { text: "WhatsApp lead capture + templates", included: true },
       { text: "Round-robin auto-assignment", included: true },
-      { text: "AI auto-reply (100/mo)", included: true },
+      { text: "AI auto-reply (250/mo)", included: true },
       { text: "5 knowledge base articles", included: true },
       { text: "Native call tracking (Android)", included: true },
       { text: "1 website lead form", included: true },
@@ -93,7 +93,7 @@ export const PLANS = [
       { text: "Unlimited team members", included: true },
       { text: "Unlimited leads", included: true },
       { text: "Everything in Scale", included: true },
-      { text: "Unlimited AI auto-replies", included: true },
+      { text: "AI auto-reply (50,000/mo)", included: true },
       { text: "AI Voice Bot + Bridge calling", included: true },
       { text: "500 products + unlimited images", included: true },
       { text: "Unlimited workflows", included: true },
@@ -105,7 +105,7 @@ export const PLANS = [
 ];
 
 export const ADD_ONS = [
-  { id: "ai_messages", name: "Extra AI Messages", price: 499, unit: "5,000 msgs/mo", description: "5,000 additional AI auto-replies per month" },
+  { id: "ai_messages", name: "Extra AI Replies", price: 499, unit: "2,500 replies/mo", description: "2,500 additional AI auto-replies per month" },
   { id: "extra_seats", name: "Extra Team Seats", price: 499, unit: "5 seats", description: "5 additional team members" },
   { id: "extra_leads", name: "Extra Leads Pack", price: 399, unit: "5,000 leads/mo", description: "5,000 additional leads per month" },
   { id: "catalogue_pro", name: "Catalogue Pro", price: 499, unit: "500 products", description: "500 products + 5,000 image messages/month" },

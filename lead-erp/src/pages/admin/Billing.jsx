@@ -10,10 +10,12 @@ import {
   getBillingConfig, createRazorpayOrder, verifyRazorpayPayment, getPayuHash,
   createSubscription, verifySubscription, cancelAutopay,
   loadRazorpayScript, submitPayuForm,
+  createAddOnOrder, verifyAddOnPayment, getQuotaStatus,
 } from "../../utils/billingApi";
 import {
   Check, Sparkles, Users, Inbox, Clock, Loader2, ShieldCheck,
   CreditCard, RefreshCw, Zap, Lock, TrendingUp, X, AlertTriangle, Repeat, ChevronDown,
+  Bot, Plus, Package,
 } from "lucide-react";
 
 const fmtDate = (ms) => ms ? new Date(ms).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -33,6 +35,14 @@ export default function Billing() {
   const [msg, setMsg] = useState("");
   const [downgradeModal, setDowngradeModal] = useState(null); // target plan
   const [showManage, setShowManage] = useState(false);
+  const [quota, setQuota] = useState(null);
+
+  const refreshQuota = () => {
+    if (!b.org?.id) return;
+    getQuotaStatus(b.org.id).then(setQuota).catch(() => {});
+  };
+
+  useEffect(refreshQuota, [b.org?.id]);
 
   useEffect(() => {
     fetchPlatformConfig().then(setConfig);
@@ -58,6 +68,19 @@ export default function Billing() {
 
   const seatPct = b.seatsLimit > 0 ? Math.min(100, Math.round((b.seatsUsed / b.seatsLimit) * 100)) : 0;
   const leadPct = b.leadsLimit > 0 ? Math.min(100, Math.round((b.leadsUsed / b.leadsLimit) * 100)) : 0;
+
+  // AI allowance comes from the backend rather than the plan table, because the
+  // effective limit includes any purchased add-on packs.
+  const aiRaw = quota?.quotas?.aiMessages;
+  const aiQuota = {
+    used: Number(aiRaw?.used || 0),
+    limit: Number(aiRaw?.limit || 0),
+    unlimited: aiRaw?.unlimited === true,
+  };
+  const aiPct = aiQuota.unlimited ? 4
+    : aiQuota.limit > 0 ? Math.min(100, Math.round((aiQuota.used / aiQuota.limit) * 100))
+    : 0;
+  const aiExhausted = !aiQuota.unlimited && aiQuota.limit > 0 && aiQuota.used >= aiQuota.limit;
 
   // ---- payment ----
   const doPayment = async (plan, { autopay = false } = {}) => {
@@ -134,6 +157,49 @@ export default function Billing() {
   };
 
   const handleRenew = () => handlePay(currentPlan, { autopay: false });
+
+  // Add-on packs are one-time Razorpay charges that raise a plan limit for the
+  // current billing period. Only Razorpay is wired for these (PayU's redirect
+  // flow would lose the add-on context on return).
+  const handleBuyAddOn = async (addOn) => {
+    if (!gateways.razorpay) { setMsg("Add-on purchases need Razorpay, which is currently unavailable."); return; }
+    setBusy(`addon-${addOn.id}`);
+    setMsg("");
+    try {
+      const ok = await loadRazorpayScript();
+      if (!ok) throw new Error("Razorpay checkout failed to load.");
+      const order = await createAddOnOrder({ orgId: b.org.id, addOnId: addOn.id, quantity: 1 });
+
+      await new Promise((resolve, reject) => {
+        const rzp = new window.Razorpay({
+          key: order.keyId, amount: order.amount, currency: order.currency, order_id: order.orderId,
+          name: "Codeskate CRM", description: addOn.name,
+          prefill: { name: user?.displayName || "", contact: (user?.phone || "").replace("+91", "") },
+          theme: { color: "#F04E00" },
+          handler: async (r) => {
+            try {
+              await verifyAddOnPayment({
+                orgId: b.org.id,
+                razorpay_order_id: r.razorpay_order_id,
+                razorpay_payment_id: r.razorpay_payment_id,
+                razorpay_signature: r.razorpay_signature,
+              });
+              resolve();
+            } catch (e) { reject(e); }
+          },
+          modal: { ondismiss: () => reject(new Error("Purchase was cancelled.")) },
+        });
+        rzp.open();
+      });
+
+      setMsg(`✅ ${addOn.name} added to your account.`);
+      refreshQuota();
+    } catch (e) {
+      setMsg(e.message || "Could not complete the purchase.");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const confirmDowngrade = async () => {
     const target = downgradeModal;
@@ -213,10 +279,12 @@ export default function Billing() {
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-5">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           <UsageMeter icon={Users} label="Team seats" used={b.seatsUsed} limit={b.seatsLimit} pct={seatPct} />
           <UsageMeter icon={Inbox} label="Leads this cycle" used={b.leadsUsed}
             limit={b.leadsLimit >= 1000000 ? "∞" : b.leadsLimit} pct={b.leadsLimit >= 1000000 ? 4 : leadPct} />
+          <UsageMeter icon={Bot} label="AI replies this month" used={aiQuota.used}
+            limit={aiQuota.unlimited ? "∞" : aiQuota.limit} pct={aiPct} />
         </div>
 
         {/* Renew + manage row (only when paid) */}
@@ -264,6 +332,58 @@ export default function Billing() {
       </div>
 
       {msg && <div className="bg-orange-50 border border-orange-200 text-ember-700 rounded-xl px-4 py-3 mb-6 text-sm">{msg}</div>}
+
+      {/* ===== Out-of-quota nudge ===== */}
+      {aiExhausted && (
+        <div className="bg-warning-50 border border-warning-200 rounded-xl p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
+          <Bot className="text-warning-600 shrink-0" size={20} />
+          <p className="flex-1 text-sm text-ink-soft">
+            You've used all <span className="font-semibold text-ink">{aiQuota.limit.toLocaleString("en-IN")}</span> AI
+            replies for this month. New conversations are being routed to your team instead. Add a pack below to resume
+            AI replies immediately, or upgrade your plan for a larger monthly allowance.
+          </p>
+        </div>
+      )}
+
+      {/* ===== Add-on packs ===== */}
+      {hasPaid && quota?.availableAddOns?.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Package size={18} className="text-orange-500" />
+            <h3 className="font-display font-bold text-base text-ink">Add-on packs</h3>
+          </div>
+          <p className="text-sm text-ink-muted mb-4">
+            Top up a single limit without changing your plan. Packs apply to your current billing period.
+          </p>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {quota.availableAddOns.map((addOn) => (
+              <div key={addOn.id} className="rounded-xl border border-cream-300/60 p-4 flex flex-col">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <p className="text-sm font-semibold text-ink">{addOn.name}</p>
+                  {addOn.owned > 0 && (
+                    <span className="badge badge-success whitespace-nowrap">{addOn.owned} active</span>
+                  )}
+                </div>
+                <p className="text-xs text-ink-muted mb-3 flex-1">{addOn.description}</p>
+                <div className="flex items-baseline gap-1 mb-3">
+                  <span className="font-display font-bold text-xl text-ink">₹{addOn.monthlyPrice.toLocaleString("en-IN")}</span>
+                  <span className="text-xs text-ink-muted">/mo</span>
+                </div>
+                <button
+                  onClick={() => handleBuyAddOn(addOn)}
+                  disabled={busy === `addon-${addOn.id}` || !gateways.razorpay || addOn.owned >= addOn.maxQuantity}
+                  className="btn btn-secondary w-full text-sm"
+                >
+                  {busy === `addon-${addOn.id}` ? <><Loader2 size={14} className="animate-spin" /> Processing…</>
+                    : addOn.owned >= addOn.maxQuantity ? "Maximum reached"
+                    : <><Plus size={14} /> {addOn.owned > 0 ? "Add another" : "Add pack"}</>}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ===== Cycle + method controls ===== */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">

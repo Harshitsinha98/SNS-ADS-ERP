@@ -23,6 +23,24 @@ import { db } from "../bootstrap/firebase.js";
 import { getEffectiveLimits, hasFeature } from "./planLimits.js";
 import { logger } from "../middleware/logger.js";
 
+/** Current billing month key, e.g. "2026-08". */
+export const currentMonthKey = () => new Date().toISOString().slice(0, 7);
+
+/**
+ * Monthly AI usage, self-expiring.
+ *
+ * ARCHITECTURAL DECISION: `resetMonthlyCounters()` below exists but has never
+ * been wired to any cron. Rather than depend on a scheduled job firing (a
+ * missed run would permanently lock every tenant out of AI), the AI counter
+ * carries the month it belongs to. When that key is not the current month the
+ * usage simply reads as zero, so the quota resets itself with no cron at all.
+ */
+function monthlyAiUsage(org) {
+  return org.aiUsageMonth === currentMonthKey()
+    ? Number(org.aiMessagesUsedThisMonth || 0)
+    : 0;
+}
+
 /**
  * Get org's plan, add-ons, and current usage counters.
  */
@@ -37,7 +55,7 @@ async function getOrgBillingState(orgId) {
     usage: {
       seatsUsed: Number(org.seatsUsed || 0),
       leadsUsed: Number(org.leadsUsed || 0),
-      aiMessagesUsed: Number(org.aiMessagesUsedThisMonth || 0),
+      aiMessagesUsed: monthlyAiUsage(org),
       productsCount: Number(org.productsCount || 0),
       catalogueImagesSent: Number(org.catalogueImagesSentThisMonth || 0),
       workflowsCount: Number(org.workflowsCount || 0),
@@ -45,6 +63,38 @@ async function getOrgBillingState(orgId) {
       knowledgeBaseCount: Number(org.knowledgeBaseCount || 0),
     },
   };
+}
+
+/**
+ * Consume one AI reply from the org's monthly allowance.
+ *
+ * Transactional so concurrent inbound messages cannot both slip past the last
+ * remaining unit. Also performs the lazy month rollover described above, which
+ * is why this is the only place that writes `aiUsageMonth`.
+ *
+ * Called AFTER a reply is actually delivered, so escalations — which spend
+ * tokens but send the customer nothing — are not billed against the plan.
+ */
+export async function consumeAiMessage(orgId) {
+  const orgRef = db.collection("organizations").doc(orgId);
+  const monthKey = currentMonthKey();
+  try {
+    return await db.runTransaction(async (tx) => {
+      const snap = await tx.get(orgRef);
+      if (!snap.exists) return { consumed: false, reason: "org_not_found" };
+      const org = snap.data();
+      const used = monthlyAiUsage(org);
+      tx.set(orgRef, {
+        aiMessagesUsedThisMonth: used + 1,
+        aiUsageMonth: monthKey,
+      }, { merge: true });
+      return { consumed: true, used: used + 1 };
+    });
+  } catch (error) {
+    // Never fail a delivered reply because metering failed.
+    logger.warn({ orgId, error: error.message }, "AI message metering failed");
+    return { consumed: false, reason: error.message };
+  }
 }
 
 /**
@@ -168,6 +218,9 @@ export async function resetMonthlyCounters(orgId) {
   await db.collection("organizations").doc(orgId).update({
     leadsUsed: 0,
     aiMessagesUsedThisMonth: 0,
+    // Keep the month key in step with the counter it guards, so an explicit
+    // reset and the lazy rollover in monthlyAiUsage() can never disagree.
+    aiUsageMonth: currentMonthKey(),
     catalogueImagesSentThisMonth: 0,
     monthlyResetAt: new Date().toISOString(),
   });

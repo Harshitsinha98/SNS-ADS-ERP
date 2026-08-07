@@ -9,6 +9,7 @@
 import { db } from "../bootstrap/firebase.js";
 import * as analytics from "../services/platformAnalytics.js";
 import { enrichOrganizations, listOrganizationDirectory, newOrganizationDirectoryEvent } from "../services/platformOrganization.js";
+import { getTenantUsageOverview } from "../services/platformTenantUsage.js";
 import { nowIso, safeDocId } from "../services/helpers.js";
 import { getMergedPlans } from "../../plans.js";
 
@@ -525,4 +526,18 @@ export async function updatePlatformSettings(req, res) {
     await db.collection("platformAuditLogs").add({ actor: req.authUser.uid, action: "update_platform_settings", targetType: "platform_config", params: patch, at: nowIso() });
     return res.json({ ok: true });
   } catch (error) { return res.status(500).json({ error: error.message || "Could not update settings" }); }
+}
+
+/**
+ * GET /api/v1/platform/tenant-usage
+ * Cross-tenant metered usage (voice wallet, AI allowance, leads, seats) plus
+ * renewal urgency — the "who is about to run out of what" view.
+ */
+export async function getTenantUsage(req, res) {
+  try {
+    const overview = await getTenantUsageOverview();
+    return res.json({ ok: true, ...overview });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Could not load tenant usage" });
+  }
 }

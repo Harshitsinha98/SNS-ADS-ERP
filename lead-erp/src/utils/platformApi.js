@@ -115,6 +115,11 @@ export const createFeatureFlag = (body) => platformPost("/api/v1/platform/featur
 export const getPlatformSettings = () => platformGet("/api/v1/platform/settings");
 export const updatePlatformSettings = (patch) => platformPatch("/api/v1/platform/settings", patch);
 
+// ── Tenant usage & renewals ──
+// Server-side join of org docs + voiceWallets + effective plan limits, so the
+// browser never has to mirror the pricing table to know what a tenant has left.
+export const getTenantUsage = () => platformGet("/api/v1/platform/tenant-usage");
+
 // ── Support Center ──
 export const listSupportTickets = (params = {}) => {
   const qs = new URLSearchParams(params).toString();

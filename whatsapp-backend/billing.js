@@ -6,6 +6,8 @@ import express from "express";
 import crypto from "crypto";
 import { getAuth } from "firebase-admin/auth";
 import { getMergedPlans, amountForPlan } from "./plans.js";
+import { ADD_ONS } from "./src/billing/planLimits.js";
+import { getQuotaStatus } from "./src/billing/quotaEnforcement.js";
 
 let Razorpay = null;
 try {
@@ -254,6 +256,79 @@ export default function createBillingRouter(db) {
       });
       tx.set(activityRef, {
         text: `💳 Payment received — ${plan.name} plan (${cycle}) via ${meta.gateway}. Valid until ${new Date(newPeriodEndMs).toLocaleDateString("en-IN")}`,
+        at: nowIso(),
+        orgId,
+      });
+      return { alreadyApplied: false, ...result };
+    });
+  }
+
+  // Grant a purchased add-on. Mirrors applyPlan's billingEvents guard so a
+  // retried verify or a duplicate webhook can never grant the pack twice —
+  // important because add-on quantity is additive, not idempotent by nature.
+  //
+  // Add-ons ride the org's existing billing period rather than starting their
+  // own, so `expiresAtMs` tracks currentPeriodEndMs. Quota resolution only
+  // honours `active: true`, which is what lets a lapsed pack stop counting.
+  async function applyAddOn(orgId, addOn, quantity, meta, eventId) {
+    const amount = addOn.monthlyPrice * quantity;
+    const eventRef = db.collection("billingEvents").doc(safeDocId(eventId));
+    const orgRef = db.collection("organizations").doc(orgId);
+    const invoiceRef = orgRef.collection("invoices").doc(safeDocId(eventId));
+    const activityRef = orgRef.collection("activity").doc(`addon_${safeDocId(eventId)}`);
+
+    return db.runTransaction(async (tx) => {
+      const [eventSnap, orgSnap] = await Promise.all([tx.get(eventRef), tx.get(orgRef)]);
+      if (eventSnap.exists) return { alreadyApplied: true, ...(eventSnap.data().result || {}) };
+      if (!orgSnap.exists) throw httpError(404, "Organization not found");
+
+      const org = orgSnap.data();
+      const existing = org.addOns?.[addOn.id];
+      // Buying the same pack again stacks quantity instead of replacing it.
+      const priorQty = existing?.active ? Number(existing.quantity || 0) : 0;
+      const nextQty = Math.min(priorQty + quantity, addOn.maxQuantity);
+
+      const result = {
+        addOnId: addOn.id,
+        addOnName: addOn.name,
+        quantity: nextQty,
+        unitsAdded: addOn.unit ? addOn.unit * nextQty : null,
+      };
+
+      tx.update(orgRef, {
+        [`addOns.${addOn.id}`]: {
+          addOnId: addOn.id,
+          addOnName: addOn.name,
+          active: true,
+          quantity: nextQty,
+          monthlyPrice: addOn.monthlyPrice * nextQty,
+          purchasedAt: nowIso(),
+          expiresAtMs: Number(org.currentPeriodEndMs || 0) || null,
+        },
+        lifetimeRevenue: Number(org.lifetimeRevenue || 0) + amount,
+      });
+      tx.create(eventRef, {
+        eventId,
+        orgId,
+        kind: "addon",
+        gateway: meta.gateway,
+        paymentReference: meta.paymentId || null,
+        appliedAt: nowIso(),
+        result,
+      });
+      tx.set(invoiceRef, {
+        amount,
+        currency: "INR",
+        plan: `${addOn.name} x${quantity}`,
+        cycle: "monthly",
+        gateway: meta.gateway,
+        reference: meta.paymentId || null,
+        status: "paid",
+        at: nowIso(),
+        orgId,
+      });
+      tx.set(activityRef, {
+        text: `🧩 Add-on purchased — ${addOn.name} x${quantity} via ${meta.gateway}`,
         at: nowIso(),
         orgId,
       });
@@ -640,6 +715,113 @@ export default function createBillingRouter(db) {
       if (orderId) await failIntent(orderId, error.message).catch(() => {});
       console.error("razorpay/verify:", error.message);
       res.status(error.status || 500).json({ error: error.message || "Payment verification failed" });
+    }
+  });
+
+  // ----- Razorpay add-on purchase (extra AI replies, seats, leads, ...) -----
+  function resolveAddOn(addOnId, planId, quantityInput) {
+    const addOn = ADD_ONS[String(addOnId || "")];
+    if (!addOn) throw httpError(400, "Unknown add-on");
+    if (Array.isArray(addOn.availableOn) && !addOn.availableOn.includes(planId)) {
+      throw httpError(409, `${addOn.name} is not available on your current plan`);
+    }
+    const quantity = Number(quantityInput) || 1;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > addOn.maxQuantity) {
+      throw httpError(400, `Choose between 1 and ${addOn.maxQuantity} packs`);
+    }
+    return { addOn, quantity };
+  }
+
+  router.post("/razorpay/addon/order", requireAuth, requireOrgAdmin, async (req, res) => {
+    try {
+      if (!razorpay) throw httpError(503, "Razorpay is not configured on the server");
+      const orgSnap = await db.collection("organizations").doc(req.body.orgId).get();
+      if (!orgSnap.exists) throw httpError(404, "Organization not found");
+
+      const { addOn, quantity } = resolveAddOn(req.body.addOnId, orgSnap.data().planId || "starter", req.body.quantity);
+      const amountPaise = addOn.monthlyPrice * quantity * 100;
+
+      const order = await razorpay.orders.create({
+        amount: amountPaise,
+        currency: "INR",
+        receipt: `ao_${req.body.orgId}_${Date.now()}`.slice(0, 40),
+        notes: { kind: "addon", addOnId: addOn.id },
+      });
+      await createIntent(order.id, {
+        kind: "addon",
+        uid: req.authUser.uid,
+        orgId: req.body.orgId,
+        addOnId: addOn.id,
+        quantity,
+        amountPaise,
+        expiresAtMs: Date.now() + 30 * 60 * 1000,
+      });
+      res.json({
+        orderId: order.id,
+        amount: amountPaise,
+        currency: "INR",
+        keyId: process.env.RAZORPAY_KEY_ID,
+        addOnName: addOn.name,
+      });
+    } catch (error) {
+      console.error("razorpay/addon/order:", error.message);
+      res.status(error.status || 500).json({ error: error.message || "Could not create add-on order" });
+    }
+  });
+
+  router.post("/razorpay/addon/verify", requireAuth, async (req, res) => {
+    const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body || {};
+    try {
+      const intent = await beginIntent(orderId, req.authUser.uid, "addon");
+      if (intent.completed) return res.json({ ok: true, replay: true, ...(intent.outcome || {}) });
+      const { payment } = await verifyRazorpayPayment({ orderId, paymentId, signature, intent });
+      const addOn = ADD_ONS[intent.addOnId];
+      if (!addOn) throw httpError(400, "Unknown add-on");
+      const result = await applyAddOn(
+        intent.orgId,
+        addOn,
+        Number(intent.quantity) || 1,
+        { gateway: "razorpay", paymentId: payment.id },
+        `razorpay_payment_${payment.id}`
+      );
+      await finishIntent(orderId, result);
+      res.json({ ok: true, ...result });
+    } catch (error) {
+      if (orderId) await failIntent(orderId, error.message).catch(() => {});
+      console.error("razorpay/addon/verify:", error.message);
+      res.status(error.status || 500).json({ error: error.message || "Add-on payment verification failed" });
+    }
+  });
+
+  // Current entitlement + usage snapshot, used by the Billing page meters.
+  router.get("/quota-status", requireAuth, async (req, res) => {
+    try {
+      const orgId = String(req.query.orgId || "").trim();
+      if (!orgId) throw httpError(400, "Organization is required");
+      if (!(await isOrgAdmin(req.authUser.uid, orgId))) throw httpError(403, "Organization admin access required");
+
+      const [status, orgSnap] = await Promise.all([
+        getQuotaStatus(orgId),
+        db.collection("organizations").doc(orgId).get(),
+      ]);
+      const planId = orgSnap.data()?.planId || "starter";
+      const available = Object.values(ADD_ONS)
+        .filter((a) => !Array.isArray(a.availableOn) || a.availableOn.includes(planId))
+        .map((a) => ({
+          id: a.id,
+          name: a.name,
+          description: a.description,
+          monthlyPrice: a.monthlyPrice,
+          unit: a.unit,
+          maxQuantity: a.maxQuantity,
+          owned: orgSnap.data()?.addOns?.[a.id]?.active === true
+            ? Number(orgSnap.data().addOns[a.id].quantity || 0)
+            : 0,
+        }));
+
+      res.json({ ok: true, ...status, availableAddOns: available });
+    } catch (error) {
+      res.status(error.status || 500).json({ error: error.message || "Could not load quota status" });
     }
   });
 

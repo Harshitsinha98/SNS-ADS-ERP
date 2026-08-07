@@ -28,6 +28,7 @@ import { isAIActiveForLead, createChatSession } from "../chatSessionService.js";
 import { runQualification } from "./qualificationService.js";
 import { sendInteractiveList } from "../whatsappInteractive.js";
 import { recordOutboundConversation } from "../conversationIndexService.js";
+import { consumeAiMessage } from "../../billing/quotaEnforcement.js";
 
 /**
  * Send a WhatsApp image message with caption (for product photos).
@@ -187,6 +188,8 @@ async function notifyEscalation({ orgId, leadId, assignedTo, reason, customerMes
     intent_excluded_by_config: "Message intent is configured for human handling",
     daily_ai_limit_reached: "Daily AI message limit reached",
     max_ai_replies_per_lead_reached: "Maximum AI replies for this lead reached",
+    ai_message_limit_reached: "Monthly AI reply allowance used up — buy an Extra AI Replies pack or upgrade your plan",
+    ai_not_available_on_plan: "AI Customer Care is not included in your current plan",
     ai_processing_error: "AI service encountered an error",
   }[reason] || reason;
 
@@ -252,6 +255,14 @@ export async function triggerAIResponse({ orgId, leadId, phone, customerName, cu
           phone,
           text: aiResult.response,
         });
+
+        // Meter against the plan's monthly allowance only when the customer
+        // actually received something. Escalations spend tokens but deliver no
+        // reply, so billing them against the plan would be unfair.
+        if (sendResult.sent) {
+          consumeAiMessage(orgId).catch((e) =>
+            logger.warn({ orgId, error: e.message }, "AI quota metering failed"));
+        }
 
         // If intent is product_inquiry, follow up with the catalogue.
         if (aiResult.intent === "product_inquiry" && orgConfig.catalogueMode === "product_db") {

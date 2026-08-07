@@ -18,6 +18,7 @@ import { aiConfig } from "../../config/env.js";
 import { db } from "../../bootstrap/firebase.js";
 import { nowIso, orgCollection } from "../helpers.js";
 import { logger } from "../../middleware/logger.js";
+import { checkQuota } from "../../billing/quotaEnforcement.js";
 
 // ─── LLM Transport ──────────────────────────────────────────────────
 
@@ -355,13 +356,29 @@ export async function processWithAI({ orgId, leadId, message, customerName, cust
   }
   const orgAiConfig = configSnap.data();
 
-  // 3. Check quota limits
+  // 3. Check the org's own daily throttle (self-imposed, not plan-derived)
   const today = new Date().toISOString().slice(0, 10);
   const usageSnap = await orgCollection(db, orgId, "aiUsage").doc(today).get();
   const todayUsage = usageSnap.exists ? usageSnap.data() : { totalCalls: 0 };
   const dailyLimit = orgAiConfig.dailyLimit || 500;
   if (todayUsage.totalCalls >= dailyLimit) {
     return { action: "escalate", reason: "daily_ai_limit_reached", intent: "unknown", confidence: 0 };
+  }
+
+  // 3b. Check the PLAN's monthly AI allowance.
+  // Deliberately placed before intent classification so an out-of-quota tenant
+  // costs zero tokens. The daily gate above is an org preference; this is the
+  // billing entitlement, and escalating to a human is the correct fallback.
+  const planQuota = await checkQuota(orgId, "ai_message");
+  if (!planQuota.allowed) {
+    logger.info({ orgId, reason: planQuota.reason, limit: planQuota.limit }, "AI reply blocked by plan quota");
+    return {
+      action: "escalate",
+      reason: planQuota.reason || "ai_message_limit_reached",
+      intent: "unknown",
+      confidence: 0,
+      quota: { limit: planQuota.limit, used: planQuota.used },
+    };
   }
 
   // 4. Check working hours (if configured)

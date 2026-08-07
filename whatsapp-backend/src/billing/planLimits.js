@@ -42,7 +42,10 @@ export const PLAN_LIMITS = {
 
     // AI Customer Care
     aiEnabled: true,
-    aiMessagesPerMonth: 100,
+    // 100/month worked out to ~3 replies/day, which reads as a broken feature
+    // rather than a starter allowance. 250 is genuinely usable while still
+    // leaving clear headroom to upsell Growth.
+    aiMessagesPerMonth: 250,
     aiKnowledgeBaseLimit: 5,
     aiTestPlayground: false,
     aiAnalytics: false,
@@ -194,7 +197,11 @@ export const PLAN_LIMITS = {
     activityLog: "full",
 
     aiEnabled: true,
-    aiMessagesPerMonth: -1, // unlimited
+    // Fair-use cap rather than truly unlimited. Every AI reply costs real
+    // tokens, so an uncapped tenant could consume more in LLM spend than the
+    // plan collects. 50,000/month is effectively unlimited for real usage
+    // while bounding worst-case cost.
+    aiMessagesPerMonth: 50000,
     aiKnowledgeBaseLimit: 100,
     aiTestPlayground: true,
     aiAnalytics: true,
@@ -226,12 +233,16 @@ export const PLAN_LIMITS = {
 export const ADD_ONS = {
   ai_messages: {
     id: "ai_messages",
-    name: "Extra AI Messages",
-    description: "5,000 additional AI auto-replies per month",
+    name: "Extra AI Replies",
+    description: "2,500 additional AI auto-replies per month",
+    // At ~2,500 tokens per reply (intent classification + generation), each
+    // reply costs roughly Rs 0.07-0.08 in LLM spend. 2,500 replies for Rs 499
+    // is Rs 0.20/reply, leaving a workable margin even if token prices rise
+    // or knowledge bases grow (longer prompts = more tokens per reply).
     monthlyPrice: 499,
-    unit: 5000,
+    unit: 2500,
     field: "aiMessagesPerMonth", // which limit it increases
-    maxQuantity: 10, // max 10 packs = 50,000 extra
+    maxQuantity: 20, // max 20 packs = 50,000 extra
     availableOn: ["starter", "growth", "enterprise"], // which plans can buy
   },
   extra_seats: {

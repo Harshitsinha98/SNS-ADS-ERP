@@ -22,7 +22,7 @@ import PlatformLogin from "./PlatformLogin";
 import {
   LayoutDashboard, Building2, CreditCard, HeartHandshake, BarChart3,
   Server, MessageCircle, Brain, ScrollText, ToggleLeft, Settings2,
-  HelpCircle, LogOut, Menu, X, Shield, ChevronLeft,
+  HelpCircle, LogOut, Menu, X, Shield, ChevronLeft, Gauge,
 } from "lucide-react";
 
 const NAV_SECTIONS = [
@@ -46,6 +46,7 @@ const NAV_SECTIONS = [
   {
     label: "System",
     items: [
+      { to: "/platform/tenant-usage", label: "Tenant Usage", icon: Gauge },
       { to: "/platform/ai-usage", label: "AI Usage & Cost", icon: Brain },
       { to: "/platform/audit-logs", label: "Audit Logs", icon: ScrollText },
       { to: "/platform/feature-flags", label: "Feature Flags", icon: ToggleLeft },

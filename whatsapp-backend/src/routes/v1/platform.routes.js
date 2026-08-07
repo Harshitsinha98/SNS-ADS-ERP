@@ -19,6 +19,7 @@ import {
   listAuditLogs,
   listFeatureFlags, toggleFeatureFlag, createFeatureFlag,
   getPlatformSettings, updatePlatformSettings,
+  getTenantUsage,
 } from "../../controllers/platform.controller.js";
 import { getPlatformAIStats } from "../../controllers/ai.controller.js";
 
@@ -67,6 +68,9 @@ export function createPlatformRoutes() {
 
   // AI Usage & Cost (platform-wide)
   router.get("/ai-usage", getPlatformAIStats);
+
+  // Per-tenant usage & renewal visibility (voice minutes, AI allowance, expiry)
+  router.get("/tenant-usage", getTenantUsage);
 
   return router;
 }
