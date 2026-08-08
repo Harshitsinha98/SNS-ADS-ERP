@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { initiateBridgeCall, watchBridgeCall } from "../utils/bridgeCallApi";
 
@@ -9,12 +9,32 @@ export function useBridgeCall() {
   const [bridgeCallId, setBridgeCallId] = useState(null);
   const [bridgeDuration, setBridgeDuration] = useState(0);
   const [bridgeRecording, setBridgeRecording] = useState(null);
+  const [bridgeElapsed, setBridgeElapsed] = useState(0);
   const stopWatchRef = useRef(null);
+  const timerRef = useRef(null);
+  const startTimeRef = useRef(null);
+
+  // Live timer during in-progress state
+  useEffect(() => {
+    if (bridgeState === "in-progress") {
+      startTimeRef.current = Date.now();
+      setBridgeElapsed(0);
+      timerRef.current = setInterval(() => {
+        setBridgeElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [bridgeState]);
 
   const startBridgeCall = useCallback(async (lead) => {
     if (!user?.activeOrgId || !lead?.phone) return;
     setBridgeState("initiating"); setBridgeError(""); setBridgeCallId(null);
-    setBridgeDuration(0); setBridgeRecording(null);
+    setBridgeDuration(0); setBridgeRecording(null); setBridgeElapsed(0);
 
     const result = await initiateBridgeCall({
       orgId: user.activeOrgId, leadId: lead.id, leadPhone: lead.phone, leadName: lead.name || "",
@@ -48,8 +68,8 @@ export function useBridgeCall() {
   const resetBridgeCall = useCallback(() => {
     if (stopWatchRef.current) stopWatchRef.current();
     setBridgeState("idle"); setBridgeError(""); setBridgeCallId(null);
-    setBridgeDuration(0); setBridgeRecording(null);
+    setBridgeDuration(0); setBridgeRecording(null); setBridgeElapsed(0);
   }, []);
 
-  return { bridgeState, bridgeError, bridgeCallId, bridgeDuration, bridgeRecording, startBridgeCall, resetBridgeCall };
+  return { bridgeState, bridgeError, bridgeCallId, bridgeDuration, bridgeRecording, bridgeElapsed, startBridgeCall, resetBridgeCall };
 }

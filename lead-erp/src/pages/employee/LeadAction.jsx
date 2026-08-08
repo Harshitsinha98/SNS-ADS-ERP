@@ -60,8 +60,9 @@ export default function LeadAction() {
     window.location.href = `tel:${lead.phone}`;
   };
 
-  const { bridgeState, bridgeError, bridgeDuration, bridgeRecording, startBridgeCall, resetBridgeCall } = useBridgeCall();
+  const { bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed, startBridgeCall, resetBridgeCall } = useBridgeCall();
   const handleBridgeCall = async () => { const r = await startBridgeCall(lead); if (r?.fallback) startCall(); };
+  const handleBridgeComplete = () => { setPendingDuration(bridgeDuration || bridgeElapsed); setShowWorknoteModal(true); };
 
   const endCall = () => {
     setPendingDuration(elapsed);
@@ -119,12 +120,12 @@ export default function LeadAction() {
               <Loader2 size={13} className="animate-spin" />
               {bridgeState === "initiating" && "Connecting..."}
               {bridgeState === "ringing" && "Ringing your phone..."}
-              {bridgeState === "in-progress" && "Connected!"}
+              {bridgeState === "in-progress" && `Connected! ${fmtDuration(bridgeElapsed)}`}
             </div>
           )}
           {bridgeState === "completed" && (
             <div className="bg-green-50 border border-green-200 rounded-md p-2.5 text-xs text-green-800 mb-2">
-              Done ({fmtDuration(bridgeDuration)}). <button onClick={resetBridgeCall} className="underline">OK</button>
+              Done ({fmtDuration(bridgeDuration || bridgeElapsed)}). <button onClick={handleBridgeComplete} className="underline font-semibold">Add note</button> <button onClick={resetBridgeCall} className="underline ml-2">Dismiss</button>
             </div>
           )}
           {bridgeState === "failed" && bridgeError && (

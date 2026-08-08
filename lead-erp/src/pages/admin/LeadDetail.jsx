@@ -132,13 +132,19 @@ export default function LeadDetail() {
   };
 
   const {
-    bridgeState, bridgeError, bridgeDuration, bridgeRecording,
+    bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed,
     startBridgeCall, resetBridgeCall,
   } = useBridgeCall();
 
   const handleBridgeCall = async () => {
     const result = await startBridgeCall(lead);
     if (result?.fallback) startCall();
+  };
+
+  // Bridge call completed → show worknote modal
+  const handleBridgeComplete = () => {
+    setPendingDuration(bridgeDuration || bridgeElapsed);
+    setShowWorknoteModal(true);
   };
 
   const endCall = () => {
@@ -209,13 +215,14 @@ export default function LeadDetail() {
                   <Loader2 size={15} className="animate-spin" />
                   {bridgeState === "initiating" && "Connecting to your phone..."}
                   {bridgeState === "ringing" && "Ringing your phone — pick up!"}
-                  {bridgeState === "in-progress" && "Connected! Talking to lead..."}
+                  {bridgeState === "in-progress" && `Connected! ${fmtDuration(bridgeElapsed)}`}
                 </div>
               )}
               {bridgeState === "completed" && (
                 <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-800">
-                  Bridge call done ({fmtDuration(bridgeDuration)}).
+                  Bridge call done ({fmtDuration(bridgeDuration || bridgeElapsed)}).
                   {bridgeRecording && <a href={bridgeRecording} target="_blank" rel="noreferrer" className="ml-2 underline font-medium">Play recording</a>}
+                  <button onClick={handleBridgeComplete} className="ml-2 text-xs font-semibold underline">Add worknote</button>
                   <button onClick={resetBridgeCall} className="ml-2 text-xs underline">Dismiss</button>
                 </div>
               )}
