@@ -106,7 +106,11 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
   if (!snap.exists) { logger.warn({ callId }, "Bridge call status for unknown callId"); return; }
 
   const call = snap.data();
-  if (call.status === "completed" || call.status === "wallet-deducted") return;
+  if (call.status === "wallet-deducted") return; // fully processed, skip
+
+  // Allow re-processing if status is already "completed" but duration is still 0
+  // (first webhook sets status but has no duration; second webhook brings actual duration)
+  if (call.status === "completed" && call.durationSeconds > 0) return;
 
   // ── 2-Leg Billing Logic ──
   // Plivo charges us per-leg, 60/60 increment (ceil to next minute).
@@ -151,8 +155,10 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
   if (bLegUuid) updateData.plivoBLegUuid = bLegUuid;
   await callRef.update(updateData);
 
-  // Always deduct — even if only A-leg connected (employee answered, customer didn't)
-  if (totalBilledMinutes > 0) await deductWalletMinutes(call.orgId, totalBilledMinutes, costInr, callId);
+  // Only deduct wallet when we have actual duration (not from the initial dial callback with 0 seconds)
+  if (totalBilledMinutes > 0 && (aSeconds > 0 || bSeconds > 0)) {
+    await deductWalletMinutes(call.orgId, totalBilledMinutes, costInr, callId);
+  }
 
   // Add lead note only if actual conversation happened (B-leg connected)
   if (bLegConnected && call.leadId) {
