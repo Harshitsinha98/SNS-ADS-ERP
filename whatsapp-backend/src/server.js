@@ -127,3 +127,4 @@ app.listen(serverConfig.port, () => {
     webhookVerified: Boolean(metaConfig.whatsappAppSecret),
   }, "Backend started");
 });
+
