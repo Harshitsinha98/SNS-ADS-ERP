@@ -120,7 +120,7 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
 
   const aSeconds = Number(aLegSeconds) || 0;
   const bSeconds = Number(bLegSeconds) || 0;
-  const bLegConnected = dialStatus === "completed" || bSeconds > 0;
+  const bLegConnected = dialStatus === "completed" || bSeconds > 0 || (aSeconds > 0 && dialStatus !== "no-answer" && dialStatus !== "busy" && dialStatus !== "cancel");
 
   // Leg A: employee answered (must have, since we got answerURL callback)
   // Minimum 1 min charged (Plivo charges us even for short A-leg)

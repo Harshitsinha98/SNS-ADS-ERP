@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { collection, doc, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../../firebase";
 import Layout from "../../components/Layout";
@@ -141,11 +141,21 @@ export default function LeadDetail() {
     if (result?.fallback) startCall();
   };
 
-  // Bridge call completed → show worknote modal
+  // Bridge call completed → show worknote modal (mandatory)
   const handleBridgeComplete = () => {
     setPendingDuration(bridgeDuration || bridgeElapsed);
+    resetBridgeCall();
     setShowWorknoteModal(true);
   };
+
+  // Auto-trigger worknote modal when bridge call completes
+  const prevBridgeState = useRef(bridgeState);
+  useEffect(() => {
+    if (prevBridgeState.current === "in-progress" && bridgeState === "completed") {
+      handleBridgeComplete();
+    }
+    prevBridgeState.current = bridgeState;
+  }, [bridgeState]);
 
   const endCall = () => {
     setPendingDuration(elapsed);
@@ -222,8 +232,6 @@ export default function LeadDetail() {
                 <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-800">
                   Bridge call done ({fmtDuration(bridgeDuration || bridgeElapsed)}).
                   {bridgeRecording && <a href={bridgeRecording} target="_blank" rel="noreferrer" className="ml-2 underline font-medium">Play recording</a>}
-                  <button onClick={handleBridgeComplete} className="ml-2 text-xs font-semibold underline">Add worknote</button>
-                  <button onClick={resetBridgeCall} className="ml-2 text-xs underline">Dismiss</button>
                 </div>
               )}
               {bridgeState === "failed" && bridgeError && (

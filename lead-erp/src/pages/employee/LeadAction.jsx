@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import Layout from "../../components/Layout";
@@ -62,7 +62,16 @@ export default function LeadAction() {
 
   const { bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed, startBridgeCall, resetBridgeCall } = useBridgeCall();
   const handleBridgeCall = async () => { const r = await startBridgeCall(lead); if (r?.fallback) startCall(); };
-  const handleBridgeComplete = () => { setPendingDuration(bridgeDuration || bridgeElapsed); setShowWorknoteModal(true); };
+  const handleBridgeComplete = () => { setPendingDuration(bridgeDuration || bridgeElapsed); resetBridgeCall(); setShowWorknoteModal(true); };
+
+  // Auto-trigger worknote modal when bridge call completes
+  const prevBridgeState = useRef(bridgeState);
+  useEffect(() => {
+    if (prevBridgeState.current === "in-progress" && bridgeState === "completed") {
+      handleBridgeComplete();
+    }
+    prevBridgeState.current = bridgeState;
+  }, [bridgeState]);
 
   const endCall = () => {
     setPendingDuration(elapsed);
@@ -125,7 +134,7 @@ export default function LeadAction() {
           )}
           {bridgeState === "completed" && (
             <div className="bg-green-50 border border-green-200 rounded-md p-2.5 text-xs text-green-800 mb-2">
-              Done ({fmtDuration(bridgeDuration || bridgeElapsed)}). <button onClick={handleBridgeComplete} className="underline font-semibold">Add note</button> <button onClick={resetBridgeCall} className="underline ml-2">Dismiss</button>
+              Done ({fmtDuration(bridgeDuration || bridgeElapsed)}).
             </div>
           )}
           {bridgeState === "failed" && bridgeError && (
