@@ -71,6 +71,23 @@ export default function LeadDetail() {
     return () => clearInterval(t);
   }, [callActive, callStart]);
 
+  const {
+    bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed,
+    startBridgeCall, resetBridgeCall,
+  } = useBridgeCall();
+
+  // Bridge call completed → show worknote modal (mandatory)
+  const prevBridgeStateRef = useRef("idle");
+  useEffect(() => {
+    if (bridgeState === "completed" && prevBridgeStateRef.current !== "completed") {
+      setPendingDuration(bridgeDuration || bridgeElapsed);
+      resetBridgeCall();
+      setShowWorknoteModal(true);
+    }
+    prevBridgeStateRef.current = bridgeState;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridgeState]);
+
   if (!lead) return <Layout title="Lead"><p className="text-red-500">Lead not found.</p></Layout>;
 
   const employees = users.filter((u) => u.role === "employee");
@@ -131,27 +148,10 @@ export default function LeadDetail() {
     window.location.href = `tel:${lead.phone}`;
   };
 
-  const {
-    bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed,
-    startBridgeCall, resetBridgeCall,
-  } = useBridgeCall();
-
   const handleBridgeCall = async () => {
     const result = await startBridgeCall(lead);
     if (result?.fallback) startCall();
   };
-
-  // Bridge call completed → show worknote modal (mandatory)
-  const prevBridgeStateRef = useRef("idle");
-  useEffect(() => {
-    if (bridgeState === "completed" && prevBridgeStateRef.current !== "completed") {
-      setPendingDuration(bridgeDuration || bridgeElapsed);
-      resetBridgeCall();
-      setShowWorknoteModal(true);
-    }
-    prevBridgeStateRef.current = bridgeState;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bridgeState]);
 
   const endCall = () => {
     setPendingDuration(elapsed);
