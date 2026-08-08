@@ -128,3 +128,14 @@ export const listSupportTickets = (params = {}) => {
 export const getSupportTicket = (ticketId) => platformGet(`/api/v1/platform/support/tickets/${ticketId}`);
 export const updateSupportTicket = (ticketId, body) =>
   platformPatch(`/api/v1/platform/support/tickets/${ticketId}`, body);
+
+
+
+// Voice P&L (per-tenant profit/loss for bridge calling)
+export const getVoicePnl = (from, to) => {
+  const params = new URLSearchParams();
+  if (from) params.set("from", from);
+  if (to) params.set("to", to);
+  const qs = params.toString();
+  return platformGet(`/api/v1/platform/voice-pnl${qs ? `?${qs}` : ""}`);
+};

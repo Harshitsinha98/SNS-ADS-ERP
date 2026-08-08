@@ -18,6 +18,7 @@ import Billing from "./pages/admin/Billing";
 import VoiceWallet from "./pages/admin/VoiceWallet";
 import Broadcast from "./pages/admin/Broadcast";
 import BroadcastDetail from "./pages/admin/BroadcastDetail";
+import CallHistory from "./pages/admin/CallHistory";
 import TeamInbox from "./pages/TeamInbox";
 import WhatsApp from "./pages/admin/WhatsApp";
 import WebsiteLeadIntegration from "./pages/admin/WebsiteLeadIntegration";
@@ -39,6 +40,7 @@ import InfrastructurePage from "./pages/platform/InfrastructurePage";
 import WhatsAppOpsPage from "./pages/platform/WhatsAppOpsPage";
 import AiUsagePage from "./pages/platform/AiUsagePage";
 import TenantUsagePage from "./pages/platform/TenantUsagePage";
+import VoicePnlPage from "./pages/platform/VoicePnlPage";
 import AuditLogsPage from "./pages/platform/AuditLogsPage";
 import FeatureFlagsPage from "./pages/platform/FeatureFlagsPage";
 import SettingsPage from "./pages/platform/SettingsPage";
@@ -86,6 +88,7 @@ export default function App() {
         <Route path="/admin/settings" element={<ProtectedRoute role="admin"><Settings /></ProtectedRoute>} />
         <Route path="/admin/billing" element={<ProtectedRoute role="admin"><Billing /></ProtectedRoute>} />
         <Route path="/admin/voice-wallet" element={<ProtectedRoute role="admin"><VoiceWallet /></ProtectedRoute>} />
+        <Route path="/admin/call-history" element={<ProtectedRoute role="admin"><CallHistory /></ProtectedRoute>} />
         <Route path="/admin/inbox" element={<ProtectedRoute role="admin"><TeamInbox /></ProtectedRoute>} />
         <Route path="/admin/broadcast" element={<ProtectedRoute role="admin"><Broadcast /></ProtectedRoute>} />
         <Route path="/admin/broadcast/:broadcastId" element={<ProtectedRoute role="admin"><BroadcastDetail /></ProtectedRoute>} />
@@ -110,6 +113,7 @@ export default function App() {
         <Route path="/platform/infrastructure" element={<InfrastructurePage />} />
         <Route path="/platform/whatsapp" element={<WhatsAppOpsPage />} />
         <Route path="/platform/tenant-usage" element={<TenantUsagePage />} />
+        <Route path="/platform/voice-pnl" element={<VoicePnlPage />} />
         <Route path="/platform/ai-usage" element={<AiUsagePage />} />
         <Route path="/platform/audit-logs" element={<AuditLogsPage />} />
         <Route path="/platform/feature-flags" element={<FeatureFlagsPage />} />

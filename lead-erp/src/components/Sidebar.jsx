@@ -20,6 +20,7 @@ import {
   Brain,
   Wallet,
   Radio,
+  PhoneCall,
 } from "lucide-react";
 
 const adminLinks = [
@@ -37,6 +38,7 @@ const adminLinks = [
   { to: "/admin/ad-leads", label: "Meta & Google Ads", icon: Megaphone },
   { to: "/admin/billing", label: "Billing", icon: CreditCard },
   { to: "/admin/voice-wallet", label: "Voice Wallet", icon: Wallet },
+  { to: "/admin/call-history", label: "Call History", icon: PhoneCall },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
