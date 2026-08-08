@@ -15,7 +15,7 @@ function injectLogoKeyframes() {
   document.head.appendChild(style);
 }
 
-export default function Logo({ size = "md", onDark = false, animate = true }) {
+export default function Logo({ size = "md", onDark = false, animate = false }) {
   const px = size === "lg" ? 44 : size === "sm" ? 32 : 36;
   const text = size === "lg" ? "text-2xl" : size === "sm" ? "text-lg" : "text-xl";
   const pillText = size === "lg" ? "text-xs" : size === "sm" ? "text-[9px]" : "text-[10px]";

@@ -22,7 +22,7 @@ function injectKeyframes() {
   document.head.appendChild(style);
 }
 
-export default function SkateMark({ size = 40, animate = true, className = "" }) {
+export default function SkateMark({ size = 40, animate = false, className = "" }) {
   const radius = Math.round(size * 0.28);
 
   useEffect(() => {
