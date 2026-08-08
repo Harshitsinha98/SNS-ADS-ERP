@@ -142,19 +142,15 @@ export default function LeadDetail() {
   };
 
   // Bridge call completed → show worknote modal (mandatory)
-  const handleBridgeComplete = () => {
-    setPendingDuration(bridgeDuration || bridgeElapsed);
-    resetBridgeCall();
-    setShowWorknoteModal(true);
-  };
-
-  // Auto-trigger worknote modal when bridge call completes
-  const prevBridgeState = useRef(bridgeState);
+  const prevBridgeStateRef = useRef("idle");
   useEffect(() => {
-    if (prevBridgeState.current === "in-progress" && bridgeState === "completed") {
-      handleBridgeComplete();
+    if (bridgeState === "completed" && prevBridgeStateRef.current !== "completed") {
+      setPendingDuration(bridgeDuration || bridgeElapsed);
+      resetBridgeCall();
+      setShowWorknoteModal(true);
     }
-    prevBridgeState.current = bridgeState;
+    prevBridgeStateRef.current = bridgeState;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bridgeState]);
 
   const endCall = () => {
