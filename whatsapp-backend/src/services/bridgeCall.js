@@ -48,6 +48,76 @@ function ensureE164Digits(phone) {
   return digits;
 }
 
+function plivoAuthHeader() {
+  return "Basic " + Buffer.from(
+    `${bridgeCallConfig.plivoAuthId}:${bridgeCallConfig.plivoAuthToken}`
+  ).toString("base64");
+}
+
+/**
+ * Call the customer (lead) into the conference room, WITH Answering Machine
+ * Detection. If a voicemail/machine answers, Plivo hangs up automatically
+ * (machine_detection=hangup) and the customer never joins — so the admin is
+ * never charged for talking to a voicemail. This is the core of the
+ * "pay only when a real human connects" model.
+ */
+export async function callCustomerIntoConference(callId, leadPhone) {
+  const from = toDigits(bridgeCallConfig.fromNumber);
+  const to = ensureE164Digits(leadPhone);
+  const base = bridgeCallConfig.publicBackendUrl.replace(/\/$/, "");
+
+  const answerUrl = `${base}/api/v1/bridge-call/customer-answer?callId=${callId}`;
+  const hangupUrl = `${base}/api/v1/bridge-call/customer-status?callId=${callId}`;
+
+  try {
+    const res = await fetch(
+      `https://api.plivo.com/v1/Account/${bridgeCallConfig.plivoAuthId}/Call/`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: plivoAuthHeader() },
+        body: JSON.stringify({
+          from, to,
+          answer_url: answerUrl, answer_method: "GET",
+          hangup_url: hangupUrl, hangup_method: "POST",
+          ring_timeout: bridgeCallConfig.ringTimeoutSeconds,
+          time_limit: bridgeCallConfig.maxCallDurationSeconds,
+          caller_name: "CodeSkate CRM",
+          // Answering Machine Detection: hang up if voicemail/machine answers.
+          machine_detection: "hangup",
+          machine_detection_time: "5000",
+        }),
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data?.error) {
+      logger.error({ callId, err: data?.error || res.status }, "Customer leg call failed");
+      return { ok: false };
+    }
+    const customerUuid = data?.request_uuid || (data?.call_uuid && data.call_uuid[0]) || null;
+    await db.collection("bridgeCalls").doc(callId).update({ plivoBLegUuid: customerUuid }).catch(() => {});
+    return { ok: true, customerUuid };
+  } catch (e) {
+    logger.error({ callId, err: e.message }, "Customer leg exception");
+    return { ok: false };
+  }
+}
+
+/**
+ * Hang up a Plivo call by its UUID (used to end the agent's conference wait
+ * when the customer turns out to be a voicemail / doesn't answer).
+ */
+export async function hangupPlivoCall(callUuid) {
+  if (!callUuid) return;
+  try {
+    await fetch(
+      `https://api.plivo.com/v1/Account/${bridgeCallConfig.plivoAuthId}/Call/${callUuid}/`,
+      { method: "DELETE", headers: { Authorization: plivoAuthHeader() } }
+    );
+  } catch (e) {
+    logger.warn({ callUuid, err: e.message }, "Hangup call failed");
+  }
+}
+
 export async function initiateBridgeCall({
   orgId, leadId, leadPhone, employeePhone, employeeName, employeeUid, leadName, record,
 }) {
@@ -129,8 +199,8 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
   if (!snap.exists) { logger.warn({ callId }, "Bridge call status for unknown callId"); return; }
 
   const call = snap.data();
-  if (call.status === "wallet-deducted") return; // fully processed, skip
-  if (call.status === "agent_no_confirm") return; // already handled by noinput endpoint
+  const terminalStates = ["wallet-deducted", "agent_no_confirm", "customer_voicemail", "no-answer"];
+  if (terminalStates.includes(call.status)) return; // already finalized, skip
 
   // Allow re-processing if status is already "completed" but duration is still 0
   if (call.status === "completed" && call.durationSeconds > 0) return;

@@ -220,7 +220,8 @@ export default function LeadDetail() {
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm text-blue-800 flex items-center gap-2">
                   <Loader2 size={15} className="animate-spin" />
                   {bridgeState === "initiating" && "Connecting to your phone..."}
-                  {bridgeState === "ringing" && "Ringing your phone — pick up!"}
+                  {bridgeState === "ringing" && "Ringing your phone — pick up & press 1!"}
+                  {bridgeState === "waiting_customer" && "Connecting customer..."}
                   {bridgeState === "in-progress" && `Connected! ${fmtDuration(bridgeElapsed)}`}
                 </div>
               )}

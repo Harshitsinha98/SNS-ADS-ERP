@@ -3,7 +3,7 @@
  */
 import { bridgeCallConfig } from "../config/env.js";
 import { isOrgAdmin, getActiveMembership } from "../middleware/auth.js";
-import { initiateBridgeCall, handleCallCompleted, checkWalletBalance, getBridgeCallStatus } from "../services/bridgeCall.js";
+import { initiateBridgeCall, handleCallCompleted, checkWalletBalance, getBridgeCallStatus, callCustomerIntoConference, hangupPlivoCall } from "../services/bridgeCall.js";
 import { logger } from "../middleware/logger.js";
 import { db } from "../bootstrap/firebase.js";
 import { nowIso } from "../services/helpers.js";
@@ -83,29 +83,107 @@ export function answerConfirmHandler(req, res) {
     return res.set("Content-Type", "application/xml").send(xml);
   }
 
-  const from = bridgeCallConfig.fromNumber.replace(/\D/g, "");
   const shouldRecord = record === "true";
-  const statusUrl = `${bridgeCallConfig.publicBackendUrl.replace(/\/$/, "")}/api/v1/bridge-call/status?callId=${callId || ""}`;
+  const base = bridgeCallConfig.publicBackendUrl.replace(/\/$/, "");
+  const confRoom = `conf_${callId}`;
+  const confCallbackUrl = xmlUrl(`${base}/api/v1/bridge-call/conf-event?callId=${callId}`);
 
-  // Agent confirmed (pressed 1) → mark in-progress so the frontend timer starts
-  // ticking. Without this the UI never enters the in-progress state and shows 00:00.
+  // Agent confirmed (pressed 1) → mark in-progress (frontend timer starts) and
+  // trigger the customer leg WITH Answering Machine Detection (fire-and-forget).
+  if (callId) {
+    db.collection("bridgeCalls").doc(callId).update({
+      status: "waiting_customer",
+      inProgressAtMs: Date.now(),
+    }).catch(() => {});
+    // Call the customer into the conference with AMD (voicemail → auto hangup)
+    callCustomerIntoConference(callId, leadPhone).catch(() => {});
+  }
+
+  // Employee waits in the conference until the customer (human) joins.
+  // startConferenceOnEnter=false → employee hears hold music until customer joins.
+  // endConferenceOnExit=true → if employee hangs up, conference ends.
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Speak voice="Polly.Aditi" language="hi-IN">Customer ko connect kar rahe hain, please wait.</Speak>
+  <Conference startConferenceOnEnter="false" endConferenceOnExit="true" waitSound="https://s3.amazonaws.com/plivocloud/music.mp3" timeLimit="${bridgeCallConfig.maxCallDurationSeconds}"${shouldRecord ? ` record="true" recordingCallbackUrl="${xmlUrl(`${base}/api/v1/bridge-call/status?callId=${callId}`)}" recordingCallbackMethod="POST"` : ""} callbackUrl="${confCallbackUrl}" callbackMethod="POST">${confRoom}</Conference>
+</Response>`;
+  res.set("Content-Type", "application/xml").send(xml);
+}
+
+// Customer's leg answered by a HUMAN (AMD passed) → join the conference.
+export function customerAnswerHandler(req, res) {
+  const { callId } = req.query;
+  const confRoom = `conf_${callId}`;
+
+  // Customer (human) answered → mark in-progress so the frontend timer starts
+  // counting the real conversation.
   if (callId) {
     db.collection("bridgeCalls").doc(callId).update({
       status: "in-progress",
-      inProgressAtMs: Date.now(),
+      customerJoinedAtMs: Date.now(),
     }).catch(() => {});
   }
 
-  // Dial customer with machine_detection (AMD) — if voicemail detected, Plivo
-  // returns machine_detection status and we avoid charging admin for voicemail.
+  // Customer joins and starts the conference (both now hear each other).
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Speak voice="Polly.Aditi" language="hi-IN">Connecting.</Speak>
-  <Dial callerId="${from}" timeLimit="${bridgeCallConfig.maxCallDurationSeconds}" action="${statusUrl}" method="POST" ringTimeout="${bridgeCallConfig.ringTimeoutSeconds}"${shouldRecord ? ` record="true" recordingCallbackUrl="${statusUrl}" recordingCallbackMethod="POST"` : ""}>
-    <Number machineDetection="hangup" machineDetectionTimeout="5000">${String(leadPhone).replace(/\D/g, "")}</Number>
-  </Dial>
+  <Conference startConferenceOnEnter="true" endConferenceOnExit="true" timeLimit="${bridgeCallConfig.maxCallDurationSeconds}">${confRoom}</Conference>
 </Response>`;
   res.set("Content-Type", "application/xml").send(xml);
+}
+
+// Customer leg ended — this tells us if it was voicemail / no-answer / real talk.
+export async function customerStatusHandler(req, res) {
+  try {
+    const callId = req.query.callId || req.body?.callId;
+    if (!callId) return res.status(200).send("ok");
+    const body = req.body || {};
+    logger.info({ callId, body }, "Customer leg status webhook");
+
+    const machine = body.Machine || body.machine_detection || body.AnsweredBy || null;
+    const hangupCause = body.HangupCause || body.hangup_cause || null;
+    const callStatus = body.CallStatus || body.Status || null;
+    const customerSeconds = Number(body.Duration || body.BillDuration || 0);
+
+    const isMachine = String(machine).toLowerCase().includes("machine") || machine === "true";
+    const noAnswer = callStatus === "no-answer" || hangupCause === "NO_ANSWER" || hangupCause === "NO_USER_RESPONSE" || hangupCause === "USER_BUSY";
+
+    const snap = await db.collection("bridgeCalls").doc(callId).get();
+    const call = snap.exists ? snap.data() : null;
+
+    if (isMachine || (customerSeconds === 0 && noAnswer)) {
+      // Voicemail or no-answer → end agent's wait, no charge.
+      await db.collection("bridgeCalls").doc(callId).update({
+        status: isMachine ? "customer_voicemail" : "no-answer",
+        completedAt: nowIso(), completedAtMs: Date.now(),
+        durationSeconds: 0, customerSeconds: 0, billedMinutes: 0, costInr: 0,
+        failureReason: isMachine ? "Customer voicemail (AMD) — no charge." : "Customer did not answer — no charge.",
+      }).catch(() => {});
+      if (call?.plivoCallUuid) await hangupPlivoCall(call.plivoCallUuid); // end agent leg
+      return res.status(200).send("ok");
+    }
+
+    // Real human conversation happened → bill customer talk time.
+    if (call && call.status !== "wallet-deducted") {
+      await handleCallCompleted(callId, {
+        aLegSeconds: 0,
+        bLegSeconds: customerSeconds,
+        dialStatus: "completed",
+        recordingUrl: body.RecordUrl || body.RecordingUrl || null,
+        status: "completed",
+        bLegUuid: body.CallUUID || null,
+      });
+    }
+    return res.status(200).send("ok");
+  } catch (e) {
+    logger.error({ err: e.message }, "Customer status webhook error");
+    return res.status(200).send("ok");
+  }
+}
+
+// Conference events (member enter/exit) — optional logging/precision.
+export function confEventHandler(req, res) {
+  return res.status(200).send("ok");
 }
 
 export function answerNoInputHandler(req, res) {

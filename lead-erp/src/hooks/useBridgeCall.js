@@ -53,6 +53,7 @@ export function useBridgeCall() {
     setBridgeState("ringing"); setBridgeCallId(result.callId);
     const stop = watchBridgeCall(result.callId, (s) => {
       if (s.status === "ringing") setBridgeState("ringing");
+      else if (s.status === "waiting_customer") setBridgeState("waiting_customer");
       else if (s.status === "in-progress") setBridgeState("in-progress");
       else if (s.status === "completed" || s.status === "wallet-deducted") {
         setBridgeState("completed"); setBridgeDuration(s.durationSeconds || 0);

@@ -130,7 +130,8 @@ export default function LeadAction() {
             <div className="bg-blue-50 border border-blue-200 rounded-md p-2.5 text-xs text-blue-800 flex items-center gap-2 mb-2">
               <Loader2 size={13} className="animate-spin" />
               {bridgeState === "initiating" && "Connecting..."}
-              {bridgeState === "ringing" && "Ringing your phone..."}
+              {bridgeState === "ringing" && "Ringing — pick up & press 1!"}
+              {bridgeState === "waiting_customer" && "Connecting customer..."}
               {bridgeState === "in-progress" && `Connected! ${fmtDuration(bridgeElapsed)}`}
             </div>
           )}
