@@ -48,13 +48,17 @@ export async function initiateHandler(req, res) {
   }
 }
 
+// XML attribute values must escape '&' — Plivo rejects raw ampersands in URLs
+// (multiple query params) and hangs up the call ("Invalid Action XML").
+const xmlUrl = (url) => String(url).replace(/&/g, "&amp;");
+
 export function answerHandler(req, res) {
   const { leadPhone, record, callId } = req.query;
   if (!leadPhone) return res.set("Content-Type", "application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response><Speak>Error.</Speak><Hangup/></Response>`);
 
   const base = bridgeCallConfig.publicBackendUrl.replace(/\/$/, "");
-  const confirmUrl = `${base}/api/v1/bridge-call/answer-confirm?callId=${encodeURIComponent(callId || "")}&leadPhone=${encodeURIComponent(leadPhone)}&record=${record || "false"}`;
-  const noInputUrl = `${base}/api/v1/bridge-call/answer-noinput?callId=${encodeURIComponent(callId || "")}`;
+  const confirmUrl = xmlUrl(`${base}/api/v1/bridge-call/answer-confirm?callId=${encodeURIComponent(callId || "")}&leadPhone=${encodeURIComponent(leadPhone)}&record=${record || "false"}`);
+  const noInputUrl = xmlUrl(`${base}/api/v1/bridge-call/answer-noinput?callId=${encodeURIComponent(callId || "")}`);
 
   // Press-1 confirmation: prevents voicemail from triggering customer dial.
   // Employee hears prompt → presses 1 → then customer is dialed.
