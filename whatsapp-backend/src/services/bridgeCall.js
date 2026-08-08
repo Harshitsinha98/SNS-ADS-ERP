@@ -18,6 +18,29 @@ import { nowIso, orgCollection } from "./helpers.js";
 
 const toDigits = (phone) => String(phone || "").replace(/\D/g, "");
 
+/**
+ * Fetch a single call leg's actual duration (seconds) from Plivo's CDR API.
+ * Used when webhooks don't include the B-leg (customer) talk duration.
+ * Best-effort: returns 0 on any failure.
+ */
+async function fetchPlivoCallDuration(callUuid) {
+  if (!callUuid) return 0;
+  try {
+    const auth = Buffer.from(
+      `${bridgeCallConfig.plivoAuthId}:${bridgeCallConfig.plivoAuthToken}`
+    ).toString("base64");
+    const res = await fetch(
+      `https://api.plivo.com/v1/Account/${bridgeCallConfig.plivoAuthId}/Call/${callUuid}/`,
+      { headers: { Authorization: `Basic ${auth}` } }
+    );
+    if (!res.ok) return 0;
+    const data = await res.json().catch(() => ({}));
+    return Number(data.duration) || 0;
+  } catch {
+    return 0;
+  }
+}
+
 function ensureE164Digits(phone) {
   const digits = toDigits(phone);
   if (digits.length === 10) return `91${digits}`;
@@ -122,31 +145,46 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
   // Leg B (customer): billed only if customer answered (DialStatus=completed).
   //   - Duration = actual talk time, rounded up to next minute.
 
-  const aSeconds = Number(aLegSeconds) || 0;
-  const bSeconds = Number(bLegSeconds) || 0;
+  let aSeconds = Number(aLegSeconds) || 0;
+  let bSeconds = Number(bLegSeconds) || 0;
+
+  // Plivo's webhooks often don't include the B-leg (customer) talk duration.
+  // Fetch accurate per-leg durations from Plivo's CDR API for transparency.
+  const bLegCallUuid = bLegUuid || call.plivoBLegUuid;
+  if (bSeconds === 0 && bLegCallUuid) {
+    const cdr = await fetchPlivoCallDuration(bLegCallUuid);
+    if (cdr > 0) bSeconds = cdr;
+  }
+  if (aSeconds === 0 && call.plivoCallUuid) {
+    const cdr = await fetchPlivoCallDuration(call.plivoCallUuid);
+    if (cdr > 0) aSeconds = cdr;
+  }
+
   const bLegConnected = dialStatus === "completed" || bSeconds > 0 || (aSeconds > 0 && dialStatus !== "no-answer" && dialStatus !== "busy" && dialStatus !== "cancel");
 
-  // Leg A: employee answered (must have, since we got answerURL callback)
-  // Minimum 1 min charged (Plivo charges us even for short A-leg)
-  const aLegBilledMinutes = aSeconds > 0 ? Math.ceil(aSeconds / 60) : 1;
+  // ── Transparent billing ──
+  // agentSeconds  = how long the agent (employee) leg was connected
+  // customerSeconds = actual talk time with the customer (B-leg)
+  // We bill the CUSTOMER conversation time (rounded up to the next minute),
+  // which is the fair, transparent metric shown to the tenant.
+  const agentSeconds = aSeconds;
+  const customerSeconds = bSeconds > 0 ? bSeconds : (bLegConnected ? aSeconds : 0);
 
-  // Leg B: only if customer picked up
-  const bLegBilledMinutes = bLegConnected ? Math.max(1, Math.ceil(bSeconds / 60)) : 0;
+  // Billed minutes = customer conversation time, min 1 min if connected
+  const billedMinutes = bLegConnected ? Math.max(1, Math.ceil(customerSeconds / 60)) : 0;
+  const costInr = billedMinutes * bridgeCallConfig.costPerMinuteInr;
 
-  const totalBilledMinutes = aLegBilledMinutes + bLegBilledMinutes;
-  const costPerMinPerLeg = bridgeCallConfig.costPerMinuteInr; // ₹1/min per leg
-  const costInr = totalBilledMinutes * costPerMinPerLeg;
-
-  const durationSeconds = bLegConnected ? bSeconds : aSeconds;
+  // durationSeconds shown in UI = actual talk time (customer), fallback agent
+  const durationSeconds = customerSeconds || agentSeconds;
 
   const updateData = {
     status: bLegConnected ? "completed" : (status || dialStatus || "no-answer"),
     durationSeconds,
+    agentSeconds,
+    customerSeconds,
     aLegSeconds: aSeconds,
     bLegSeconds: bSeconds,
-    aLegBilledMinutes,
-    bLegBilledMinutes,
-    billedMinutes: totalBilledMinutes,
+    billedMinutes,
     costInr,
     dialStatus: dialStatus || null,
     completedAt: nowIso(), completedAtMs: Date.now(),
@@ -155,26 +193,27 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
   if (bLegUuid) updateData.plivoBLegUuid = bLegUuid;
   await callRef.update(updateData);
 
-  // Only deduct wallet when we have actual duration (not from the initial dial callback with 0 seconds)
-  if (totalBilledMinutes > 0 && (aSeconds > 0 || bSeconds > 0)) {
-    await deductWalletMinutes(call.orgId, totalBilledMinutes, costInr, callId);
+  // Only deduct wallet when the customer actually connected and we have a duration
+  if (billedMinutes > 0 && customerSeconds > 0) {
+    await deductWalletMinutes(call.orgId, billedMinutes, costInr, callId);
   }
 
   // Add lead note only if actual conversation happened (B-leg connected)
   if (bLegConnected && call.leadId) {
-    const noteText = `Bridge call: ${call.employeeName || "Agent"} \u2192 ${call.leadName || call.leadPhone} (${formatDuration(bSeconds)}) — ₹${costInr.toFixed(0)} (${aLegBilledMinutes}+${bLegBilledMinutes} min)`;
+    const noteText = `Bridge call: ${call.employeeName || "Agent"} \u2192 ${call.leadName || call.leadPhone} — Agent ${formatDuration(agentSeconds)}, Customer ${formatDuration(customerSeconds)} — ₹${costInr.toFixed(0)} (${billedMinutes} min)`;
     await orgCollection(db, call.orgId, "leads").doc(call.leadId).collection("notes").add({
       type: "bridge_call",
       text: noteText,
       authorId: call.employeeUid, authorName: call.employeeName || "Agent",
-      visibility: "team", at: nowIso(), bridgeCallId: callId, duration: bSeconds,
+      visibility: "team", at: nowIso(), bridgeCallId: callId, duration: customerSeconds,
+      agentSeconds, customerSeconds,
       ...(recordingUrl ? { recordingUrl } : {}),
     }).catch((e) => logger.warn({ err: e.message }, "Bridge call note write failed"));
   } else if (!bLegConnected && call.leadId) {
     // Customer didn't pick up — still log it
     await orgCollection(db, call.orgId, "leads").doc(call.leadId).collection("notes").add({
       type: "bridge_call",
-      text: `Bridge call: ${call.employeeName || "Agent"} \u2192 ${call.leadName || call.leadPhone} — customer didn't answer (₹${costInr.toFixed(0)}, ${aLegBilledMinutes} min A-leg)`,
+      text: `Bridge call: ${call.employeeName || "Agent"} \u2192 ${call.leadName || call.leadPhone} — customer didn't answer (no charge)`,
       authorId: call.employeeUid, authorName: call.employeeName || "Agent",
       visibility: "team", at: nowIso(), bridgeCallId: callId, duration: 0,
     }).catch((e) => logger.warn({ err: e.message }, "Bridge call note write failed"));

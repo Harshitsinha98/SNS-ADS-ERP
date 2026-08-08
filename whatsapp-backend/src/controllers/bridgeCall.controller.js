@@ -126,7 +126,16 @@ export async function pollHandler(req, res) {
     if (!call) return res.status(404).json({ error: "Call not found." });
     const membership = await getActiveMembership(req.authUser.uid, call.orgId);
     if (!membership) return res.status(403).json({ error: "Access denied." });
-    return res.json({ callId: call.callId, status: call.status, durationSeconds: call.durationSeconds || 0, recordingUrl: call.recordingUrl || null });
+    return res.json({
+      callId: call.callId,
+      status: call.status,
+      durationSeconds: call.durationSeconds || 0,
+      agentSeconds: call.agentSeconds || 0,
+      customerSeconds: call.customerSeconds || 0,
+      billedMinutes: call.billedMinutes || 0,
+      costInr: call.costInr || 0,
+      recordingUrl: call.recordingUrl || null,
+    });
   } catch (e) {
     return res.status(500).json({ error: "Could not fetch call status." });
   }
