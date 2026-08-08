@@ -87,6 +87,15 @@ export function answerConfirmHandler(req, res) {
   const shouldRecord = record === "true";
   const statusUrl = `${bridgeCallConfig.publicBackendUrl.replace(/\/$/, "")}/api/v1/bridge-call/status?callId=${callId || ""}`;
 
+  // Agent confirmed (pressed 1) → mark in-progress so the frontend timer starts
+  // ticking. Without this the UI never enters the in-progress state and shows 00:00.
+  if (callId) {
+    db.collection("bridgeCalls").doc(callId).update({
+      status: "in-progress",
+      inProgressAtMs: Date.now(),
+    }).catch(() => {});
+  }
+
   // Dial customer with machine_detection (AMD) — if voicemail detected, Plivo
   // returns machine_detection status and we avoid charging admin for voicemail.
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
