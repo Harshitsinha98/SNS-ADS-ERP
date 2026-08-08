@@ -6,6 +6,7 @@ import { isOrgAdmin, getActiveMembership } from "../middleware/auth.js";
 import { initiateBridgeCall, handleCallCompleted, checkWalletBalance, getBridgeCallStatus } from "../services/bridgeCall.js";
 import { logger } from "../middleware/logger.js";
 import { db } from "../bootstrap/firebase.js";
+import { nowIso } from "../services/helpers.js";
 
 async function orgHasBridgeAccess(orgId) {
   const orgSnap = await db.collection("organizations").doc(orgId).get();
@@ -51,16 +52,65 @@ export function answerHandler(req, res) {
   const { leadPhone, record, callId } = req.query;
   if (!leadPhone) return res.set("Content-Type", "application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response><Speak>Error.</Speak><Hangup/></Response>`);
 
+  const base = bridgeCallConfig.publicBackendUrl.replace(/\/$/, "");
+  const confirmUrl = `${base}/api/v1/bridge-call/answer-confirm?callId=${encodeURIComponent(callId || "")}&leadPhone=${encodeURIComponent(leadPhone)}&record=${record || "false"}`;
+  const noInputUrl = `${base}/api/v1/bridge-call/answer-noinput?callId=${encodeURIComponent(callId || "")}`;
+
+  // Press-1 confirmation: prevents voicemail from triggering customer dial.
+  // Employee hears prompt → presses 1 → then customer is dialed.
+  // If no input (voicemail/machine) → hang up, no customer leg.
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <GetDigits action="${confirmUrl}" method="GET" timeout="8" numDigits="1" retries="1" validDigits="1" redirect="true">
+    <Speak voice="Polly.Aditi" language="hi-IN">Naya lead call hai. Connect karne ke liye 1 dabayen.</Speak>
+  </GetDigits>
+  <Redirect method="GET">${noInputUrl}</Redirect>
+</Response>`;
+  res.set("Content-Type", "application/xml").send(xml);
+}
+
+export function answerConfirmHandler(req, res) {
+  const { leadPhone, record, callId } = req.query;
+  const digits = req.query.Digits || req.body?.Digits;
+
+  if (digits !== "1") {
+    // Agent pressed something else — hang up
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Speak voice="Polly.Aditi" language="hi-IN">Call cancel ho gayi.</Speak><Hangup/></Response>`;
+    return res.set("Content-Type", "application/xml").send(xml);
+  }
+
   const from = bridgeCallConfig.fromNumber.replace(/\D/g, "");
   const shouldRecord = record === "true";
   const statusUrl = `${bridgeCallConfig.publicBackendUrl.replace(/\/$/, "")}/api/v1/bridge-call/status?callId=${callId || ""}`;
 
+  // Dial customer with machine_detection (AMD) — if voicemail detected, Plivo
+  // returns machine_detection status and we avoid charging admin for voicemail.
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Speak voice="Polly.Aditi" language="hi-IN">Connecting you to the customer.</Speak>
-  <Dial callerId="${from}" timeLimit="${bridgeCallConfig.maxCallDurationSeconds}" action="${statusUrl}" method="POST"${shouldRecord ? ` record="true" recordingCallbackUrl="${statusUrl}" recordingCallbackMethod="POST"` : ""}>
-    <Number>${String(leadPhone).replace(/\D/g, "")}</Number>
+  <Speak voice="Polly.Aditi" language="hi-IN">Connecting.</Speak>
+  <Dial callerId="${from}" timeLimit="${bridgeCallConfig.maxCallDurationSeconds}" action="${statusUrl}" method="POST" ringTimeout="${bridgeCallConfig.ringTimeoutSeconds}"${shouldRecord ? ` record="true" recordingCallbackUrl="${statusUrl}" recordingCallbackMethod="POST"` : ""}>
+    <Number machineDetection="hangup" machineDetectionTimeout="5000">${String(leadPhone).replace(/\D/g, "")}</Number>
   </Dial>
+</Response>`;
+  res.set("Content-Type", "application/xml").send(xml);
+}
+
+export function answerNoInputHandler(req, res) {
+  const { callId } = req.query;
+  // Employee didn't press 1 (voicemail or didn't respond) — hang up gracefully.
+  // Mark call as agent_no_confirm in Firestore.
+  if (callId) {
+    db.collection("bridgeCalls").doc(callId).update({
+      status: "agent_no_confirm",
+      completedAt: nowIso(),
+      completedAtMs: Date.now(),
+      failureReason: "Agent did not confirm (voicemail or no response).",
+    }).catch(() => {});
+  }
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Speak voice="Polly.Aditi" language="hi-IN">Koi response nahi mila. Call khatam ho rahi hai.</Speak>
+  <Hangup/>
 </Response>`;
   res.set("Content-Type", "application/xml").send(xml);
 }
@@ -110,6 +160,7 @@ export async function statusHandler(req, res) {
       recordingUrl: body.RecordUrl || body.RecordingUrl || body.recording_url || null,
       status: body.CallStatus || body.Status || body.call_status || dialStatus || null,
       bLegUuid: body.DialBLegUUID || body.BLegUUID || body.b_leg_uuid || null,
+      machineDetection: body.Machine || body.machine_detection || null,
     });
     return res.status(200).send("ok");
   } catch (e) {

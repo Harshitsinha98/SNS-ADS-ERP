@@ -29,7 +29,7 @@ export async function pollBridgeCallStatus(callId) {
 
 export function watchBridgeCall(callId, onUpdate, intervalMs = 3000) {
   let stopped = false;
-  const terminal = new Set(["completed", "wallet-deducted", "failed", "no-answer"]);
+  const terminal = new Set(["completed", "wallet-deducted", "failed", "no-answer", "agent_no_confirm", "customer_voicemail"]);
   const poll = async () => {
     if (stopped) return;
     const result = await pollBridgeCallStatus(callId);

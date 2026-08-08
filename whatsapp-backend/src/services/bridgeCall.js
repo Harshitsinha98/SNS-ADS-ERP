@@ -123,17 +123,29 @@ export async function initiateBridgeCall({
   }
 }
 
-export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, dialStatus, recordingUrl, status, bLegUuid }) {
+export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, dialStatus, recordingUrl, status, bLegUuid, machineDetection }) {
   const callRef = db.collection("bridgeCalls").doc(callId);
   const snap = await callRef.get();
   if (!snap.exists) { logger.warn({ callId }, "Bridge call status for unknown callId"); return; }
 
   const call = snap.data();
   if (call.status === "wallet-deducted") return; // fully processed, skip
+  if (call.status === "agent_no_confirm") return; // already handled by noinput endpoint
 
   // Allow re-processing if status is already "completed" but duration is still 0
-  // (first webhook sets status but has no duration; second webhook brings actual duration)
   if (call.status === "completed" && call.durationSeconds > 0) return;
+
+  // Customer voicemail detected by AMD — no charge, end call
+  if (machineDetection === "true" || machineDetection === "machine_start" || dialStatus === "machine") {
+    await callRef.update({
+      status: "customer_voicemail",
+      completedAt: nowIso(), completedAtMs: Date.now(),
+      failureReason: "Customer voicemail detected (AMD). No charge.",
+      durationSeconds: 0, costInr: 0, billedMinutes: 0,
+    });
+    logger.info({ callId }, "Bridge call — customer voicemail (AMD), no charge");
+    return;
+  }
 
   // ── 2-Leg Billing Logic ──
   // Plivo charges us per-leg, 60/60 increment (ceil to next minute).

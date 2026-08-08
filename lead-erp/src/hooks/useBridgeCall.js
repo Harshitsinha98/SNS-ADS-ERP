@@ -56,9 +56,10 @@ export function useBridgeCall() {
       else if (s.status === "completed" || s.status === "wallet-deducted") {
         setBridgeState("completed"); setBridgeDuration(s.durationSeconds || 0);
         setBridgeRecording(s.recordingUrl || null);
-      } else if (s.status === "failed" || s.status === "no-answer") {
+      } else if (s.status === "failed" || s.status === "no-answer" || s.status === "agent_no_confirm" || s.status === "customer_voicemail") {
         setBridgeState("failed");
-        setBridgeError(s.status === "no-answer" ? "Lead did not answer." : "Call failed.");
+        const msgs = { "no-answer": "Lead did not answer.", "agent_no_confirm": "Agent didn't confirm — customer was not dialed.", "customer_voicemail": "Customer voicemail detected — no charge." };
+        setBridgeError(msgs[s.status] || "Call failed.");
       }
     });
     stopWatchRef.current = stop;
