@@ -20,6 +20,7 @@ import {
   listFeatureFlags, toggleFeatureFlag, createFeatureFlag,
   getPlatformSettings, updatePlatformSettings,
   getTenantUsage,
+  getVoicePnlHandler,
 } from "../../controllers/platform.controller.js";
 import { getPlatformAIStats } from "../../controllers/ai.controller.js";
 
@@ -71,6 +72,9 @@ export function createPlatformRoutes() {
 
   // Per-tenant usage & renewal visibility (voice minutes, AI allowance, expiry)
   router.get("/tenant-usage", getTenantUsage);
+
+  // Voice P&L — per-tenant profit/loss for bridge calling
+  router.get("/voice-pnl", getVoicePnlHandler);
 
   return router;
 }

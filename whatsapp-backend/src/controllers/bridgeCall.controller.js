@@ -152,11 +152,14 @@ export async function customerStatusHandler(req, res) {
     const call = snap.exists ? snap.data() : null;
 
     if (isMachine || (customerSeconds === 0 && noAnswer)) {
-      // Voicemail or no-answer → end agent's wait, no charge.
+      // Voicemail or no-answer → end agent's wait, no charge to tenant.
+      // Still track Plivo cost (CodeSkate absorbs this).
+      const plivoCostBLeg = Number(body.TotalCost || body.total_cost || 0);
       await db.collection("bridgeCalls").doc(callId).update({
         status: isMachine ? "customer_voicemail" : "no-answer",
         completedAt: nowIso(), completedAtMs: Date.now(),
         durationSeconds: 0, customerSeconds: 0, billedMinutes: 0, costInr: 0,
+        plivoCostBLeg,
         failureReason: isMachine ? "Customer voicemail (AMD) — no charge." : "Customer did not answer — no charge.",
       }).catch(() => {});
       if (call?.plivoCallUuid) await hangupPlivoCall(call.plivoCallUuid); // end agent leg
@@ -164,6 +167,7 @@ export async function customerStatusHandler(req, res) {
     }
 
     // Real human conversation happened → bill customer talk time.
+    const plivoCostBLeg = Number(body.TotalCost || body.total_cost || 0);
     if (call && call.status !== "wallet-deducted") {
       await handleCallCompleted(callId, {
         aLegSeconds: 0,
@@ -172,6 +176,7 @@ export async function customerStatusHandler(req, res) {
         recordingUrl: body.RecordUrl || body.RecordingUrl || null,
         status: "completed",
         bLegUuid: body.CallUUID || null,
+        plivoCostBLeg,
       });
     }
     return res.status(200).send("ok");
@@ -252,6 +257,7 @@ export async function statusHandler(req, res) {
       status: body.CallStatus || body.Status || body.call_status || dialStatus || null,
       bLegUuid: body.DialBLegUUID || body.BLegUUID || body.b_leg_uuid || null,
       machineDetection: body.Machine || body.machine_detection || null,
+      plivoCostALeg: Number(body.TotalCost || body.total_cost || 0),
     });
     return res.status(200).send("ok");
   } catch (e) {
@@ -280,5 +286,58 @@ export async function pollHandler(req, res) {
     });
   } catch (e) {
     return res.status(500).json({ error: "Could not fetch call status." });
+  }
+}
+
+/**
+ * Call history for a tenant's org — all bridge calls, paginated.
+ */
+export async function historyHandler(req, res) {
+  try {
+    const { orgId, limit: limitStr, startAfter } = req.query;
+    if (!orgId) return res.status(400).json({ error: "orgId required." });
+    const membership = await getActiveMembership(req.authUser.uid, orgId);
+    if (!membership) return res.status(403).json({ error: "Access denied." });
+    if (membership.role !== "admin" && membership.role !== "owner") {
+      return res.status(403).json({ error: "Only admins can view call history." });
+    }
+
+    const pageSize = Math.min(Number(limitStr) || 50, 100);
+    let q = db.collection("bridgeCalls")
+      .where("orgId", "==", orgId)
+      .orderBy("initiatedAtMs", "desc")
+      .limit(pageSize);
+
+    if (startAfter) {
+      q = q.startAfter(Number(startAfter));
+    }
+
+    const snap = await q.get();
+    const calls = snap.docs.map((d) => {
+      const c = d.data();
+      return {
+        callId: c.callId,
+        status: c.status,
+        initiatedAt: c.initiatedAt,
+        initiatedAtMs: c.initiatedAtMs,
+        employeeName: c.employeeName || "Agent",
+        leadName: c.leadName || c.leadPhone || "",
+        leadPhone: c.leadPhone,
+        durationSeconds: c.durationSeconds || 0,
+        agentSeconds: c.agentSeconds || 0,
+        customerSeconds: c.customerSeconds || 0,
+        billedMinutes: c.billedMinutes || 0,
+        costInr: c.costInr || 0,
+        recordingUrl: c.recordingUrl || null,
+        failureReason: c.failureReason || null,
+      };
+    });
+
+    const lastMs = calls.length > 0 ? calls[calls.length - 1].initiatedAtMs : null;
+
+    return res.json({ ok: true, calls, nextCursor: lastMs, hasMore: calls.length === pageSize });
+  } catch (e) {
+    logger.error({ err: e.message }, "Call history error");
+    return res.status(500).json({ error: "Could not load call history." });
   }
 }

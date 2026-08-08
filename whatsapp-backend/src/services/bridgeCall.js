@@ -150,6 +150,7 @@ export async function initiateBridgeCall({
     initiatedAt: nowIso(), initiatedAtMs: Date.now(),
     durationSeconds: 0, costInr: 0,
     recordingUrl: null, plivoCallUuid: null, plivoBLegUuid: null,
+    plivoCost: 0, plivoCostALeg: 0, plivoCostBLeg: 0,
   });
 
   try {
@@ -193,7 +194,7 @@ export async function initiateBridgeCall({
   }
 }
 
-export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, dialStatus, recordingUrl, status, bLegUuid, machineDetection }) {
+export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, dialStatus, recordingUrl, status, bLegUuid, machineDetection, plivoCostALeg, plivoCostBLeg }) {
   const callRef = db.collection("bridgeCalls").doc(callId);
   const snap = await callRef.get();
   if (!snap.exists) { logger.warn({ callId }, "Bridge call status for unknown callId"); return; }
@@ -270,7 +271,14 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
     costInr,
     dialStatus: dialStatus || null,
     completedAt: nowIso(), completedAtMs: Date.now(),
+    // Plivo cost tracking for P&L auditing
+    ...(plivoCostALeg ? { plivoCostALeg } : {}),
+    ...(plivoCostBLeg ? { plivoCostBLeg } : {}),
   };
+  // Calculate total Plivo cost (merge with any previously stored leg cost)
+  const existingPlivoCostA = call.plivoCostALeg || plivoCostALeg || 0;
+  const existingPlivoCostB = call.plivoCostBLeg || plivoCostBLeg || 0;
+  updateData.plivoCost = existingPlivoCostA + existingPlivoCostB;
   if (recordingUrl) updateData.recordingUrl = recordingUrl;
   if (bLegUuid) updateData.plivoBLegUuid = bLegUuid;
   await callRef.update(updateData);

@@ -10,6 +10,7 @@ import { db } from "../bootstrap/firebase.js";
 import * as analytics from "../services/platformAnalytics.js";
 import { enrichOrganizations, listOrganizationDirectory, newOrganizationDirectoryEvent } from "../services/platformOrganization.js";
 import { getTenantUsageOverview } from "../services/platformTenantUsage.js";
+import { getVoicePnl } from "../services/voicePnl.js";
 import { nowIso, safeDocId } from "../services/helpers.js";
 import { getMergedPlans } from "../../plans.js";
 
@@ -539,5 +540,20 @@ export async function getTenantUsage(req, res) {
     return res.json({ ok: true, ...overview });
   } catch (error) {
     return res.status(500).json({ error: error.message || "Could not load tenant usage" });
+  }
+}
+
+/**
+ * Voice P&L — per-tenant profit/loss breakdown for bridge calling.
+ */
+export async function getVoicePnlHandler(req, res) {
+  try {
+    const { from, to } = req.query;
+    const fromMs = from ? new Date(from).getTime() : undefined;
+    const toMs = to ? new Date(to).getTime() : undefined;
+    const result = await getVoicePnl({ fromMs, toMs });
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Could not load voice P&L" });
   }
 }
