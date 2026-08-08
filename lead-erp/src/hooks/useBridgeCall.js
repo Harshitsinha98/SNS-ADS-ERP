@@ -10,6 +10,7 @@ export function useBridgeCall() {
   const [bridgeDuration, setBridgeDuration] = useState(0);
   const [bridgeRecording, setBridgeRecording] = useState(null);
   const [bridgeElapsed, setBridgeElapsed] = useState(0);
+  const [bridgeDetails, setBridgeDetails] = useState(null); // { agentSeconds, customerSeconds, billedMinutes, costInr }
   const stopWatchRef = useRef(null);
   const timerRef = useRef(null);
   const startTimeRef = useRef(null);
@@ -34,7 +35,7 @@ export function useBridgeCall() {
   const startBridgeCall = useCallback(async (lead) => {
     if (!user?.activeOrgId || !lead?.phone) return;
     setBridgeState("initiating"); setBridgeError(""); setBridgeCallId(null);
-    setBridgeDuration(0); setBridgeRecording(null); setBridgeElapsed(0);
+    setBridgeDuration(0); setBridgeRecording(null); setBridgeElapsed(0); setBridgeDetails(null);
 
     const result = await initiateBridgeCall({
       orgId: user.activeOrgId, leadId: lead.id, leadPhone: lead.phone, leadName: lead.name || "",
@@ -56,6 +57,7 @@ export function useBridgeCall() {
       else if (s.status === "completed" || s.status === "wallet-deducted") {
         setBridgeState("completed"); setBridgeDuration(s.durationSeconds || 0);
         setBridgeRecording(s.recordingUrl || null);
+        setBridgeDetails({ agentSeconds: s.agentSeconds || 0, customerSeconds: s.customerSeconds || 0, billedMinutes: s.billedMinutes || 0, costInr: s.costInr || 0 });
       } else if (s.status === "failed" || s.status === "no-answer" || s.status === "agent_no_confirm" || s.status === "customer_voicemail") {
         setBridgeState("failed");
         const msgs = { "no-answer": "Lead did not answer.", "agent_no_confirm": "Agent didn't confirm — customer was not dialed.", "customer_voicemail": "Customer voicemail detected — no charge." };
@@ -69,8 +71,8 @@ export function useBridgeCall() {
   const resetBridgeCall = useCallback(() => {
     if (stopWatchRef.current) stopWatchRef.current();
     setBridgeState("idle"); setBridgeError(""); setBridgeCallId(null);
-    setBridgeDuration(0); setBridgeRecording(null); setBridgeElapsed(0);
+    setBridgeDuration(0); setBridgeRecording(null); setBridgeElapsed(0); setBridgeDetails(null);
   }, []);
 
-  return { bridgeState, bridgeError, bridgeCallId, bridgeDuration, bridgeRecording, bridgeElapsed, startBridgeCall, resetBridgeCall };
+  return { bridgeState, bridgeError, bridgeCallId, bridgeDuration, bridgeRecording, bridgeElapsed, bridgeDetails, startBridgeCall, resetBridgeCall };
 }

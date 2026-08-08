@@ -72,7 +72,7 @@ export default function LeadDetail() {
   }, [callActive, callStart]);
 
   const {
-    bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed,
+    bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed, bridgeDetails,
     startBridgeCall, resetBridgeCall,
   } = useBridgeCall();
 
@@ -226,8 +226,13 @@ export default function LeadDetail() {
               )}
               {bridgeState === "completed" && (
                 <div className="bg-green-50 border border-green-200 rounded-md p-3 text-sm text-green-800">
-                  Bridge call done ({fmtDuration(bridgeDuration || bridgeElapsed)}).
-                  {bridgeRecording && <a href={bridgeRecording} target="_blank" rel="noreferrer" className="ml-2 underline font-medium">Play recording</a>}
+                  <p className="font-medium">Bridge call done ({fmtDuration(bridgeDuration || bridgeElapsed)})</p>
+                  {bridgeDetails && (
+                    <p className="text-xs mt-1 text-green-700">
+                      Agent: {fmtDuration(bridgeDetails.agentSeconds)} · Customer: {fmtDuration(bridgeDetails.customerSeconds)} · Billed: {bridgeDetails.billedMinutes} min · ₹{bridgeDetails.costInr?.toFixed(0) || 0}
+                    </p>
+                  )}
+                  {bridgeRecording && <a href={bridgeRecording} target="_blank" rel="noreferrer" className="text-xs underline font-medium mt-1 inline-block">Play recording</a>}
                 </div>
               )}
               {bridgeState === "failed" && bridgeError && (

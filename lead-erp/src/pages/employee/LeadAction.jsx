@@ -60,7 +60,7 @@ export default function LeadAction() {
     window.location.href = `tel:${lead.phone}`;
   };
 
-  const { bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed, startBridgeCall, resetBridgeCall } = useBridgeCall();
+  const { bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed, bridgeDetails, startBridgeCall, resetBridgeCall } = useBridgeCall();
   const handleBridgeCall = async () => { const r = await startBridgeCall(lead); if (r?.fallback) startCall(); };
 
   // Auto-trigger worknote modal when bridge call completes (mandatory)
@@ -136,7 +136,8 @@ export default function LeadAction() {
           )}
           {bridgeState === "completed" && (
             <div className="bg-green-50 border border-green-200 rounded-md p-2.5 text-xs text-green-800 mb-2">
-              Done ({fmtDuration(bridgeDuration || bridgeElapsed)}).
+              <p className="font-medium">Done ({fmtDuration(bridgeDuration || bridgeElapsed)})</p>
+              {bridgeDetails && <p className="text-[10px] mt-0.5 text-green-700">Agent: {fmtDuration(bridgeDetails.agentSeconds)} · Customer: {fmtDuration(bridgeDetails.customerSeconds)} · ₹{bridgeDetails.costInr?.toFixed(0) || 0}</p>}
             </div>
           )}
           {bridgeState === "failed" && bridgeError && (
