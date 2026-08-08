@@ -1,0 +1,19 @@
+name: Deploy Backend to Oracle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'whatsapp-backend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Oracle Cloud
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 129.225.113.130
+          username: ubuntu
+          key: ${{ secrets.ORACLE_SSH_KEY }}
+          script: bash ~/deploy.sh
