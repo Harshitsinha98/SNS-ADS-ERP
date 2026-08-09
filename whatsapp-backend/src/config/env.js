@@ -188,6 +188,26 @@ export const otpConfig = {
 
 
 /**
+ * Cloudflare R2 storage for call recordings.
+ * R2 is S3-compatible with ZERO egress fees — perfect for audio playback.
+ */
+export const r2Config = {
+  accountId: process.env.R2_ACCOUNT_ID || "",
+  accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+  secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+  bucketName: process.env.R2_BUCKET_NAME || "codeskate-recordings",
+  // Public URL for the bucket (custom domain or R2.dev subdomain).
+  // If set, recordings are served directly via this URL (no signed URLs needed).
+  publicUrl: (process.env.R2_PUBLIC_URL || "").replace(/\/$/, ""),
+  get enabled() {
+    return Boolean(this.accountId && this.accessKeyId && this.secretAccessKey && this.bucketName);
+  },
+  get endpoint() {
+    return `https://${this.accountId}.r2.cloudflarestorage.com`;
+  },
+};
+
+/**
  * Bridge Call configuration (Plivo two-leg call bridging).
  */
 export const bridgeCallConfig = {

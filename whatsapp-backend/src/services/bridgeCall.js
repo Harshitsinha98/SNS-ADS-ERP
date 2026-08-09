@@ -15,6 +15,7 @@ import { db } from "../bootstrap/firebase.js";
 import { bridgeCallConfig } from "../config/env.js";
 import { logger } from "../middleware/logger.js";
 import { nowIso, orgCollection } from "./helpers.js";
+import { uploadRecordingToR2 } from "./r2Storage.js";
 
 const toDigits = (phone) => String(phone || "").replace(/\D/g, "");
 
@@ -296,6 +297,18 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
   if (recordingUrl) updateData.recordingUrl = recordingUrl;
   if (bLegUuid) updateData.plivoBLegUuid = bLegUuid;
   await callRef.update(updateData);
+
+  // ── Async R2 upload (fire-and-forget) ──
+  // Download from Plivo CDN → upload to Cloudflare R2 for permanent storage.
+  // Runs in background so the webhook responds fast. On success, updates
+  // Firestore with the R2 URL (replaces temporary Plivo CDN link).
+  if (recordingUrl) {
+    uploadRecordingToR2(recordingUrl, callId, call.orgId).then((r2Url) => {
+      if (r2Url) {
+        callRef.update({ r2RecordingUrl: r2Url }).catch(() => {});
+      }
+    }).catch((e) => logger.warn({ callId, err: e.message }, "R2 upload background task failed"));
+  }
 
   // Only deduct wallet when the customer actually connected and we have a duration
   if (billedMinutes > 0 && customerSeconds > 0) {

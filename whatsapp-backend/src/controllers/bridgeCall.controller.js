@@ -405,3 +405,76 @@ export async function historyHandler(req, res) {
     return res.status(500).json({ error: "Could not load call history." });
   }
 }
+
+
+/**
+ * Recordings list — returns all bridge calls that have a recording for an org.
+ * Prefers R2 URL (permanent) over Plivo CDN URL (temporary ~90 days).
+ * Paginated, filterable by employee and date range.
+ */
+export async function recordingsHandler(req, res) {
+  try {
+    const { orgId, limit: limitStr, startAfter, employee, from, to } = req.query;
+    if (!orgId) return res.status(400).json({ error: "orgId required." });
+    const membership = await getActiveMembership(req.authUser.uid, orgId);
+    if (!membership) return res.status(403).json({ error: "Access denied." });
+    if (membership.role !== "admin" && membership.role !== "owner") {
+      return res.status(403).json({ error: "Only admins can view recordings." });
+    }
+
+    const pageSize = Math.min(Number(limitStr) || 30, 100);
+
+    // Base query — all calls for this org ordered by time
+    let q = db.collection("bridgeCalls")
+      .where("orgId", "==", orgId)
+      .orderBy("initiatedAtMs", "desc")
+      .limit(pageSize * 3); // over-fetch since we filter for recordings client-side
+
+    if (startAfter) {
+      q = q.startAfter(Number(startAfter));
+    }
+
+    // Date range filter (if provided)
+    if (from) {
+      const fromMs = new Date(from).getTime();
+      if (!isNaN(fromMs)) q = q.where("initiatedAtMs", ">=", fromMs);
+    }
+    if (to) {
+      const toMs = new Date(to).getTime() + 86400000; // end of day
+      if (!isNaN(toMs)) q = q.where("initiatedAtMs", "<=", toMs);
+    }
+
+    const snap = await q.get();
+
+    // Filter to only calls with recordings, apply employee filter
+    const recordings = [];
+    for (const d of snap.docs) {
+      if (recordings.length >= pageSize) break;
+      const c = d.data();
+      const recUrl = c.r2RecordingUrl || c.recordingUrl;
+      if (!recUrl) continue;
+      if (employee && c.employeeUid !== employee && !c.employeeName?.toLowerCase().includes(employee.toLowerCase())) continue;
+
+      recordings.push({
+        callId: c.callId,
+        initiatedAt: c.initiatedAt,
+        initiatedAtMs: c.initiatedAtMs,
+        employeeName: c.employeeName || "Agent",
+        employeeUid: c.employeeUid || null,
+        leadName: c.leadName || c.leadPhone || "",
+        leadPhone: c.leadPhone,
+        durationSeconds: c.durationSeconds || 0,
+        customerSeconds: c.customerSeconds || 0,
+        recordingUrl: recUrl,
+        isR2: Boolean(c.r2RecordingUrl),
+      });
+    }
+
+    const lastMs = recordings.length > 0 ? recordings[recordings.length - 1].initiatedAtMs : null;
+
+    return res.json({ ok: true, recordings, nextCursor: lastMs, hasMore: recordings.length === pageSize });
+  } catch (e) {
+    logger.error({ err: e.message }, "Recordings list error");
+    return res.status(500).json({ error: "Could not load recordings." });
+  }
+}
