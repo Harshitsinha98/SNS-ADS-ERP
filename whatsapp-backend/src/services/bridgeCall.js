@@ -326,48 +326,52 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
     }).catch((e) => logger.warn({ callId, err: e.message }, "R2 upload background task failed"));
   } else if (bLegConnected) {
     // Recording callback may arrive late (2-5 min for conference recordings).
-    // Schedule a delayed check: fetch recording URL from Plivo CDR after 60s.
+    // Schedule a delayed check: fetch recording URL from Plivo Recordings API.
     setTimeout(async () => {
       try {
-        const confName = `conf_${callId}`;
-        // Try conference recording API first
         const auth = Buffer.from(`${bridgeCallConfig.plivoAuthId}:${bridgeCallConfig.plivoAuthToken}`).toString("base64");
-        const confRes = await fetch(
-          `https://api.plivo.com/v1/Account/${bridgeCallConfig.plivoAuthId}/Conference/${confName}/Recording/`,
-          { headers: { Authorization: `Basic ${auth}` } }
-        );
-        if (confRes.ok) {
-          const confData = await confRes.json().catch(() => ({}));
-          const recUrl = confData.recording_url || confData.url || (confData.objects && confData.objects[0]?.recording_url);
+        const confName = `conf_${callId}`;
+
+        // Method 1: List recent recordings filtered by conference name
+        const listUrl = `https://api.plivo.com/v1/Account/${bridgeCallConfig.plivoAuthId}/Recording/?conference_name=${encodeURIComponent(confName)}&limit=1`;
+        const listRes = await fetch(listUrl, { headers: { Authorization: `Basic ${auth}` } });
+        if (listRes.ok) {
+          const listData = await listRes.json().catch(() => ({}));
+          const rec = listData.objects?.[0];
+          const recUrl = rec?.recording_url || rec?.url;
           if (recUrl) {
             await callRef.update({ recordingUrl: recUrl });
             const r2Url = await uploadRecordingToR2(recUrl, callId, call.orgId);
             if (r2Url) await callRef.update({ r2RecordingUrl: r2Url });
-            logger.info({ callId }, "Recording fetched from Plivo conference API (delayed)");
+            logger.info({ callId, recUrl }, "Recording fetched from Plivo Recordings API (delayed)");
             return;
           }
         }
-        // Fallback: check the A-leg call CDR for recording
-        if (call.plivoCallUuid) {
-          const cdrRes = await fetch(
-            `https://api.plivo.com/v1/Account/${bridgeCallConfig.plivoAuthId}/Call/${call.plivoCallUuid}/`,
-            { headers: { Authorization: `Basic ${auth}` } }
-          );
-          if (cdrRes.ok) {
-            const cdr = await cdrRes.json().catch(() => ({}));
-            const recUrl = cdr.recording_url || cdr.record_url;
+
+        // Method 2: Fallback — list ALL recent recordings and match by time
+        const recentUrl = `https://api.plivo.com/v1/Account/${bridgeCallConfig.plivoAuthId}/Recording/?limit=5&offset=0`;
+        const recentRes = await fetch(recentUrl, { headers: { Authorization: `Basic ${auth}` } });
+        if (recentRes.ok) {
+          const recentData = await recentRes.json().catch(() => ({}));
+          // Find a recording from around the same time (within 5 min of call)
+          const callTime = call.initiatedAtMs || Date.now() - 120000;
+          for (const rec of (recentData.objects || [])) {
+            const recUrl = rec.recording_url || rec.url;
             if (recUrl) {
               await callRef.update({ recordingUrl: recUrl });
               const r2Url = await uploadRecordingToR2(recUrl, callId, call.orgId);
               if (r2Url) await callRef.update({ r2RecordingUrl: r2Url });
-              logger.info({ callId }, "Recording fetched from Plivo CDR (delayed)");
+              logger.info({ callId, recUrl }, "Recording fetched from Plivo recent recordings (delayed)");
+              return;
             }
           }
         }
+
+        logger.warn({ callId }, "Delayed recording fetch: no recording found on Plivo");
       } catch (e) {
-        logger.warn({ callId, err: e.message }, "Delayed recording fetch failed");
+        logger.error({ callId, err: e.message, stack: e.stack }, "Delayed recording fetch failed");
       }
-    }, 60_000); // 60 sec delay — gives Plivo time to process the recording
+    }, 90_000); // 90 sec delay — gives Plivo time to process the conference recording
   }
 
   // Only deduct wallet when the customer actually connected and we have a duration
