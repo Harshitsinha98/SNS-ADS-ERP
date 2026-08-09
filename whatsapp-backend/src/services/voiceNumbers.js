@@ -455,20 +455,26 @@ export async function getByComplianceId(complianceId) {
 
 /**
  * Cancel/deactivate a number (admin action or non-payment).
+ * Accepts either phoneNumber or numberId (doc ID) for flexibility.
  */
-export async function cancelNumber(orgId, phoneNumber) {
+export async function cancelNumber(orgId, phoneNumberOrId) {
+  // Try by doc ID first
+  const byId = db.collection(COLLECTION).doc(phoneNumberOrId);
+  const idSnap = await byId.get();
+  if (idSnap.exists && idSnap.data().orgId === orgId) {
+    await byId.update({ status: "cancelled", updatedAt: nowIso() });
+    return { ...idSnap.data(), status: "cancelled" };
+  }
+
+  // Fallback: by phoneNumber field
   const snap = await db.collection(COLLECTION)
     .where("orgId", "==", orgId)
-    .where("phoneNumber", "==", phoneNumber)
+    .where("phoneNumber", "==", phoneNumberOrId)
     .limit(1)
     .get();
 
   if (snap.empty) return null;
 
-  await snap.docs[0].ref.update({
-    status: "cancelled",
-    updatedAt: nowIso(),
-  });
-
+  await snap.docs[0].ref.update({ status: "cancelled", updatedAt: nowIso() });
   return { ...snap.docs[0].data(), status: "cancelled" };
 }

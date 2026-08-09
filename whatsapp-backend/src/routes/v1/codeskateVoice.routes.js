@@ -22,6 +22,10 @@ import {
   activateHandler,
   registerOwnedHandler,
   priorityHandler,
+  cancelHandler,
+  adminRejectHandler,
+  adminApproveHandler,
+  adminPendingHandler,
 } from "../../controllers/codeskateVoice.controller.js";
 
 // Multer in-memory storage for doc uploads (max 5MB per file, 2 files)
@@ -62,6 +66,10 @@ export function createCodeskateVoiceRoutes() {
   // Platform admin manual trigger
   router.post("/activate", requireAuth, activateHandler);
   router.post("/register-owned", requireAuth, registerOwnedHandler);
+  router.post("/cancel", requireAuth, cancelHandler);
+  router.post("/admin-reject", requireAuth, adminRejectHandler);
+  router.post("/admin-approve", requireAuth, adminApproveHandler);
+  router.get("/admin-pending", requireAuth, adminPendingHandler);
 
   return router;
 }

@@ -146,6 +146,13 @@ export default function LeadAction() {
               {bridgeError} <button onClick={resetBridgeCall} className="underline">OK</button>
             </div>
           )}
+          {bridgeState === "idle" && bridgeError && (
+            <div className="bg-orange-50 border border-orange-200 rounded-md p-2.5 text-xs text-orange-700 mb-2 flex items-center gap-2">
+              <span>{bridgeError}</span>
+              <a href="/admin/voice" className="font-semibold underline whitespace-nowrap">Get Number →</a>
+              <button onClick={resetBridgeCall} className="ml-auto underline opacity-60">OK</button>
+            </div>
+          )}
           {!callActive && bridgeState === "idle" ? (
             <div className="space-y-2">
               <button onClick={handleBridgeCall} className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-blue-700 transition-colors">

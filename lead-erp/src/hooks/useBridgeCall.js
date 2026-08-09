@@ -42,7 +42,7 @@ export function useBridgeCall() {
     });
 
     if (!result.ok) {
-      if (result.code === "plan_upgrade_required" || result.code === "wallet_empty") {
+      if (result.code === "plan_upgrade_required" || result.code === "wallet_empty" || result.code === "no_voice_number") {
         setBridgeState("idle"); setBridgeError(result.error);
         return { fallback: false, error: result.error, code: result.code };
       }

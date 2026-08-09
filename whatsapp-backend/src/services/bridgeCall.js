@@ -146,15 +146,14 @@ export async function initiateBridgeCall({
     return { ok: false, error: "Bridge calling is not configured on the server." };
   }
 
-  // Use tenant's own number if they have one (CodeSkate Voice), else fallback
-  // to the shared platform number.
-  let fromNumber = bridgeCallConfig.fromNumber;
+  // Tenant MUST have their own active number — no shared fallback.
+  // This enforces the "buy your number first" model.
   const tenantNumber = await getActiveNumberForOrg(orgId).catch(() => null);
-  if (tenantNumber?.phoneNumber) {
-    fromNumber = tenantNumber.phoneNumber;
+  if (!tenantNumber?.phoneNumber) {
+    return { ok: false, error: "You need a dedicated CodeSkate Voice number to make bridge calls. Go to CodeSkate Voice to get one.", code: "no_voice_number" };
   }
 
-  const from = toDigits(fromNumber);
+  const from = toDigits(tenantNumber.phoneNumber);
   const to = ensureE164Digits(employeePhone);
   const leadTo = ensureE164Digits(leadPhone);
 
@@ -174,7 +173,7 @@ export async function initiateBridgeCall({
     callId, orgId, leadId,
     leadPhone: leadTo, leadName: leadName || "",
     employeePhone: to, employeeName: employeeName || "", employeeUid,
-    fromNumber: from, // the caller ID used (tenant's own or shared)
+    fromNumber: from, // tenant's own CodeSkate Voice number
     status: "initiating",
     record: shouldRecord,
     initiatedAt: nowIso(), initiatedAtMs: Date.now(),

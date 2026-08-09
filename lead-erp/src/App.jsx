@@ -43,6 +43,7 @@ import WhatsAppOpsPage from "./pages/platform/WhatsAppOpsPage";
 import AiUsagePage from "./pages/platform/AiUsagePage";
 import TenantUsagePage from "./pages/platform/TenantUsagePage";
 import VoicePnlPage from "./pages/platform/VoicePnlPage";
+import VoiceRequestsPage from "./pages/platform/VoiceRequestsPage";
 import AuditLogsPage from "./pages/platform/AuditLogsPage";
 import FeatureFlagsPage from "./pages/platform/FeatureFlagsPage";
 import SettingsPage from "./pages/platform/SettingsPage";
@@ -118,6 +119,7 @@ export default function App() {
         <Route path="/platform/whatsapp" element={<WhatsAppOpsPage />} />
         <Route path="/platform/tenant-usage" element={<TenantUsagePage />} />
         <Route path="/platform/voice-pnl" element={<VoicePnlPage />} />
+        <Route path="/platform/voice-requests" element={<VoiceRequestsPage />} />
         <Route path="/platform/ai-usage" element={<AiUsagePage />} />
         <Route path="/platform/audit-logs" element={<AuditLogsPage />} />
         <Route path="/platform/feature-flags" element={<FeatureFlagsPage />} />

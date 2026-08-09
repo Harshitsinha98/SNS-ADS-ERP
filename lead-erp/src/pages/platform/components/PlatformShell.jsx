@@ -48,6 +48,7 @@ const NAV_SECTIONS = [
     items: [
       { to: "/platform/tenant-usage", label: "Tenant Usage", icon: Gauge },
       { to: "/platform/voice-pnl", label: "Voice P&L", icon: Phone },
+      { to: "/platform/voice-requests", label: "Voice Requests", icon: Phone },
       { to: "/platform/ai-usage", label: "AI Usage & Cost", icon: Brain },
       { to: "/platform/audit-logs", label: "Audit Logs", icon: ScrollText },
       { to: "/platform/feature-flags", label: "Feature Flags", icon: ToggleLeft },

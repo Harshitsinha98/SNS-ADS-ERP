@@ -241,6 +241,13 @@ export default function LeadDetail() {
                   {bridgeError} <button onClick={resetBridgeCall} className="ml-2 text-xs underline">Dismiss</button>
                 </div>
               )}
+              {bridgeState === "idle" && bridgeError && (
+                <div className="bg-orange-50 border border-orange-200 rounded-md p-3 text-sm text-orange-700 flex items-center gap-2">
+                  <span>{bridgeError}</span>
+                  <a href="/admin/voice" className="text-xs font-semibold underline whitespace-nowrap">Get Number →</a>
+                  <button onClick={resetBridgeCall} className="ml-auto text-xs underline opacity-60">Dismiss</button>
+                </div>
+              )}
               {!callActive && bridgeState === "idle" ? (
                 <div className="space-y-2">
                   <button onClick={handleBridgeCall} className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-blue-700 transition">

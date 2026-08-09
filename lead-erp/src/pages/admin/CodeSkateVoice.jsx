@@ -127,7 +127,8 @@ function StatusBadge({ status }) {
   );
 }
 
-function ActiveNumberCard({ number }) {
+function ActiveNumberCard({ number, onCancel }) {
+  const [confirming, setConfirming] = useState(false);
   return (
     <div className="bg-white border-2 border-green-200 rounded-xl p-6">
       <div className="flex items-center gap-3 mb-4">
@@ -165,6 +166,24 @@ function ActiveNumberCard({ number }) {
         </span>
       </div>
 
+      {/* Cancel */}
+      <div className="mt-3 border-t pt-3">
+        {!confirming ? (
+          <button onClick={() => setConfirming(true)} className="text-xs text-red-500 hover:text-red-700">
+            Cancel this number
+          </button>
+        ) : (
+          <div className="bg-red-50 rounded-lg p-3 text-xs text-red-700">
+            <p className="font-medium mb-2">Are you sure? This will deactivate the number. Bridge calls will stop working until you get a new one.</p>
+            <div className="flex gap-2">
+              <button onClick={() => { onCancel(number.id); setConfirming(false); }}
+                className="bg-red-600 text-white px-3 py-1 rounded text-xs font-medium">Yes, cancel</button>
+              <button onClick={() => setConfirming(false)} className="text-gray-600 px-3 py-1">Keep it</button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <p className="text-xs text-gray-400 mt-3">
         All bridge calls from your org use this number as caller ID. Your customers see YOUR number.
       </p>
@@ -172,7 +191,7 @@ function ActiveNumberCard({ number }) {
   );
 }
 
-function PendingCard({ number }) {
+function PendingCard({ number, onCancel }) {
   return (
     <div className="bg-white border rounded-xl p-6">
       <div className="flex items-center gap-3 mb-4">
@@ -199,7 +218,12 @@ function PendingCard({ number }) {
           <p className="text-xs mt-1">{number.rejectionReason}</p>
         </div>
       )}
-      <p className="text-xs text-gray-400 mt-3">Business: {number.businessName}</p>
+      <div className="mt-3 flex items-center justify-between">
+        <p className="text-xs text-gray-400">Business: {number.businessName}</p>
+        <button onClick={() => onCancel(number.id)} className="text-xs text-red-500 hover:text-red-700">
+          Cancel request
+        </button>
+      </div>
     </div>
   );
 }
@@ -396,6 +420,15 @@ export default function CodeSkateVoice() {
     }
   };
 
+  const handleCancel = async (numberId) => {
+    try {
+      await apiPostJson("/api/v1/voice/cancel", { orgId, numberId });
+      load();
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
   useEffect(() => { load(); }, [orgId]);
 
   return (
@@ -465,7 +498,7 @@ export default function CodeSkateVoice() {
                     </div>
                   )}
                   <div className="flex-1">
-                    {n.status === "active" ? <ActiveNumberCard number={n} /> : <PendingCard number={n} />}
+                    {n.status === "active" ? <ActiveNumberCard number={n} onCancel={handleCancel} /> : <PendingCard number={n} onCancel={handleCancel} />}
                   </div>
                 </div>
               ));

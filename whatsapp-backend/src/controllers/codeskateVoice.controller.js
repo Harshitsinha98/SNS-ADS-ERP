@@ -27,6 +27,7 @@ import {
   createVoiceNumberRequest,
   registerOwnedNumber,
   setNumberPriority,
+  cancelNumber,
   updateComplianceStatus,
   activateNumber,
   getOrgVoiceNumbers,
@@ -332,4 +333,130 @@ async function autoProvisionNumber(complianceId, orgId) {
   await activateNumber(complianceId, { phoneNumber, displayNumber, plivoAppId });
 
   logger.info({ orgId, phoneNumber, plivoAppId }, "Voice number fully provisioned and active");
+}
+
+
+// ─── POST /cancel (customer cancels their own number request/active number) ──
+// - pending_review / rejected → free cancel (nothing purchased)
+// - active / suspended → deactivate number (stop rent, bridge falls back to "get number")
+export async function cancelHandler(req, res) {
+  try {
+    const { orgId, numberId } = req.body || {};
+    if (!orgId || !numberId) return res.status(400).json({ error: "orgId and numberId are required." });
+
+    const membership = await getActiveMembership(req.authUser.uid, orgId);
+    if (!membership || (membership.role !== "admin" && membership.role !== "owner")) {
+      return res.status(403).json({ error: "Only admins can cancel numbers." });
+    }
+
+    const result = await cancelNumber(orgId, numberId);
+    if (!result) return res.status(404).json({ error: "Number not found." });
+
+    return res.json({ ok: true, message: "Number request cancelled.", record: result });
+  } catch (e) {
+    logger.error({ err: e.message }, "Cancel number error");
+    return res.status(500).json({ error: e.message || "Could not cancel." });
+  }
+}
+
+// ─── POST /admin-reject (platform owner rejects a pending request with reason) ──
+export async function adminRejectHandler(req, res) {
+  try {
+    const callerPhone = req.authUser.phone_number || req.authUser.phoneNumber || "";
+    if (callerPhone !== PLATFORM_OWNER_PHONE) {
+      return res.status(403).json({ error: "Only the platform owner can reject requests." });
+    }
+
+    const { numberId, reason } = req.body || {};
+    if (!numberId) return res.status(400).json({ error: "numberId is required." });
+
+    const ref = db.collection("voiceNumbers").doc(numberId);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: "Number request not found." });
+
+    await ref.update({
+      status: "rejected",
+      complianceStatus: "rejected",
+      rejectionReason: reason || "Your documents could not be verified. Please resubmit with correct details.",
+      updatedAt: new Date().toISOString(),
+    });
+
+    return res.json({ ok: true, message: "Request rejected." });
+  } catch (e) {
+    logger.error({ err: e.message }, "Admin reject error");
+    return res.status(500).json({ error: e.message || "Could not reject." });
+  }
+}
+
+// ─── POST /admin-approve (platform owner approves + assigns a number) ────────
+// After verifying docs on Plivo console and purchasing the number there,
+// platform owner enters the phone number here → system activates it for the org.
+export async function adminApproveHandler(req, res) {
+  try {
+    const callerPhone = req.authUser.phone_number || req.authUser.phoneNumber || "";
+    if (callerPhone !== PLATFORM_OWNER_PHONE) {
+      return res.status(403).json({ error: "Only the platform owner can approve requests." });
+    }
+
+    const { numberId, phoneNumber, displayNumber } = req.body || {};
+    if (!numberId || !phoneNumber) {
+      return res.status(400).json({ error: "numberId and phoneNumber are required." });
+    }
+
+    const ref = db.collection("voiceNumbers").doc(numberId);
+    const snap = await ref.get();
+    if (!snap.exists) return res.status(404).json({ error: "Number request not found." });
+    const num = snap.data();
+
+    const digits = String(phoneNumber).replace(/\D/g, "");
+    const display = displayNumber || `+${digits.slice(0, 2)} ${digits.slice(2, 7)} ${digits.slice(7)}`;
+
+    await ref.update({
+      phoneNumber: digits,
+      displayNumber: display,
+      status: "active",
+      complianceStatus: "accepted",
+      rejectionReason: null,
+      activatedAt: new Date().toISOString(),
+      purchasedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Charge first month rent from wallet (if paid number)
+    if ((num.monthlyCostInr || 0) > 0) {
+      const { chargeFirstMonthRent } = await import("../services/voiceNumbers.js");
+      await chargeFirstMonthRent(num.orgId, numberId).catch((e) =>
+        logger.warn({ numberId, err: e.message }, "First-month rent charge failed on admin approve")
+      );
+    }
+
+    logger.info({ numberId, phoneNumber: digits, orgId: num.orgId }, "Number approved and activated by platform admin");
+    return res.json({ ok: true, message: "Number approved and activated.", phoneNumber: digits, displayNumber: display });
+  } catch (e) {
+    logger.error({ err: e.message }, "Admin approve error");
+    return res.status(500).json({ error: e.message || "Could not approve." });
+  }
+}
+
+// ─── GET /admin-pending (platform owner: list all pending voice number requests) ──
+export async function adminPendingHandler(req, res) {
+  try {
+    const callerPhone = req.authUser.phone_number || req.authUser.phoneNumber || "";
+    if (callerPhone !== PLATFORM_OWNER_PHONE) {
+      return res.status(403).json({ error: "Only the platform owner can view pending requests." });
+    }
+
+    const snap = await db.collection("voiceNumbers")
+      .where("status", "in", ["pending_review", "compliance_approved", "rejected"])
+      .get();
+
+    const requests = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    // Sort newest first
+    requests.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+    return res.json({ ok: true, requests });
+  } catch (e) {
+    logger.error({ err: e.message }, "Admin pending list error");
+    return res.status(500).json({ error: "Could not load pending requests." });
+  }
 }
