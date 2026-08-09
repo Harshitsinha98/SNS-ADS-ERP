@@ -12,6 +12,7 @@
 import { getActiveMembership, isOrgAdmin } from "../middleware/auth.js";
 import { bridgeCallConfig } from "../config/env.js";
 import { logger } from "../middleware/logger.js";
+import { db } from "../bootstrap/firebase.js";
 import {
   getIndiaRequirements,
   createComplianceApplication,
