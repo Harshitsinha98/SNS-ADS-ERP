@@ -22,6 +22,7 @@ import {
   Radio,
   PhoneCall,
   Mic,
+  Phone,
 } from "lucide-react";
 
 const adminLinks = [
@@ -41,6 +42,7 @@ const adminLinks = [
   { to: "/admin/voice-wallet", label: "Voice Wallet", icon: Wallet },
   { to: "/admin/call-history", label: "Call History", icon: PhoneCall },
   { to: "/admin/recordings", label: "Recordings", icon: Mic },
+  { to: "/admin/voice", label: "CodeSkate Voice", icon: Phone },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 

@@ -20,6 +20,7 @@ import Broadcast from "./pages/admin/Broadcast";
 import BroadcastDetail from "./pages/admin/BroadcastDetail";
 import CallHistory from "./pages/admin/CallHistory";
 import Recordings from "./pages/admin/Recordings";
+import CodeSkateVoice from "./pages/admin/CodeSkateVoice";
 import TeamInbox from "./pages/TeamInbox";
 import WhatsApp from "./pages/admin/WhatsApp";
 import WebsiteLeadIntegration from "./pages/admin/WebsiteLeadIntegration";
@@ -91,6 +92,7 @@ export default function App() {
         <Route path="/admin/voice-wallet" element={<ProtectedRoute role="admin"><VoiceWallet /></ProtectedRoute>} />
         <Route path="/admin/call-history" element={<ProtectedRoute role="admin"><CallHistory /></ProtectedRoute>} />
         <Route path="/admin/recordings" element={<ProtectedRoute role="admin"><Recordings /></ProtectedRoute>} />
+        <Route path="/admin/voice" element={<ProtectedRoute role="admin"><CodeSkateVoice /></ProtectedRoute>} />
         <Route path="/admin/inbox" element={<ProtectedRoute role="admin"><TeamInbox /></ProtectedRoute>} />
         <Route path="/admin/broadcast" element={<ProtectedRoute role="admin"><Broadcast /></ProtectedRoute>} />
         <Route path="/admin/broadcast/:broadcastId" element={<ProtectedRoute role="admin"><BroadcastDetail /></ProtectedRoute>} />

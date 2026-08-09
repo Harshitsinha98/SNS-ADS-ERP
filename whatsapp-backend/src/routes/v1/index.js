@@ -25,6 +25,7 @@ import { createOtpRoutes } from "./otp.routes.js";
 import { createBridgeCallRoutes } from "./bridgeCall.routes.js";
 import { createWalletRoutes } from "./wallet.routes.js";
 import { createBroadcastRoutes } from "./broadcast.routes.js";
+import { createCodeskateVoiceRoutes } from "./codeskateVoice.routes.js";
 import { publicChatMessage } from "../../controllers/publicChat.controller.js";
 
 export function createV1Router() {
@@ -47,6 +48,9 @@ export function createV1Router() {
 
   // WhatsApp Broadcast (bulk template sending)
   router.use("/broadcast", createBroadcastRoutes());
+
+  // CodeSkate Voice — multi-tenant number purchase + compliance
+  router.use("/voice", createCodeskateVoiceRoutes());
 
   // WhatsApp management
   router.use("/whatsapp", createWhatsAppRoutes());

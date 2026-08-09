@@ -16,6 +16,7 @@ import { bridgeCallConfig } from "../config/env.js";
 import { logger } from "../middleware/logger.js";
 import { nowIso, orgCollection } from "./helpers.js";
 import { uploadRecordingToR2 } from "./r2Storage.js";
+import { getActiveNumberForOrg } from "./voiceNumbers.js";
 
 const toDigits = (phone) => String(phone || "").replace(/\D/g, "");
 
@@ -74,7 +75,11 @@ function plivoAuthHeader() {
  * This is the core of the "pay only when a real human connects" model.
  */
 export async function callCustomerIntoConference(callId, leadPhone) {
-  const from = toDigits(bridgeCallConfig.fromNumber);
+  // Use the same fromNumber that was stored when the call was initiated.
+  // This ensures the customer sees the tenant's own number (if they have one).
+  const callSnap = await db.collection("bridgeCalls").doc(callId).get().catch(() => null);
+  const storedFrom = callSnap?.exists ? callSnap.data()?.fromNumber : null;
+  const from = storedFrom || toDigits(bridgeCallConfig.fromNumber);
   const to = ensureE164Digits(leadPhone);
   const base = bridgeCallConfig.publicBackendUrl.replace(/\/$/, "");
 
@@ -140,7 +145,15 @@ export async function initiateBridgeCall({
     return { ok: false, error: "Bridge calling is not configured on the server." };
   }
 
-  const from = toDigits(bridgeCallConfig.fromNumber);
+  // Use tenant's own number if they have one (CodeSkate Voice), else fallback
+  // to the shared platform number.
+  let fromNumber = bridgeCallConfig.fromNumber;
+  const tenantNumber = await getActiveNumberForOrg(orgId).catch(() => null);
+  if (tenantNumber?.phoneNumber) {
+    fromNumber = tenantNumber.phoneNumber;
+  }
+
+  const from = toDigits(fromNumber);
   const to = ensureE164Digits(employeePhone);
   const leadTo = ensureE164Digits(leadPhone);
 
@@ -160,6 +173,7 @@ export async function initiateBridgeCall({
     callId, orgId, leadId,
     leadPhone: leadTo, leadName: leadName || "",
     employeePhone: to, employeeName: employeeName || "", employeeUid,
+    fromNumber: from, // the caller ID used (tenant's own or shared)
     status: "initiating",
     record: shouldRecord,
     initiatedAt: nowIso(), initiatedAtMs: Date.now(),
