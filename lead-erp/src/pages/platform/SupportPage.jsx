@@ -74,7 +74,7 @@ function TicketCard({ ticket, onUpdate }) {
       <div className="px-5 py-3.5 flex items-center gap-3 cursor-pointer hover:bg-cream-50" onClick={() => setExpanded(!expanded)}>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
-            <p className="font-medium text-sm text-ink truncate">{ticket.subject}</p>
+            <p className="font-medium text-sm text-ink truncate">{ticket.ticketNumber ? `${ticket.ticketNumber} — ` : ""}{ticket.subject}</p>
             <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${badge.bg}`}>
               <BadgeIcon size={10} /> {badge.label}
             </span>

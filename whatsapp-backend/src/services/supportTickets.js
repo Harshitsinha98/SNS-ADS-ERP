@@ -25,7 +25,8 @@ const nowIso = () => new Date().toISOString();
 
 async function sendTelegramAlert(message) {
   try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -34,9 +35,28 @@ async function sendTelegramAlert(message) {
         parse_mode: "HTML",
       }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) logger.error({ status: res.status, data }, "Telegram support alert HTTP error");
+    else logger.info("Telegram support alert sent successfully");
   } catch (e) {
-    logger.warn({ err: e.message }, "Support ticket Telegram alert failed");
+    logger.error({ err: e.message }, "Telegram support alert network error");
   }
+}
+
+/**
+ * Generate next ticket number (CS-001, CS-002, ...).
+ * Uses a counter doc for atomicity.
+ */
+async function getNextTicketNumber() {
+  const counterRef = db.collection("platformCounters").doc("supportTickets");
+  const newCount = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(counterRef);
+    const current = snap.exists ? (snap.data().count || 0) : 0;
+    const next = current + 1;
+    tx.set(counterRef, { count: next }, { merge: true });
+    return next;
+  });
+  return `CS-${String(newCount).padStart(3, "0")}`;
 }
 
 /**
@@ -47,8 +67,10 @@ export async function createTicket({
   subject, description, conversationHistory, priority,
 }) {
   const ref = db.collection(COLLECTION).doc();
+  const ticketNumber = await getNextTicketNumber();
   const ticket = {
     id: ref.id,
+    ticketNumber,
     orgId: orgId || null,
     orgName: orgName || "",
     userId: userId || null,
@@ -71,7 +93,7 @@ export async function createTicket({
 
   // Telegram alert
   const alert = [
-    `🎫 <b>New Support Ticket</b>`,
+    `🎫 <b>New Support Ticket ${ticket.ticketNumber}</b>`,
     ``,
     `<b>From:</b> ${ticket.userName} (${ticket.userRole})`,
     ticket.orgName ? `<b>Org:</b> ${ticket.orgName}` : "",
@@ -79,7 +101,7 @@ export async function createTicket({
     `<b>Issue:</b> ${ticket.description.slice(0, 200)}${ticket.description.length > 200 ? "..." : ""}`,
     ``,
     `<b>Priority:</b> ${ticket.priority}`,
-    `→ /platform/support`,
+    `→ crm.codeskate.com/platform/support`,
   ].filter(Boolean).join("\n");
 
   sendTelegramAlert(alert).catch(() => {});
@@ -90,14 +112,19 @@ export async function createTicket({
 
 /**
  * List tickets (platform admin — all; or filtered by orgId for a tenant).
+ * Avoids composite index by sorting in-memory (ticket count always < 100).
  */
-export async function listTickets({ orgId, status, limit: lim = 50 } = {}) {
-  let q = db.collection(COLLECTION).orderBy("createdAtMs", "desc").limit(lim);
+export async function listTickets({ orgId, status, limit: lim = 100 } = {}) {
+  let q = db.collection(COLLECTION);
   if (orgId) q = q.where("orgId", "==", orgId);
   if (status) q = q.where("status", "==", status);
+  q = q.limit(lim);
 
   const snap = await q.get();
-  return snap.docs.map((d) => d.data());
+  const tickets = snap.docs.map((d) => d.data());
+  // Sort newest first in-memory (avoids composite index requirement)
+  tickets.sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+  return tickets;
 }
 
 /**
