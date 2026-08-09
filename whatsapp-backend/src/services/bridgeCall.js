@@ -317,12 +317,58 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
   // Download from Plivo CDN → upload to Cloudflare R2 for permanent storage.
   // Runs in background so the webhook responds fast. On success, updates
   // Firestore with the R2 URL (replaces temporary Plivo CDN link).
+  // Also tries to fetch the recording from Plivo CDR if callback didn't include it.
   if (recordingUrl) {
     uploadRecordingToR2(recordingUrl, callId, call.orgId).then((r2Url) => {
       if (r2Url) {
         callRef.update({ r2RecordingUrl: r2Url }).catch(() => {});
       }
     }).catch((e) => logger.warn({ callId, err: e.message }, "R2 upload background task failed"));
+  } else if (bLegConnected) {
+    // Recording callback may arrive late (2-5 min for conference recordings).
+    // Schedule a delayed check: fetch recording URL from Plivo CDR after 60s.
+    setTimeout(async () => {
+      try {
+        const bLegUuid = bLegUuid || call.plivoBLegUuid;
+        const confName = `conf_${callId}`;
+        // Try conference recording API first
+        const auth = Buffer.from(`${bridgeCallConfig.plivoAuthId}:${bridgeCallConfig.plivoAuthToken}`).toString("base64");
+        const confRes = await fetch(
+          `https://api.plivo.com/v1/Account/${bridgeCallConfig.plivoAuthId}/Conference/${confName}/Recording/`,
+          { headers: { Authorization: `Basic ${auth}` } }
+        );
+        if (confRes.ok) {
+          const confData = await confRes.json().catch(() => ({}));
+          const recUrl = confData.recording_url || confData.url || (confData.objects && confData.objects[0]?.recording_url);
+          if (recUrl) {
+            await callRef.update({ recordingUrl: recUrl });
+            const r2Url = await uploadRecordingToR2(recUrl, callId, call.orgId);
+            if (r2Url) await callRef.update({ r2RecordingUrl: r2Url });
+            logger.info({ callId }, "Recording fetched from Plivo conference API (delayed)");
+            return;
+          }
+        }
+        // Fallback: check the A-leg call CDR for recording
+        if (call.plivoCallUuid) {
+          const cdrRes = await fetch(
+            `https://api.plivo.com/v1/Account/${bridgeCallConfig.plivoAuthId}/Call/${call.plivoCallUuid}/`,
+            { headers: { Authorization: `Basic ${auth}` } }
+          );
+          if (cdrRes.ok) {
+            const cdr = await cdrRes.json().catch(() => ({}));
+            const recUrl = cdr.recording_url || cdr.record_url;
+            if (recUrl) {
+              await callRef.update({ recordingUrl: recUrl });
+              const r2Url = await uploadRecordingToR2(recUrl, callId, call.orgId);
+              if (r2Url) await callRef.update({ r2RecordingUrl: r2Url });
+              logger.info({ callId }, "Recording fetched from Plivo CDR (delayed)");
+            }
+          }
+        }
+      } catch (e) {
+        logger.warn({ callId, err: e.message }, "Delayed recording fetch failed");
+      }
+    }, 60_000); // 60 sec delay — gives Plivo time to process the recording
   }
 
   // Only deduct wallet when the customer actually connected and we have a duration
