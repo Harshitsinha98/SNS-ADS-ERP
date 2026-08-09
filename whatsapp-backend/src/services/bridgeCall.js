@@ -377,7 +377,7 @@ async function deductWalletMinutes(orgId, minutes, costInr, callId) {
     packName: "Bridge Call",
     minutes: -minutes,
     amountInr: costInr,
-    description: `Bridge call (${minutes} min — A+B legs)`,
+    description: `Bridge call (${minutes} min)`,
     callId,
     createdAt: nowIso(),
     timestamp: Date.now(),

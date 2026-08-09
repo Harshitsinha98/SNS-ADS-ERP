@@ -25,6 +25,7 @@ import {
 import {
   createVoiceNumber,
   createVoiceNumberRequest,
+  registerOwnedNumber,
   updateComplianceStatus,
   activateNumber,
   getOrgVoiceNumbers,
@@ -215,6 +216,39 @@ export async function complianceWebhookHandler(req, res) {
   } catch (e) {
     logger.error({ err: e.message }, "Compliance webhook error");
     return res.status(200).send("ok"); // always 200 to Plivo
+  }
+}
+
+// ─── POST /register-owned (platform owner: add an existing owned number) ─────
+// Lets the platform owner attach a number CodeSkate already owns on Plivo to a
+// tenant org as active — without going through compliance. Used for the shared
+// CodeSkate number or numbers bought manually in the Plivo console.
+const PLATFORM_OWNER_PHONE = process.env.PLATFORM_OWNER_PHONE || "+919653043939";
+
+export async function registerOwnedHandler(req, res) {
+  try {
+    const callerPhone = req.authUser.phone_number || req.authUser.phoneNumber || "";
+    if (callerPhone !== PLATFORM_OWNER_PHONE) {
+      return res.status(403).json({ error: "Only the platform owner can register owned numbers." });
+    }
+
+    const { orgId, phoneNumber, displayNumber, businessName, chargeRent } = req.body || {};
+    if (!orgId || !phoneNumber) {
+      return res.status(400).json({ error: "orgId and phoneNumber are required." });
+    }
+
+    const record = await registerOwnedNumber({
+      orgId,
+      phoneNumber,
+      displayNumber: displayNumber || null,
+      businessName: businessName || "",
+      chargeRent: chargeRent !== false, // default true; pass false for CodeSkate's own free number
+    });
+
+    return res.status(201).json({ ok: true, record });
+  } catch (e) {
+    logger.error({ err: e.message }, "Register owned number error");
+    return res.status(500).json({ error: e.message || "Could not register number." });
   }
 }
 

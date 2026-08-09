@@ -29,6 +29,8 @@ import { logger } from "../middleware/logger.js";
 import { nowIso } from "./helpers.js";
 
 const COLLECTION = "voiceNumbers";
+const DEFAULT_RENT_INR = 500;
+const RENT_PERIOD_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 /**
  * Create a voice-number REQUEST record (tenant submitted docs, awaiting
@@ -140,6 +142,46 @@ export async function updateComplianceStatus(complianceId, { status, rejectionRe
 }
 
 /**
+ * Register an existing, already-owned Plivo number to an org as ACTIVE.
+ * Used by the platform owner to bring pre-owned numbers (e.g. the shared
+ * CodeSkate number) into a tenant's account. Starts the monthly rent clock
+ * unless chargeRent=false (e.g. for CodeSkate's own free number).
+ */
+export async function registerOwnedNumber({
+  orgId, phoneNumber, displayNumber, businessName,
+  monthlyCostInr = DEFAULT_RENT_INR, chargeRent = true,
+}) {
+  const digits = String(phoneNumber || "").replace(/\D/g, "");
+  const docRef = db.collection(COLLECTION).doc();
+  const nextRentAtMs = chargeRent ? Date.now() + RENT_PERIOD_MS : null;
+  const record = {
+    id: docRef.id,
+    orgId,
+    phoneNumber: digits,
+    displayNumber: displayNumber || digits,
+    complianceId: null,
+    complianceStatus: "accepted",
+    rejectionReason: null,
+    plivoAppId: null,
+    status: "active",
+    businessName: businessName || "",
+    monthlyCostInr: chargeRent ? monthlyCostInr : 0,
+    plivoCostInr: 200,
+    purchasedAt: nowIso(),
+    activatedAt: nowIso(),
+    lastRentAtMs: chargeRent ? Date.now() : null,
+    lastRentAt: chargeRent ? nowIso() : null,
+    nextRentAtMs,
+    nextRentAt: nextRentAtMs ? new Date(nextRentAtMs).toISOString() : null,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  await docRef.set(record);
+  logger.info({ orgId, phoneNumber: digits }, "Owned number registered as active");
+  return record;
+}
+
+/**
  * Mark number as purchased and assign Plivo details.
  */
 export async function activateNumber(complianceId, { phoneNumber, displayNumber, plivoAppId }) {
@@ -151,6 +193,7 @@ export async function activateNumber(complianceId, { phoneNumber, displayNumber,
   if (snap.empty) return null;
 
   const doc = snap.docs[0];
+  const nextRentAtMs = Date.now() + RENT_PERIOD_MS;
   const update = {
     phoneNumber,
     displayNumber: displayNumber || phoneNumber,
@@ -158,12 +201,91 @@ export async function activateNumber(complianceId, { phoneNumber, displayNumber,
     status: "active",
     purchasedAt: nowIso(),
     activatedAt: nowIso(),
+    lastRentAtMs: Date.now(),
+    lastRentAt: nowIso(),
+    nextRentAtMs,
+    nextRentAt: new Date(nextRentAtMs).toISOString(),
     updatedAt: nowIso(),
   };
 
   await doc.ref.update(update);
   logger.info({ complianceId, phoneNumber }, "Voice number activated");
   return { ...doc.data(), ...update };
+}
+
+/**
+ * Charge monthly rent for all active numbers whose rent is due.
+ * Deducts ₹rent from the org's Voice Wallet rupee balance (balanceInr) and
+ * records a walletTransactions debit. If the wallet can't cover the rent, the
+ * number is SUSPENDED (bridge calls fall back to the shared number) until the
+ * tenant tops up — no silent negative balance.
+ *
+ * Designed to be idempotent per-period: nextRentAtMs gates re-charging.
+ */
+export async function chargeDueRents() {
+  const now = Date.now();
+  const snap = await db.collection(COLLECTION).where("status", "==", "active").get();
+  let charged = 0, suspended = 0;
+
+  for (const doc of snap.docs) {
+    const num = doc.data();
+    if (!num.monthlyCostInr || num.monthlyCostInr <= 0) continue; // free number
+    if ((num.nextRentAtMs || 0) > now) continue; // not due yet
+
+    const rent = num.monthlyCostInr || DEFAULT_RENT_INR;
+    const walletRef = db.collection("voiceWallets").doc(num.orgId);
+
+    try {
+      const outcome = await db.runTransaction(async (tx) => {
+        const wSnap = await tx.get(walletRef);
+        const wallet = wSnap.exists ? wSnap.data() : {};
+        const balanceInr = Number(wallet.balanceInr || 0);
+
+        if (balanceInr < rent) {
+          tx.update(doc.ref, {
+            status: "suspended",
+            rentFailedAt: nowIso(),
+            rejectionReason: "Voice Wallet balance too low for monthly number rent. Top up to reactivate.",
+            updatedAt: nowIso(),
+          });
+          return "suspended";
+        }
+
+        const nextRentAtMs = now + RENT_PERIOD_MS;
+        tx.set(walletRef, {
+          balanceInr: balanceInr - rent,
+          totalSpentInr: (wallet.totalSpentInr || 0) + rent,
+        }, { merge: true });
+
+        tx.update(doc.ref, {
+          lastRentAtMs: now, lastRentAt: nowIso(),
+          nextRentAtMs, nextRentAt: new Date(nextRentAtMs).toISOString(),
+          updatedAt: nowIso(),
+        });
+
+        const txnRef = db.collection("walletTransactions").doc();
+        tx.create(txnRef, {
+          orgId: num.orgId,
+          type: "debit",
+          packId: "number_rent",
+          packName: "Number Rent",
+          minutes: 0,
+          amountInr: rent,
+          description: `Number rent — ${num.displayNumber || num.phoneNumber} (30 days)`,
+          createdAt: nowIso(),
+          timestamp: now,
+        });
+        return "charged";
+      });
+
+      if (outcome === "charged") charged++;
+      else if (outcome === "suspended") suspended++;
+    } catch (e) {
+      logger.error({ orgId: num.orgId, err: e.message }, "Rent charge failed for number");
+    }
+  }
+
+  return { checked: snap.size, charged, suspended };
 }
 
 /**

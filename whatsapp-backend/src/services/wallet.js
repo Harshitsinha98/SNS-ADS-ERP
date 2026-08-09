@@ -64,6 +64,7 @@ export async function getWalletBalance(orgId) {
   return {
     bridgeMinutes: data.balanceMinutes || data.bridgeMinutes || 0,
     aiMinutes: data.aiMinutes || 0,
+    balanceInr: data.balanceInr || 0,
     totalSpentInr: data.totalSpentInr || 0,
   };
 }

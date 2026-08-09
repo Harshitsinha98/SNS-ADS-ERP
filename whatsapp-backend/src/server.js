@@ -26,6 +26,7 @@ import { db } from "./bootstrap/firebase.js";
 import { recordCronJobHealth, recomputeMissionControlMetrics } from "./services/platformAnalytics.js";
 import { runEscalationCheck } from "./services/escalationService.js";
 import { runScheduledBroadcasts } from "./services/broadcast.js";
+import { chargeDueRents } from "./services/voiceNumbers.js";
 
 // ── Cron Jobs ──────────────────────────────────────────────────────
 
@@ -118,6 +119,20 @@ cron.schedule("* * * * *", () => {
     })
   );
 });
+
+// Daily at 7 AM IST: charge monthly rent for active CodeSkate Voice numbers.
+cron.schedule("0 7 * * *", () => {
+  runMonitoredCron("voiceNumberRent", () =>
+    withLease("voiceNumberRent", 30 * 60 * 1000, async () => {
+      await recordCronStart("voiceNumberRent");
+      const summary = await chargeDueRents();
+      if (summary.charged || summary.suspended) {
+        logger.info(summary, "Voice number rent charged");
+      }
+      return summary;
+    })
+  );
+}, { timezone: "Asia/Kolkata" });
 
 // ── Start Listener ─────────────────────────────────────────────────
 

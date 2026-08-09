@@ -20,6 +20,7 @@ import {
   numbersHandler,
   complianceWebhookHandler,
   activateHandler,
+  registerOwnedHandler,
 } from "../../controllers/codeskateVoice.controller.js";
 
 // Multer in-memory storage for doc uploads (max 5MB per file, 2 files)
@@ -58,6 +59,7 @@ export function createCodeskateVoiceRoutes() {
 
   // Platform admin manual trigger
   router.post("/activate", requireAuth, activateHandler);
+  router.post("/register-owned", requireAuth, registerOwnedHandler);
 
   return router;
 }

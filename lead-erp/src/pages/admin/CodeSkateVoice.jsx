@@ -12,9 +12,73 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { auth } from "../../firebase";
 import Layout from "../../components/Layout";
+import { PLATFORM_OWNER_PHONE } from "../../data/constants";
 import {
-  Phone, Upload, CheckCircle2, Clock, AlertTriangle, Loader2, Shield,
+  Phone, Upload, CheckCircle2, Clock, AlertTriangle, Loader2, Shield, Mic, Wallet, Plus,
 } from "lucide-react";
+
+async function apiPostJson(path, body) {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(`${import.meta.env.VITE_BACKEND_URL || ""}${path}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Request failed");
+  return data;
+}
+
+// Platform-owner only: attach an already-owned Plivo number to this org.
+function RegisterOwnedForm({ orgId, onSuccess }) {
+  const [open, setOpen] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [chargeRent, setChargeRent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const submit = async () => {
+    if (!phoneNumber) { setError("Enter the number."); return; }
+    setBusy(true); setError(null);
+    try {
+      await apiPostJson("/api/v1/voice/register-owned", { orgId, phoneNumber, businessName, chargeRent });
+      setOpen(false); setPhoneNumber(""); setBusinessName("");
+      onSuccess();
+    } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)}
+        className="w-full border-2 border-dashed border-gray-300 rounded-xl py-2.5 text-xs font-medium text-gray-500 hover:border-orange-300 hover:text-orange-600">
+        <Plus size={13} className="inline mr-1" /> Register an owned number (platform admin)
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-white border rounded-xl p-4 space-y-2">
+      <p className="text-sm font-semibold text-gray-900">Register owned number</p>
+      <input value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)}
+        placeholder="918035410700" className="w-full border rounded-lg px-3 py-2 text-sm" />
+      <input value={businessName} onChange={(e) => setBusinessName(e.target.value)}
+        placeholder="Business name (optional)" className="w-full border rounded-lg px-3 py-2 text-sm" />
+      <label className="flex items-center gap-2 text-xs text-gray-600">
+        <input type="checkbox" checked={chargeRent} onChange={(e) => setChargeRent(e.target.checked)} />
+        Charge ₹500/mo rent (uncheck for CodeSkate's own free number)
+      </label>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="flex gap-2">
+        <button onClick={submit} disabled={busy}
+          className="bg-orange-500 text-white text-sm px-3 py-1.5 rounded-lg hover:bg-orange-600 disabled:opacity-50">
+          {busy ? "Adding..." : "Add number"}
+        </button>
+        <button onClick={() => setOpen(false)} className="text-sm text-gray-500 px-3 py-1.5">Cancel</button>
+      </div>
+    </div>
+  );
+}
 
 const BASE = import.meta.env.VITE_BACKEND_URL || "";
 
@@ -82,12 +146,22 @@ function ActiveNumberCard({ number }) {
           <p className="font-medium">{number.businessName}</p>
         </div>
         <div>
-          <span className="text-gray-500">Monthly Cost</span>
+          <span className="text-gray-500">Monthly Rent</span>
           <p className="font-medium">₹{number.monthlyCostInr || 500}/mo</p>
         </div>
       </div>
-      <p className="text-xs text-gray-400 mt-4">
-        All bridge calls from your org now use this number as caller ID. Your customers see YOUR number, not CodeSkate's.
+
+      {/* Rent billing info */}
+      <div className="mt-3 flex items-center gap-2 bg-orange-50 rounded-lg px-3 py-2 text-xs text-orange-700">
+        <Wallet size={13} />
+        <span>
+          ₹{number.monthlyCostInr || 500}/mo auto-deducts from your Voice Wallet
+          {number.nextRentAt ? ` · next charge ${formatDate(number.nextRentAt)}` : ""}
+        </span>
+      </div>
+
+      <p className="text-xs text-gray-400 mt-3">
+        All bridge calls from your org use this number as caller ID. Your customers see YOUR number.
       </p>
     </div>
   );
@@ -285,7 +359,7 @@ function SubmitForm({ orgId, onSuccess }) {
       </form>
 
       <p className="text-[10px] text-gray-400 mt-3 text-center">
-        Plivo reviews within 24-48 hours. Number auto-activates on approval. Cancel anytime.
+        CodeSkate verifies your documents within 24-48 hours. Your number activates on approval. Cancel anytime.
       </p>
     </div>
   );
@@ -362,17 +436,40 @@ export default function CodeSkateVoice() {
                 )}
               </>
             )}
+
+            {/* Platform owner: register a number CodeSkate already owns */}
+            {user?.phone === PLATFORM_OWNER_PHONE && (
+              <RegisterOwnedForm orgId={orgId} onSuccess={load} />
+            )}
           </div>
         )}
 
         {/* Pricing info */}
-        <div className="mt-8 bg-gray-50 rounded-lg p-4 text-xs text-gray-500">
-          <p className="font-medium text-gray-700 mb-2">Pricing</p>
-          <ul className="space-y-1">
-            <li>Dedicated number: <strong>₹500/month</strong></li>
-            <li>Bridge calls: <strong>₹2.20/min</strong> (pay only when connected)</li>
-            <li>Recordings: <strong>Free</strong> (included in subscription)</li>
-          </ul>
+        <div className="mt-8">
+          <p className="text-sm font-semibold text-gray-900 mb-3">Pricing</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="bg-white border rounded-xl p-4 text-center">
+              <div className="w-9 h-9 rounded-full bg-orange-50 flex items-center justify-center mx-auto mb-2">
+                <Phone size={16} className="text-orange-500" />
+              </div>
+              <p className="text-lg font-bold text-gray-900">₹500<span className="text-xs font-normal text-gray-400">/mo</span></p>
+              <p className="text-xs text-gray-500 mt-0.5">Dedicated number</p>
+            </div>
+            <div className="bg-white border rounded-xl p-4 text-center">
+              <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-2">
+                <CheckCircle2 size={16} className="text-green-500" />
+              </div>
+              <p className="text-lg font-bold text-gray-900">₹2.20<span className="text-xs font-normal text-gray-400">/min</span></p>
+              <p className="text-xs text-gray-500 mt-0.5">Pay only when connected</p>
+            </div>
+            <div className="bg-white border rounded-xl p-4 text-center">
+              <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-2">
+                <Mic size={16} className="text-blue-500" />
+              </div>
+              <p className="text-lg font-bold text-gray-900">Free</p>
+              <p className="text-xs text-gray-500 mt-0.5">Call recordings</p>
+            </div>
+          </div>
         </div>
       </div>
     </Layout>
