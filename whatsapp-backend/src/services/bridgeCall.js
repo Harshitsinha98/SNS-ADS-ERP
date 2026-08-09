@@ -82,9 +82,6 @@ export async function callCustomerIntoConference(callId, leadPhone) {
           ring_timeout: bridgeCallConfig.ringTimeoutSeconds,
           time_limit: bridgeCallConfig.maxCallDurationSeconds,
           caller_name: "CodeSkate CRM",
-          // Answering Machine Detection: hang up if voicemail/machine answers.
-          machine_detection: "hangup",
-          machine_detection_time: "5000",
         }),
       }
     );
