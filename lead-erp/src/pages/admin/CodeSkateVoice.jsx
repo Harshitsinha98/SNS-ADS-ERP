@@ -22,6 +22,12 @@ import {
 
 const VOICE_PLANS = new Set(["growth", "enterprise", "enterprise_plus"]);
 
+function formatDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+}
+
 async function apiPostJson(path, body) {
   const token = await auth.currentUser?.getIdToken();
   const res = await fetch(`${import.meta.env.VITE_BACKEND_URL || ""}${path}`, {
