@@ -20,6 +20,7 @@ export default function LeadAction() {
   const orgId = user?.activeOrgId;
   const currentUserId = user?.uid || user?.id;
   const lead = leads.find((l) => l.id === id);
+  const canSeePhone = settings?.employeeCanSeePhone || false;
 
   const [notes, setNotes] = useState([]);
   const [note, setNote] = useState("");
@@ -124,7 +125,7 @@ export default function LeadAction() {
         <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
           <p className="eyebrow mb-3">Client profile</p>
           <p className="text-sm mb-1"><span className="text-ink/40">Name</span> · {lead.name}</p>
-          <p className="text-sm mb-1 num"><span className="text-ink/40">Phone</span> · {lead.phone ? lead.phone.slice(0, 4) + "●●●●" + lead.phone.slice(-3) : "—"}</p>
+          <p className="text-sm mb-1 num"><span className="text-ink/40">Phone</span> · {canSeePhone ? lead.phone : `+91 XXXXXX${lead.phone ? lead.phone.slice(-4) : "----"}`}</p>
           <p className="text-sm mb-1"><span className="text-ink/40">Source</span> · {lead.source}</p>
           <p className="text-sm mb-4"><span className="text-ink/40">Requirement</span> · {lead.requirement}</p>
 
@@ -160,6 +161,11 @@ export default function LeadAction() {
               <button onClick={handleBridgeCall} className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-blue-700 transition-colors">
                 <PhoneCall size={15} /> Bridge call (masked)
               </button>
+              {canSeePhone && (
+                <button onClick={startCall} className="w-full flex items-center justify-center gap-2 bg-success-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-success-700 transition-colors">
+                  <Phone size={15} /> Direct call
+                </button>
+              )}
             </div>
           ) : callActive ? (
             <button onClick={endCall} className="w-full flex items-center justify-center gap-2 bg-danger-600 text-white rounded-md p-2.5 text-sm font-medium animate-pulse">

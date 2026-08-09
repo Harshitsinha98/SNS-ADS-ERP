@@ -44,6 +44,22 @@ export default function Settings() {
             </label>
           ))}
         </div>
+
+        <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
+          <p className="eyebrow mb-3">Privacy & Access</p>
+          <label className="flex items-center gap-3 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.employeeCanSeePhone || false}
+              onChange={(e) => setSettings({ ...settings, employeeCanSeePhone: e.target.checked })}
+              className="w-4 h-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+            />
+            <div>
+              <span className="font-medium text-ink">Allow employees to see lead phone numbers</span>
+              <p className="text-xs text-ink/50 mt-0.5">When enabled, employees can see the full phone number and make direct calls. When disabled, numbers are masked (+91 XXXXXX1234) and only bridge calling is available.</p>
+            </div>
+          </label>
+        </div>
       </div>
     </Layout>
   );
