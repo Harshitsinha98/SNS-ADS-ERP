@@ -179,7 +179,19 @@ export async function registerOwnedNumber({
     updatedAt: nowIso(),
   };
   await docRef.set(record);
-  logger.info({ orgId, phoneNumber: digits }, "Owned number registered as active");
+
+  // Charge the first month now (unless it's a free number). If the wallet can't
+  // cover it, the number is parked as suspended until the tenant tops up.
+  if (chargeRent) {
+    await chargeFirstMonthRent(orgId, docRef.id).catch((e) =>
+      logger.warn({ orgId, err: e.message }, "First-month rent charge failed at registration")
+    );
+    const fresh = await docRef.get();
+    logger.info({ orgId, phoneNumber: digits }, "Owned number registered");
+    return fresh.data();
+  }
+
+  logger.info({ orgId, phoneNumber: digits }, "Owned number registered (free)");
   return record;
 }
 
@@ -211,8 +223,69 @@ export async function activateNumber(complianceId, { phoneNumber, displayNumber,
   };
 
   await doc.ref.update(update);
+  // Charge first month at activation (no charge ever happened before this point).
+  await chargeFirstMonthRent(doc.data().orgId, doc.id).catch((e) =>
+    logger.warn({ complianceId, err: e.message }, "First-month rent charge failed at activation")
+  );
+  const fresh = await doc.ref.get();
   logger.info({ complianceId, phoneNumber }, "Voice number activated");
-  return { ...doc.data(), ...update };
+  return fresh.data();
+}
+
+/**
+ * Charge the FIRST month's rent from the org's Voice Wallet at activation time.
+ * This is the ONLY point a tenant pays for a number — nothing is charged at
+ * request time, so a failed/rejected verification costs the customer ₹0 (no
+ * refund logic needed). If the wallet can't cover it, the number is parked as
+ * "suspended" (awaiting balance) and auto-activates on the next rent run once
+ * topped up.
+ */
+export async function chargeFirstMonthRent(orgId, numberId) {
+  const ref = db.collection(COLLECTION).doc(numberId);
+  const walletRef = db.collection("voiceWallets").doc(orgId);
+  const now = Date.now();
+
+  return db.runTransaction(async (tx) => {
+    const nSnap = await tx.get(ref);
+    if (!nSnap.exists) return { ok: false };
+    const num = nSnap.data();
+    const rent = num.monthlyCostInr || 0;
+    if (rent <= 0) return { ok: true, free: true }; // free number, nothing to charge
+
+    const wSnap = await tx.get(walletRef);
+    const wallet = wSnap.exists ? wSnap.data() : {};
+    const balanceInr = Number(wallet.balanceInr || 0);
+
+    if (balanceInr < rent) {
+      tx.update(ref, {
+        status: "suspended",
+        nextRentAtMs: now, // due now → daily cron reactivates once funded
+        rejectionReason: "Awaiting Voice Wallet balance for first month's rent. Top up to activate.",
+        updatedAt: nowIso(),
+      });
+      return { ok: false, reason: "insufficient_balance" };
+    }
+
+    const nextRentAtMs = now + RENT_PERIOD_MS;
+    tx.set(walletRef, {
+      balanceInr: balanceInr - rent,
+      totalSpentInr: (wallet.totalSpentInr || 0) + rent,
+    }, { merge: true });
+    tx.update(ref, {
+      status: "active",
+      lastRentAtMs: now, lastRentAt: nowIso(),
+      nextRentAtMs, nextRentAt: new Date(nextRentAtMs).toISOString(),
+      rejectionReason: null,
+      updatedAt: nowIso(),
+    });
+    tx.create(db.collection("walletTransactions").doc(), {
+      orgId, type: "debit", packId: "number_rent", packName: "Number Rent",
+      minutes: 0, amountInr: rent,
+      description: `Number rent — ${num.displayNumber || num.phoneNumber} (first month)`,
+      createdAt: nowIso(), timestamp: now,
+    });
+    return { ok: true };
+  });
 }
 
 /**

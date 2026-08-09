@@ -9,13 +9,18 @@
  */
 
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useBilling } from "../../context/BillingContext";
 import { auth } from "../../firebase";
 import Layout from "../../components/Layout";
 import { PLATFORM_OWNER_PHONE } from "../../data/constants";
 import {
   Phone, Upload, CheckCircle2, Clock, AlertTriangle, Loader2, Shield, Mic, Wallet, Plus,
+  Sparkles, ArrowRight, Lock,
 } from "lucide-react";
+
+const VOICE_PLANS = new Set(["growth", "enterprise", "enterprise_plus"]);
 
 async function apiPostJson(path, body) {
   const token = await auth.currentUser?.getIdToken();
@@ -367,6 +372,10 @@ function SubmitForm({ orgId, onSuccess }) {
 
 export default function CodeSkateVoice() {
   const { user } = useAuth();
+  const billing = useBilling();
+  const navigate = useNavigate();
+  const planId = billing?.planId || "starter";
+  const planLocked = !VOICE_PLANS.has(planId);
   const orgId = user?.activeOrgId;
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
@@ -396,6 +405,25 @@ export default function CodeSkateVoice() {
           <Phone size={20} className="text-orange-500" />
           <h1 className="text-xl font-bold text-gray-900">CodeSkate Voice</h1>
         </div>
+
+        {/* Upgrade hook — Voice is a Growth+ feature */}
+        {planLocked && (
+          <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-5 mb-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center shrink-0">
+              <Lock className="text-white" size={20} />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-gray-900">Unlock CodeSkate Voice</h3>
+              <p className="text-sm text-gray-600">
+                Dedicated numbers, bridge calling & AI voice are available on Growth and above. Upgrade to give your business its own calling identity.
+              </p>
+            </div>
+            <button onClick={() => navigate("/admin/billing")}
+              className="bg-orange-500 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-orange-600 flex items-center gap-1.5 whitespace-nowrap">
+              Upgrade <ArrowRight size={15} />
+            </button>
+          </div>
+        )}
 
         {loading && (
           <div className="flex justify-center py-16">
@@ -474,7 +502,7 @@ export default function CodeSkateVoice() {
         {/* Pricing info */}
         <div className="mt-8">
           <p className="text-sm font-semibold text-gray-900 mb-3">Pricing</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-white border rounded-xl p-4 text-center">
               <div className="w-9 h-9 rounded-full bg-orange-50 flex items-center justify-center mx-auto mb-2">
                 <Phone size={16} className="text-orange-500" />
@@ -487,7 +515,14 @@ export default function CodeSkateVoice() {
                 <CheckCircle2 size={16} className="text-green-500" />
               </div>
               <p className="text-lg font-bold text-gray-900">₹2.20<span className="text-xs font-normal text-gray-400">/min</span></p>
-              <p className="text-xs text-gray-500 mt-0.5">Pay only when connected</p>
+              <p className="text-xs text-gray-500 mt-0.5">Bridge — pay when connected</p>
+            </div>
+            <div className="bg-white border rounded-xl p-4 text-center">
+              <div className="w-9 h-9 rounded-full bg-purple-50 flex items-center justify-center mx-auto mb-2">
+                <Sparkles size={16} className="text-purple-500" />
+              </div>
+              <p className="text-lg font-bold text-gray-900">₹5<span className="text-xs font-normal text-gray-400">/min</span></p>
+              <p className="text-xs text-gray-500 mt-0.5">AI voice call</p>
             </div>
             <div className="bg-white border rounded-xl p-4 text-center">
               <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-2">
@@ -497,6 +532,7 @@ export default function CodeSkateVoice() {
               <p className="text-xs text-gray-500 mt-0.5">Call recordings</p>
             </div>
           </div>
+          <p className="text-xs text-gray-400 mt-2">All usage draws from your Voice Wallet. Top up once, use across bridge, AI & rent.</p>
         </div>
       </div>
     </Layout>

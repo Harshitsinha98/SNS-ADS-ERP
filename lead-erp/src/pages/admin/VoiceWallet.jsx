@@ -17,6 +17,8 @@ import {
 
 const PRESETS = [500, 1000, 2000, 5000];
 const MIN_TOPUP = 100;
+const BRIDGE_RATE = 2.20; // ₹/min bridge call
+const AI_RATE = 5;        // ₹/min AI voice call
 
 const fmtDate = (ts) => {
   if (!ts) return "—";
@@ -170,11 +172,18 @@ export default function VoiceWallet() {
           {loadingBalance ? (
             <div className="h-9 flex items-center"><Loader2 size={20} className="animate-spin text-ink-muted" /></div>
           ) : (
-            <p className="font-display font-bold text-3xl text-ink flex items-center">
-              <IndianRupee size={22} />{balance.balanceInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-            </p>
+            <>
+              <p className="font-display font-bold text-3xl text-ink flex items-center">
+                <IndianRupee size={22} />{balance.balanceInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-ink-soft mt-1 font-medium">
+                ≈ {Math.floor(balance.balanceInr / BRIDGE_RATE).toLocaleString("en-IN")} bridge min
+                <span className="text-ink-muted"> · </span>
+                {Math.floor(balance.balanceInr / AI_RATE).toLocaleString("en-IN")} AI min
+              </p>
+            </>
           )}
-          <p className="text-xs text-ink-muted mt-2">Used for bridge calls (₹2.20/min) & number rent (₹500/mo each).</p>
+          <p className="text-xs text-ink-muted mt-2">Bridge ₹2.20/min · AI voice ₹5/min · number rent ₹500/mo each.</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 flex flex-col justify-center">

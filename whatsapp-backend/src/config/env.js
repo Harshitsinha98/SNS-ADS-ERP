@@ -223,6 +223,9 @@ export const bridgeCallConfig = {
   amdDetectionMs: Math.min(Number(process.env.BRIDGE_CALL_AMD_MS) || 10000, 10000),
   recordByDefault: String(process.env.BRIDGE_CALL_RECORD || "true").toLowerCase() === "true",
   costPerMinuteInr: Number(process.env.BRIDGE_CALL_COST_PER_MIN) || 1,
+  // AI voice call rate (₹/min) — charged from the same unified wallet once the
+  // AI voice-call feature ships. Shown in pricing today.
+  aiCostPerMinuteInr: Number(process.env.AI_CALL_COST_PER_MIN) || 5,
   allowedPlanIds: (process.env.BRIDGE_CALL_ALLOWED_PLANS || "growth,enterprise,enterprise_plus")
     .split(",").map((s) => s.trim()).filter(Boolean),
   get enabled() {
