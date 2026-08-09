@@ -16,7 +16,9 @@ import { auth } from "../firebase";
 const BASE = import.meta.env.VITE_BACKEND_URL || "";
 
 async function platformPost(path, body) {
-  const token = await auth.currentUser?.getIdToken();
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated — please refresh and try again.");
+  const token = await user.getIdToken();
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -28,7 +30,9 @@ async function platformPost(path, body) {
 }
 
 async function platformGet(path) {
-  const token = await auth.currentUser?.getIdToken();
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated — please refresh and try again.");
+  const token = await user.getIdToken();
   const res = await fetch(`${BASE}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -38,7 +42,9 @@ async function platformGet(path) {
 }
 
 async function platformPatch(path, body) {
-  const token = await auth.currentUser?.getIdToken();
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated — please refresh and try again.");
+  const token = await user.getIdToken();
   const res = await fetch(`${BASE}${path}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
