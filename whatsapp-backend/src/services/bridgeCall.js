@@ -329,7 +329,6 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
     // Schedule a delayed check: fetch recording URL from Plivo CDR after 60s.
     setTimeout(async () => {
       try {
-        const bLegUuid = bLegUuid || call.plivoBLegUuid;
         const confName = `conf_${callId}`;
         // Try conference recording API first
         const auth = Buffer.from(`${bridgeCallConfig.plivoAuthId}:${bridgeCallConfig.plivoAuthToken}`).toString("base64");
