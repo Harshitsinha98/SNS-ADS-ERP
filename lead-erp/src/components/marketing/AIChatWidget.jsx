@@ -41,6 +41,9 @@ export default function AIChatWidget() {
   ]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
+  const [leadName, setLeadName] = useState("");
+  const [leadPhone, setLeadPhone] = useState("");
+  const [leadCaptured, setLeadCaptured] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -62,6 +65,25 @@ export default function AIChatWidget() {
   const handleSubmit = (e) => {
     e.preventDefault();
     sendMessage(input);
+  };
+
+  const handleLeadCapture = async () => {
+    if (!leadName.trim() || !leadPhone.trim()) return;
+    setLeadCaptured(true);
+    // Fire-and-forget: store as a website lead via the public chat endpoint
+    try {
+      await fetch(`${BASE}/api/v1/public/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: `[LEAD CAPTURE] Name: ${leadName}, Phone: ${leadPhone}, Interest: ${messages.filter(m => m.role === "user").map(m => m.text).join(" | ")}`,
+          history: [],
+          isLeadCapture: true,
+          leadName,
+          leadPhone,
+        }),
+      });
+    } catch { /* non-fatal */ }
   };
 
   return (
@@ -108,6 +130,36 @@ export default function AIChatWidget() {
                 </div>
               </div>
             )}
+          {/* Lead capture form (appears after 3+ messages) */}
+          {messages.length >= 4 && !leadCaptured && (
+            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3.5 space-y-2">
+              <p className="text-xs font-semibold text-orange-800">Want a personalized demo or pricing?</p>
+              <input value={leadName} onChange={(e) => setLeadName(e.target.value)}
+                placeholder="Your name" className="w-full border border-orange-200 rounded-lg px-2.5 py-1.5 text-xs" />
+              <input value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)}
+                placeholder="Phone / WhatsApp number" className="w-full border border-orange-200 rounded-lg px-2.5 py-1.5 text-xs" />
+              <div className="flex gap-2">
+                <button onClick={handleLeadCapture} disabled={!leadName.trim() || !leadPhone.trim()}
+                  className="flex-1 bg-orange-500 text-white text-xs font-medium py-1.5 rounded-lg hover:bg-orange-600 disabled:opacity-40">
+                  Get Callback
+                </button>
+                <a href={`https://wa.me/919653043939?text=${encodeURIComponent(`Hi, I'm ${leadName || "interested"}. ${messages.filter(m=>m.role==="user").slice(-1)[0]?.text || "I want to know more about CodeSkate CRM."}`)}`}
+                  target="_blank" rel="noreferrer"
+                  className="flex-1 bg-green-500 text-white text-xs font-medium py-1.5 rounded-lg text-center hover:bg-green-600">
+                  Chat on WhatsApp
+                </a>
+              </div>
+            </div>
+          )}
+          {leadCaptured && (
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-3 text-xs text-green-700 text-center">
+              ✅ Thanks {leadName}! We'll reach out shortly. Or chat now on WhatsApp:
+              <a href={`https://wa.me/919653043939?text=${encodeURIComponent(`Hi, I'm ${leadName}. Interested in CodeSkate CRM.`)}`}
+                target="_blank" rel="noreferrer" className="block mt-1 font-semibold underline text-green-800">
+                Chat on WhatsApp →
+              </a>
+            </div>
+          )}
             <div ref={messagesEndRef} />
           </div>
 

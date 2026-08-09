@@ -82,5 +82,30 @@ export function createPlatformRoutes() {
   router.post("/voice-approve", adminApproveHandler);
   router.post("/voice-reject", adminRejectHandler);
 
+  // Support tickets — platform admin view (all tickets across orgs)
+  router.get("/support-tickets", async (req, res) => {
+    try {
+      const { listTickets } = await import("../../services/supportTickets.js");
+      const { status } = req.query;
+      const tickets = await listTickets({ status: status || undefined });
+      res.json({ ok: true, tickets });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  router.post("/support-tickets/:id/reply", async (req, res) => {
+    try {
+      const { replyToTicket } = await import("../../services/supportTickets.js");
+      const result = await replyToTicket(req.params.id, { from: "platform_admin", text: req.body.text || "" });
+      if (!result) return res.status(404).json({ error: "Ticket not found" });
+      res.json({ ok: true, ticket: result });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+  router.post("/support-tickets/:id/status", async (req, res) => {
+    try {
+      const { updateTicketStatus } = await import("../../services/supportTickets.js");
+      const result = await updateTicketStatus(req.params.id, req.body.status || "resolved");
+      res.json({ ok: true, ...result });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+  });
+
   return router;
 }

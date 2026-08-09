@@ -26,6 +26,7 @@ import { createBridgeCallRoutes } from "./bridgeCall.routes.js";
 import { createWalletRoutes } from "./wallet.routes.js";
 import { createBroadcastRoutes } from "./broadcast.routes.js";
 import { createCodeskateVoiceRoutes } from "./codeskateVoice.routes.js";
+import { createSupportRoutes } from "./support.routes.js";
 import { publicChatMessage } from "../../controllers/publicChat.controller.js";
 
 export function createV1Router() {
@@ -51,6 +52,9 @@ export function createV1Router() {
 
   // CodeSkate Voice — multi-tenant number purchase + compliance
   router.use("/voice", createCodeskateVoiceRoutes());
+
+  // Support — AI chat + ticket system for logged-in customers
+  router.use("/support", createSupportRoutes());
 
   // WhatsApp management
   router.use("/whatsapp", createWhatsAppRoutes());

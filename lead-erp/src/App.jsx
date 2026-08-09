@@ -63,11 +63,16 @@ function CallTrackerEngine() {
   return null;
 }
 
+// 3. AI support chat widget (floating on all authenticated pages)
+import SupportChat from "./components/SupportChat";
+
 export default function App() {
   return (
     <>
       {/* 🔥 The real magic: mount the background call-tracker watchman */}
       <CallTrackerEngine />
+      {/* 💬 AI support chat — floating widget */}
+      <SupportChat />
 
       <Routes>
         {/* --- PUBLIC MARKETING --- */}
