@@ -127,10 +127,13 @@ export async function activateNumber(complianceId, { phoneNumber, displayNumber,
 export async function getOrgVoiceNumbers(orgId) {
   const snap = await db.collection(COLLECTION)
     .where("orgId", "==", orgId)
-    .orderBy("createdAt", "desc")
     .get();
 
-  return snap.docs.map((d) => d.data());
+  // Sort in-memory (avoids needing a composite Firestore index for a
+  // collection that will typically have 1-2 docs per org).
+  const docs = snap.docs.map((d) => d.data());
+  docs.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  return docs;
 }
 
 /**
