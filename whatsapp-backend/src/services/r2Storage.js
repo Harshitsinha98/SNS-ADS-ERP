@@ -93,6 +93,29 @@ async function putObjectR2(key, body, contentType = "audio/mpeg") {
 }
 
 /**
+ * Upload an arbitrary buffer to R2 (e.g. compliance documents).
+ * Returns the R2 URL on success, null on failure/not-configured.
+ *
+ * @param {string} key - R2 object key (path)
+ * @param {Buffer} buffer - file contents
+ * @param {string} contentType - MIME type
+ */
+export async function uploadBufferToR2(key, buffer, contentType = "application/octet-stream") {
+  if (!r2Config.enabled) {
+    logger.debug("R2 not configured — skipping buffer upload");
+    return null;
+  }
+  try {
+    const url = await putObjectR2(key, buffer, contentType);
+    logger.info({ key, size: buffer.length }, "Buffer uploaded to R2");
+    return url;
+  } catch (e) {
+    logger.error({ key, err: e.message }, "R2 buffer upload failed");
+    return null;
+  }
+}
+
+/**
  * Download a recording from Plivo CDN and upload to R2.
  * Returns the R2 public URL on success, null on failure.
  *

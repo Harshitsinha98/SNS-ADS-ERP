@@ -31,6 +31,51 @@ import { nowIso } from "./helpers.js";
 const COLLECTION = "voiceNumbers";
 
 /**
+ * Create a voice-number REQUEST record (tenant submitted docs, awaiting
+ * CodeSkate review + provisioning). Stores business details + document URLs.
+ * A tenant can create multiple requests (multiple numbers, each billed).
+ */
+export async function createVoiceNumberRequest({
+  orgId, businessName, registrationNumber, email, address, city, state, postalCode,
+  registrationDocUrl, registrationDocFilename, gstDocUrl, gstDocFilename,
+  monthlyCostInr = 500, plivoCostInr = 200,
+}) {
+  const docRef = db.collection(COLLECTION).doc();
+  const record = {
+    id: docRef.id,
+    orgId,
+    phoneNumber: null,
+    displayNumber: null,
+    complianceId: null,
+    complianceStatus: "pending_review",
+    rejectionReason: null,
+    plivoAppId: null,
+    status: "pending_review", // awaiting CodeSkate admin action
+    businessName,
+    registrationNumber: registrationNumber || "",
+    email: email || "",
+    address: address || "",
+    city: city || "",
+    state: state || "",
+    postalCode: postalCode || "",
+    // Document references (stored in R2)
+    registrationDocUrl: registrationDocUrl || null,
+    registrationDocFilename: registrationDocFilename || null,
+    gstDocUrl: gstDocUrl || null,
+    gstDocFilename: gstDocFilename || null,
+    monthlyCostInr,
+    plivoCostInr,
+    purchasedAt: null,
+    activatedAt: null,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  await docRef.set(record);
+  logger.info({ orgId, businessName }, "Voice number request created (pending review)");
+  return record;
+}
+
+/**
  * Create a new voice number record (starts in pending_compliance state).
  */
 export async function createVoiceNumber({

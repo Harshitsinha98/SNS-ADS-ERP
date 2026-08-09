@@ -38,6 +38,7 @@ async function apiPostForm(path, formData) {
 }
 
 const STATUS_CONFIG = {
+  pending_review: { label: "Under Review", color: "text-yellow-600 bg-yellow-50", icon: Clock },
   pending_compliance: { label: "Under Review", color: "text-yellow-600 bg-yellow-50", icon: Clock },
   compliance_approved: { label: "Approved — Purchasing", color: "text-blue-600 bg-blue-50", icon: Loader2 },
   purchasing: { label: "Purchasing Number", color: "text-blue-600 bg-blue-50", icon: Loader2 },
@@ -296,6 +297,7 @@ export default function CodeSkateVoice() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const load = async () => {
     if (!orgId) return;
@@ -332,28 +334,35 @@ export default function CodeSkateVoice() {
         )}
 
         {!loading && !error && data && (
-          <>
-            {/* Active number */}
-            {data.activeNumber && <ActiveNumberCard number={data.activeNumber} />}
-
-            {/* Pending/approved but not yet active */}
-            {!data.activeNumber && data.numbers?.length > 0 && (
-              <PendingCard number={data.numbers[0]} />
+          <div className="space-y-3">
+            {/* All numbers/requests for this org (multiple allowed) */}
+            {(data.numbers || []).map((n) =>
+              n.status === "active"
+                ? <ActiveNumberCard key={n.id} number={n} />
+                : <PendingCard key={n.id} number={n} />
             )}
 
-            {/* No number at all — show form */}
-            {!data.activeNumber && (!data.numbers || data.numbers.length === 0) && (
+            {/* Add-number form: shown by default if no numbers, else behind a toggle */}
+            {(!data.numbers || data.numbers.length === 0) ? (
               <SubmitForm orgId={orgId} onSuccess={load} />
+            ) : (
+              <>
+                {!showAddForm ? (
+                  <button
+                    onClick={() => setShowAddForm(true)}
+                    className="w-full border-2 border-dashed border-gray-300 rounded-xl py-3 text-sm font-medium text-gray-600 hover:border-orange-300 hover:text-orange-600 transition-colors"
+                  >
+                    + Request another number
+                  </button>
+                ) : (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2 font-medium">New number request:</p>
+                    <SubmitForm orgId={orgId} onSuccess={() => { setShowAddForm(false); load(); }} />
+                  </div>
+                )}
+              </>
             )}
-
-            {/* Rejected — show form again below the rejection card */}
-            {!data.activeNumber && data.numbers?.length > 0 && data.numbers[0].complianceStatus === "rejected" && (
-              <div className="mt-4">
-                <p className="text-sm text-gray-600 mb-2 font-medium">Resubmit with corrected documents:</p>
-                <SubmitForm orgId={orgId} onSuccess={load} />
-              </div>
-            )}
-          </>
+          </div>
         )}
 
         {/* Pricing info */}

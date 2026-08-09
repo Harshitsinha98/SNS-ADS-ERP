@@ -24,12 +24,14 @@ import {
 } from "../services/plivoCompliance.js";
 import {
   createVoiceNumber,
+  createVoiceNumberRequest,
   updateComplianceStatus,
   activateNumber,
   getOrgVoiceNumbers,
   getActiveNumberForOrg,
   getByComplianceId,
 } from "../services/voiceNumbers.js";
+import { uploadBufferToR2 } from "../services/r2Storage.js";
 
 // ─── GET /requirements ───────────────────────────────────────────────────────
 // Returns the doc type IDs needed for the frontend form.
@@ -55,29 +57,16 @@ export async function submitComplianceHandler(req, res) {
       return res.status(403).json({ error: "Only admins can purchase voice numbers." });
     }
 
-    // Check if org already has a pending/active compliance
-    const existing = await getOrgVoiceNumbers(orgId);
-    const pendingOrActive = existing.find(
-      (n) => n.status === "pending_compliance" || n.status === "compliance_approved" || n.status === "active" || n.status === "purchasing"
-    );
-    if (pendingOrActive) {
-      return res.status(409).json({
-        error: "You already have a number request in progress or active.",
-        existing: pendingOrActive,
-      });
-    }
-
-    // Extract form fields from multipart body (parsed by multer or similar)
+    // Extract form fields from multipart body (parsed by multer)
     const {
-      businessName, email, address, city, state, postalCode,
-      registrationNumber, registrationDocTypeId, gstDocTypeId,
+      businessName, email, address, city, state, postalCode, registrationNumber,
     } = req.body;
 
     if (!businessName || !registrationNumber) {
       return res.status(400).json({ error: "Business name and registration number are required." });
     }
 
-    // Files should be attached as registrationCert and gstCert
+    // Files attached as registrationCert and gstCert
     const regFile = req.files?.registrationCert?.[0];
     const gstFile = req.files?.gstCert?.[0];
 
@@ -85,73 +74,48 @@ export async function submitComplianceHandler(req, res) {
       return res.status(400).json({ error: "Both Registration Certificate and GST Certificate files are required." });
     }
 
-    // Callback URL for Plivo to notify us on status change
-    const base = bridgeCallConfig.publicBackendUrl.replace(/\/$/, "");
-    const callbackUrl = `${base}/api/v1/voice/compliance-webhook`;
+    // ── Robust flow: store the request + documents; provisioning is handled
+    // by CodeSkate (Plivo console compliance + number assign). This decouples
+    // us from Plivo's compliance API and never hard-fails the tenant.
+    // A tenant CAN request multiple numbers (each billed separately).
 
-    // Fetch requirements if doc type IDs not provided
-    let regDocTypeId = registrationDocTypeId;
-    let gstTypeId = gstDocTypeId;
+    // Upload both documents to R2 (permanent, auditable). Best-effort.
+    const ts = Date.now();
+    const ext = (f) => (f.mimetype?.includes("pdf") ? "pdf" : f.mimetype?.includes("png") ? "png" : "jpg");
+    const regKey = `compliance/${orgId}/${ts}-registration.${ext(regFile)}`;
+    const gstKey = `compliance/${orgId}/${ts}-gst.${ext(gstFile)}`;
 
-    if (!regDocTypeId || !gstTypeId) {
-      const reqs = await getIndiaRequirements();
-      const docTypes = reqs.document_types || reqs.objects?.[0]?.document_types || [];
-      // Find registration cert and GST cert doc type IDs
-      for (const dt of docTypes) {
-        const nameLower = (dt.name || "").toLowerCase();
-        if (nameLower.includes("registration") || nameLower.includes("incorporation") || nameLower.includes("udyam")) {
-          regDocTypeId = regDocTypeId || dt.document_type_id;
-        }
-        if (nameLower.includes("gst")) {
-          gstTypeId = gstTypeId || dt.document_type_id;
-        }
-      }
-    }
+    const [regUrl, gstUrl] = await Promise.all([
+      uploadBufferToR2(regKey, regFile.buffer, regFile.mimetype),
+      uploadBufferToR2(gstKey, gstFile.buffer, gstFile.mimetype),
+    ]);
 
-    if (!regDocTypeId || !gstTypeId) {
-      return res.status(500).json({ error: "Could not determine document type IDs from Plivo. Please try again." });
-    }
-
-    // Submit to Plivo
-    const plivoResult = await createComplianceApplication({
+    // Create the voice-number request record (pending CodeSkate review).
+    const record = await createVoiceNumberRequest({
+      orgId,
       businessName,
+      registrationNumber,
       email: email || "",
       address: address || "",
       city: city || "",
       state: state || "",
       postalCode: postalCode || "",
-      registrationNumber,
-      alias: `CodeSkate-${orgId.slice(0, 8)}-${businessName.slice(0, 30)}`,
-      registrationCertFile: regFile.buffer,
-      registrationCertFilename: regFile.originalname || "registration_cert.pdf",
-      gstCertFile: gstFile.buffer,
-      gstCertFilename: gstFile.originalname || "gst_cert.pdf",
-      registrationDocTypeId: regDocTypeId,
-      gstDocTypeId: gstTypeId,
-      callbackUrl,
+      registrationDocUrl: regUrl,
+      registrationDocFilename: regFile.originalname || regKey,
+      gstDocUrl: gstUrl,
+      gstDocFilename: gstFile.originalname || gstKey,
     });
 
-    const complianceId = plivoResult.compliance_id || plivoResult.id;
-    if (!complianceId) {
-      return res.status(502).json({ error: "Plivo did not return a compliance ID." });
-    }
-
-    // Create local record
-    const record = await createVoiceNumber({
-      orgId,
-      complianceId,
-      businessName,
-    });
+    logger.info({ orgId, businessName, recordId: record.id }, "Voice number request submitted for review");
 
     return res.status(201).json({
       ok: true,
-      message: "Compliance application submitted. Plivo will review within 24-48 hours.",
-      complianceId,
+      message: "Request submitted! We'll verify your documents and activate your number within 24-48 hours.",
       record,
     });
   } catch (e) {
     logger.error({ err: e.message }, "Submit compliance error");
-    return res.status(500).json({ error: e.message || "Could not submit compliance application." });
+    return res.status(500).json({ error: e.message || "Could not submit your request. Please try again." });
   }
 }
 
