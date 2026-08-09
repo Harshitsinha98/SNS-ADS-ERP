@@ -27,6 +27,7 @@ import { recordCronJobHealth, recomputeMissionControlMetrics } from "./services/
 import { runEscalationCheck } from "./services/escalationService.js";
 import { runScheduledBroadcasts } from "./services/broadcast.js";
 import { chargeDueRents } from "./services/voiceNumbers.js";
+import { runPlatformAlerts } from "./services/platformAlerts.js";
 
 // ── Cron Jobs ──────────────────────────────────────────────────────
 
@@ -94,6 +95,14 @@ cron.schedule("*/15 * * * *", () => {
     withLease("missionControlReconciliation", 14 * 60 * 1000, async () => {
       await recordCronStart("missionControlReconciliation");
       return recomputeMissionControlMetrics();
+    })
+  );
+
+  // Platform owner Telegram alerts — check all parameters, send if threshold crossed.
+  runMonitoredCron("platformAlerts", () =>
+    withLease("platformAlerts", 14 * 60 * 1000, async () => {
+      await recordCronStart("platformAlerts");
+      return runPlatformAlerts();
     })
   );
 });
