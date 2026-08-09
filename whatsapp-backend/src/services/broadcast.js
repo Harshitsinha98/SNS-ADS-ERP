@@ -23,6 +23,7 @@ import { db } from "../bootstrap/firebase.js";
 import { logger } from "../middleware/logger.js";
 import { decryptWhatsAppToken, metaGraphRequest, isWhatsAppCredentialExpired, normalizeWhatsAppRecipient } from "./meta.js";
 import { nowIso, orgCollection } from "./helpers.js";
+import { checkQuota, consumeBroadcastMessages } from "../billing/quotaEnforcement.js";
 
 const BATCH_SIZE = 50;           // messages per batch
 const BATCH_DELAY_MS = 1200;     // delay between batches (~40 msgs/sec safe)
@@ -133,6 +134,22 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
   }
   if (leads.length > MAX_RECIPIENTS) leads = leads.slice(0, MAX_RECIPIENTS);
 
+  // 3.5. Check broadcast quota (plan-based monthly limit)
+  const quota = await checkQuota(orgId, "send_broadcast");
+  if (!quota.allowed) {
+    throw Object.assign(
+      new Error(`Monthly broadcast limit reached (${quota.used}/${quota.limit}). Upgrade your plan for more.`),
+      { status: 402, code: "broadcast_limit_reached" }
+    );
+  }
+  // Check if this broadcast would exceed remaining allowance
+  if (quota.remaining != null && leads.length > quota.remaining) {
+    throw Object.assign(
+      new Error(`This broadcast needs ${leads.length} messages but you only have ${quota.remaining} remaining this month (${quota.used}/${quota.limit} used). Reduce audience or upgrade your plan.`),
+      { status: 402, code: "broadcast_limit_exceeded", remaining: quota.remaining, needed: leads.length }
+    );
+  }
+
   // 4. Determine scheduling
   const now = Date.now();
   const isScheduled = Number(scheduledAtMs) > now + 30_000; // at least 30s in future
@@ -193,7 +210,12 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
     await batch.commit();
   }
 
-  // 7. Start immediately, or leave for the scheduler
+  // 7. Consume broadcast quota (count recipients toward monthly limit)
+  await consumeBroadcastMessages(orgId, leads.length).catch((e) =>
+    logger.warn({ broadcastId, err: e.message }, "Broadcast quota consumption failed")
+  );
+
+  // 8. Start immediately, or leave for the scheduler
   if (!isScheduled) {
     processBroadcast(broadcastId).catch((e) => {
       logger.error({ broadcastId, err: e.message }, "Broadcast processing failed");

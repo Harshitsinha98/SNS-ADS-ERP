@@ -61,6 +61,9 @@ async function getOrgBillingState(orgId) {
       workflowsCount: Number(org.workflowsCount || 0),
       websiteFormsCount: Number(org.websiteFormsCount || 0),
       knowledgeBaseCount: Number(org.knowledgeBaseCount || 0),
+      broadcastMessagesSent: org.broadcastUsageMonth === currentMonthKey()
+        ? Number(org.broadcastMessagesSentThisMonth || 0)
+        : 0,
     },
   };
 }
@@ -94,6 +97,31 @@ export async function consumeAiMessage(orgId) {
     // Never fail a delivered reply because metering failed.
     logger.warn({ orgId, error: error.message }, "AI message metering failed");
     return { consumed: false, reason: error.message };
+  }
+}
+
+/**
+ * Increment the org's monthly broadcast message counter.
+ * Uses same lazy-month-rollover pattern as AI messages.
+ */
+export async function consumeBroadcastMessages(orgId, count) {
+  const orgRef = db.collection("organizations").doc(orgId);
+  const monthKey = currentMonthKey();
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(orgRef);
+      if (!snap.exists) return;
+      const org = snap.data();
+      const currentUsed = org.broadcastUsageMonth === monthKey
+        ? Number(org.broadcastMessagesSentThisMonth || 0)
+        : 0;
+      tx.set(orgRef, {
+        broadcastMessagesSentThisMonth: currentUsed + count,
+        broadcastUsageMonth: monthKey,
+      }, { merge: true });
+    });
+  } catch (error) {
+    logger.warn({ orgId, error: error.message }, "Broadcast usage metering failed");
   }
 }
 
@@ -186,6 +214,14 @@ export async function checkQuota(orgId, action) {
         return { allowed: true };
       }
 
+      case "send_broadcast": {
+        const limit = limits.broadcastMessagesPerMonth;
+        if (limit === -1) return { allowed: true };
+        const broadcastUsed = Number(usage.broadcastMessagesSent || 0);
+        if (broadcastUsed >= limit) return { allowed: false, reason: "broadcast_limit_reached", limit, used: broadcastUsed, remaining: 0 };
+        return { allowed: true, limit, used: broadcastUsed, remaining: limit - broadcastUsed };
+      }
+
       default:
         return { allowed: true };
     }
@@ -246,6 +282,7 @@ export async function getQuotaStatus(orgId) {
       workflows: { limit: limits.workflowsLimit, used: usage.workflowsCount, unlimited: limits.workflowsLimit === -1 },
       websiteForms: { limit: limits.websiteLeadForms, used: usage.websiteFormsCount, unlimited: limits.websiteLeadForms === -1 },
       knowledgeBase: { limit: limits.aiKnowledgeBaseLimit, used: usage.knowledgeBaseCount, unlimited: limits.aiKnowledgeBaseLimit === -1 },
+      broadcastMessages: { limit: limits.broadcastMessagesPerMonth, used: usage.broadcastMessagesSent, unlimited: limits.broadcastMessagesPerMonth === -1 },
     },
     features: {
       aiEnabled: limits.aiEnabled,

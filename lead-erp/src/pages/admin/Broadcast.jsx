@@ -441,6 +441,19 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
   const [scheduleMode, setScheduleMode] = useState("now"); // "now" | "later"
   const [scheduleAt, setScheduleAt] = useState("");
 
+  // Broadcast quota (monthly usage meter)
+  const [quotaData, setQuotaData] = useState(null);
+  useEffect(() => {
+    if (!orgId) return;
+    (async () => {
+      try {
+        const { getQuotaStatus } = await import("../../utils/billingApi");
+        const q = await getQuotaStatus(orgId);
+        setQuotaData(q);
+      } catch { /* non-fatal */ }
+    })();
+  }, [orgId]);
+
   const employees = (users || []).filter((u) => u.role === "employee" || u.role === "admin" || u.role === "owner");
 
   const approvedTemplates = (whatsappTemplates || [])
@@ -628,6 +641,27 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
             </p>
             <p className="text-xs opacity-80 mt-1">leads with valid WhatsApp numbers</p>
           </div>
+
+          {/* Broadcast quota meter */}
+          {quotaData?.quotas?.broadcastMessages && (
+            <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-medium text-ink-muted">Monthly Broadcast Usage</p>
+                <p className="text-xs text-ink-muted">
+                  {(quotaData.quotas.broadcastMessages.used || 0).toLocaleString("en-IN")} / {quotaData.quotas.broadcastMessages.unlimited ? "∞" : (quotaData.quotas.broadcastMessages.limit || 0).toLocaleString("en-IN")}
+                </p>
+              </div>
+              <div className="h-2 bg-cream-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-orange-500 rounded-full transition-all"
+                  style={{ width: `${quotaData.quotas.broadcastMessages.unlimited ? 0 : Math.min(100, ((quotaData.quotas.broadcastMessages.used || 0) / (quotaData.quotas.broadcastMessages.limit || 1)) * 100)}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-ink-muted mt-1.5">
+                {quotaData.quotas.broadcastMessages.unlimited ? "Unlimited" : `${((quotaData.quotas.broadcastMessages.limit || 0) - (quotaData.quotas.broadcastMessages.used || 0)).toLocaleString("en-IN")} remaining this month`}
+              </p>
+            </div>
+          )}
 
           <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
             <div className="flex items-center gap-2 mb-4">
