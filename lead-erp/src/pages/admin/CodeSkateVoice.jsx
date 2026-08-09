@@ -175,16 +175,16 @@ function PendingCard({ number }) {
           <Clock size={20} className="text-yellow-600" />
         </div>
         <div>
-          <h3 className="font-bold text-gray-900">Compliance Under Review</h3>
-          <p className="text-xs text-gray-500">Plivo is verifying your documents</p>
+          <h3 className="font-bold text-gray-900">Verification Under Review</h3>
+          <p className="text-xs text-gray-500">CodeSkate is verifying your documents</p>
         </div>
         <div className="ml-auto"><StatusBadge status={number.status} /></div>
       </div>
       <div className="bg-yellow-50 rounded-lg p-4 text-sm text-yellow-800">
         <p className="font-medium mb-1">What happens next?</p>
         <ol className="list-decimal list-inside space-y-1 text-xs">
-          <li>Plivo reviews your Udyam/CoI + GST certificate (24-48 hrs)</li>
-          <li>On approval, we auto-purchase an India number for you</li>
+          <li>CodeSkate verifies your Udyam/CoI + GST certificate (24-48 hrs)</li>
+          <li>On approval, we activate a dedicated India number for you</li>
           <li>Your bridge calls start using YOUR dedicated number</li>
         </ol>
       </div>
