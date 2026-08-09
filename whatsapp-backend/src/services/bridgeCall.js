@@ -359,9 +359,15 @@ async function deductWalletMinutes(orgId, minutes, costInr, callId) {
   await migrateWalletToInr(orgId).catch(() => {});
 
   const walletRef = db.collection("voiceWallets").doc(orgId);
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(walletRef);
-    const wallet = snap.exists ? snap.data() : {};
+  const callRef = db.collection("bridgeCalls").doc(callId);
+
+  // Atomic: check if already deducted (idempotent guard against double-webhook).
+  const deducted = await db.runTransaction(async (tx) => {
+    const [wSnap, cSnap] = await Promise.all([tx.get(walletRef), tx.get(callRef)]);
+    const call = cSnap.exists ? cSnap.data() : {};
+    if (call.status === "wallet-deducted") return false; // already charged, skip
+
+    const wallet = wSnap.exists ? wSnap.data() : {};
     const newBalanceInr = Math.max(0, Number(wallet.balanceInr || 0) - costInr);
     tx.set(walletRef, {
       orgId,
@@ -369,7 +375,11 @@ async function deductWalletMinutes(orgId, minutes, costInr, callId) {
       totalSpentInr: (wallet.totalSpentInr || 0) + costInr,
       lastDeductedAt: nowIso(), lastCallId: callId,
     }, { merge: true });
+    tx.update(callRef, { status: "wallet-deducted" });
+    return true;
   });
+
+  if (!deducted) return; // was already charged by a parallel webhook
 
   // Record debit transaction for wallet history (rupee-denominated).
   await db.collection("walletTransactions").add({
@@ -384,8 +394,6 @@ async function deductWalletMinutes(orgId, minutes, costInr, callId) {
     createdAt: nowIso(),
     timestamp: Date.now(),
   }).catch(() => {});
-
-  await db.collection("bridgeCalls").doc(callId).update({ status: "wallet-deducted" }).catch(() => {});
 }
 
 export async function checkWalletBalance(orgId) {

@@ -332,7 +332,7 @@ function TransactionRow({ tx }) {
       </div>
       <div className="text-right shrink-0">
         <p className={`text-sm font-semibold ${isCredit ? "text-green-600" : "text-ink"}`}>
-          {isCredit ? "+" : "−"}₹{Math.abs(tx.amountInr || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+          {isCredit ? "+" : "−"}₹{Math.abs(tx.amountInr || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
       </div>
     </div>

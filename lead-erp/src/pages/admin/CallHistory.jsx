@@ -119,7 +119,7 @@ export default function CallHistory() {
                         {noCharge(c.status) ? (
                           <span className="text-ink-muted">No charge</span>
                         ) : (
-                          <span className="text-ink">₹{(c.costInr || 0).toFixed(0)}</span>
+                          <span className="text-ink">₹{(c.costInr || 0).toFixed(2)}</span>
                         )}
                       </td>
                       <td className="py-2.5">
