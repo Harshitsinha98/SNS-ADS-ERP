@@ -29,6 +29,8 @@ const fmtDate = (ts) => {
 
 // Voice Wallet is a Growth+ feature.
 const WALLET_PLANS = new Set(["growth", "enterprise", "enterprise_plus"]);
+// AI voice calling is a Scale (enterprise) & above feature.
+const AI_VOICE_PLANS = new Set(["enterprise", "enterprise_plus"]);
 
 export default function VoiceWallet() {
   const b = useBilling();
@@ -38,6 +40,7 @@ export default function VoiceWallet() {
 
   const planId = b.planId || "starter";
   const walletLocked = !WALLET_PLANS.has(planId);
+  const aiVoiceEnabled = AI_VOICE_PLANS.has(planId);
 
   const [balance, setBalance] = useState({ balanceInr: 0, totalSpentInr: 0 });
   const [transactions, setTransactions] = useState([]);
@@ -159,41 +162,89 @@ export default function VoiceWallet() {
         </div>
       )}
 
-      {/* Balance + spent */}
-      <div className="grid sm:grid-cols-2 gap-5 mb-6">
-        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-orange-500 to-amber-500 opacity-5 rounded-bl-full" />
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg">
-              <Wallet className="text-white" size={22} />
+      {/* Balance hero */}
+      <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 mb-4 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-orange-500 to-amber-500 opacity-5 rounded-bl-full" />
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg">
+                <Wallet className="text-white" size={20} />
+              </div>
+              <p className="text-sm text-ink-muted">Wallet Balance</p>
+            </div>
+            {loadingBalance ? (
+              <div className="h-10 flex items-center"><Loader2 size={22} className="animate-spin text-ink-muted" /></div>
+            ) : (
+              <p className="font-display font-bold text-4xl text-ink flex items-center">
+                <IndianRupee size={26} />{balance.balanceInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              </p>
+            )}
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-ink-muted mb-1">Total spent (lifetime)</p>
+            <p className="font-display font-bold text-lg text-ink flex items-center justify-end">
+              <IndianRupee size={14} />{balance.totalSpentInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </p>
+            <button onClick={() => { fetchBalance(); fetchTransactions(); }} className="text-xs text-orange-600 hover:text-orange-800 flex items-center gap-1 mt-2 ml-auto">
+              <RefreshCw size={12} /> Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Prominent minutes cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        {/* Bridge minutes */}
+        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center">
+              <Zap size={16} className="text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-ink">Bridge Minutes</p>
+              <p className="text-[11px] text-ink-muted">₹2.20/min · pay when connected</p>
             </div>
           </div>
-          <p className="text-sm text-ink-muted mb-1">Wallet Balance</p>
-          {loadingBalance ? (
-            <div className="h-9 flex items-center"><Loader2 size={20} className="animate-spin text-ink-muted" /></div>
-          ) : (
-            <>
-              <p className="font-display font-bold text-3xl text-ink flex items-center">
-                <IndianRupee size={22} />{balance.balanceInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-              </p>
-              <p className="text-xs text-ink-soft mt-1 font-medium">
-                ≈ {Math.floor(balance.balanceInr / BRIDGE_RATE).toLocaleString("en-IN")} bridge min
-                <span className="text-ink-muted"> · </span>
-                {Math.floor(balance.balanceInr / AI_RATE).toLocaleString("en-IN")} AI min
-              </p>
-            </>
-          )}
-          <p className="text-xs text-ink-muted mt-2">Bridge ₹2.20/min · AI voice ₹5/min · number rent ₹500/mo each.</p>
+          <p className="font-display font-bold text-3xl text-ink">
+            {Math.floor(balance.balanceInr / BRIDGE_RATE).toLocaleString("en-IN")}
+            <span className="text-sm font-normal text-ink-muted ml-1">min</span>
+          </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 flex flex-col justify-center">
-          <p className="text-sm text-ink-muted mb-1">Total spent (lifetime)</p>
-          <p className="font-display font-bold text-2xl text-ink flex items-center">
-            <IndianRupee size={18} />{balance.totalSpentInr.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-          </p>
-          <button onClick={() => { fetchBalance(); fetchTransactions(); }} className="btn btn-secondary text-sm flex items-center gap-1.5 mt-4 self-start">
-            <RefreshCw size={14} /> Refresh
-          </button>
+        {/* AI voice minutes — locked if plan doesn't include AI voice */}
+        <div className={`rounded-2xl shadow-card border p-5 relative overflow-hidden ${aiVoiceEnabled ? "bg-white border-cream-300/60" : "bg-purple-50/40 border-purple-200"}`}>
+          <div className="flex items-center gap-2 mb-3">
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${aiVoiceEnabled ? "bg-purple-100" : "bg-purple-100"}`}>
+              <Sparkles size={16} className="text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-ink">AI Voice Minutes</p>
+              <p className="text-[11px] text-ink-muted">₹5/min · auto-call & qualify</p>
+            </div>
+          </div>
+          {aiVoiceEnabled ? (
+            <p className="font-display font-bold text-3xl text-ink">
+              {Math.floor(balance.balanceInr / AI_RATE).toLocaleString("en-IN")}
+              <span className="text-sm font-normal text-ink-muted ml-1">min</span>
+            </p>
+          ) : (
+            <div>
+              <p className="font-display font-bold text-3xl text-ink/30">
+                {Math.floor(balance.balanceInr / AI_RATE).toLocaleString("en-IN")}
+                <span className="text-sm font-normal ml-1">min</span>
+              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
+                  <Lock size={10} /> Locked
+                </span>
+                <button onClick={() => navigate("/admin/billing")}
+                  className="text-xs font-semibold text-purple-700 hover:text-purple-900 flex items-center gap-0.5">
+                  Upgrade to Scale to unlock <ArrowRight size={12} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

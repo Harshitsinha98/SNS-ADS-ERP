@@ -249,6 +249,7 @@ export async function getQuotaStatus(orgId) {
     },
     features: {
       aiEnabled: limits.aiEnabled,
+      aiVoiceEnabled: limits.aiVoiceEnabled || false,
       catalogueEnabled: limits.catalogueEnabled,
       apiAccess: limits.apiAccess,
       webhooks: limits.webhooks,

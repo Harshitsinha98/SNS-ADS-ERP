@@ -51,6 +51,7 @@ export const PLAN_LIMITS = {
     aiAnalytics: false,
     humanTakeover: false,
     smartNotifications: false,
+    aiVoiceEnabled: false, // AI voice calling — Scale & above only
 
     // Catalogue
     catalogueEnabled: false,
@@ -105,6 +106,7 @@ export const PLAN_LIMITS = {
     aiAnalytics: true,
     humanTakeover: true,
     smartNotifications: true,
+    aiVoiceEnabled: false, // AI voice calling — Scale & above only
 
     catalogueEnabled: true,
     catalogueProducts: 50,
@@ -154,6 +156,7 @@ export const PLAN_LIMITS = {
     aiAnalytics: true,
     humanTakeover: true,
     smartNotifications: true,
+    aiVoiceEnabled: true, // AI voice calling included
 
     catalogueEnabled: true,
     catalogueProducts: 200,
@@ -207,6 +210,7 @@ export const PLAN_LIMITS = {
     aiAnalytics: true,
     humanTakeover: true,
     smartNotifications: true,
+    aiVoiceEnabled: true, // AI voice calling included
 
     catalogueEnabled: true,
     catalogueProducts: 500,
@@ -405,6 +409,7 @@ export function getPricingMatrix() {
           { key: "aiMessagesPerMonth", label: "AI messages/month", type: "number", unlimitedText: "Unlimited" },
           { key: "aiKnowledgeBaseLimit", label: "Knowledge base articles", type: "number" },
           { key: "aiTestPlayground", label: "Test playground", type: "boolean" },
+          { key: "aiVoiceEnabled", label: "AI voice calling", type: "boolean" },
         ],
       },
       {

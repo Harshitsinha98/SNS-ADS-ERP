@@ -121,10 +121,13 @@ export default function Billing() {
         });
       } else {
         const order = await createRazorpayOrder({ orgId: b.org.id, planId: plan.id, cycle });
+        const desc = order.prorated
+          ? `${plan.name} upgrade — pay ₹${order.payable} now (₹${order.credit} credit for unused days)`
+          : `${plan.name} (${cycle})`;
         await new Promise((resolve, reject) => {
           const rzp = new window.Razorpay({
             key: order.keyId, amount: order.amount, currency: order.currency, order_id: order.orderId,
-            name: "Codeskate CRM", description: `${plan.name} (${cycle})`,
+            name: "Codeskate CRM", description: desc,
             prefill: { name: user?.displayName || "", contact: (user?.phone || "").replace("+91", "") },
             theme: { color: "#F04E00" },
             handler: async (r) => {

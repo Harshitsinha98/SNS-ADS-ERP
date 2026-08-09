@@ -198,9 +198,11 @@ export default function createBillingRouter(db) {
   // A gateway event is atomically recorded together with the plan change. This
   // makes retries and duplicate webhooks harmless: one payment/event can add
   // exactly one billing period.
-  async function applyPlan(orgId, plan, cycle, meta, eventId, extra = {}) {
+  async function applyPlan(orgId, plan, cycle, meta, eventId, extra = {}, options = {}) {
     const periodDays = cycle === "yearly" ? 365 : 30;
-    const amount = amountForPlan(plan, cycle);
+    // For a prorated mid-cycle upgrade, the amount actually charged (and recorded
+    // on the invoice / lifetime revenue) is the prorated amount, not full price.
+    const amount = options.chargedAmount != null ? Number(options.chargedAmount) : amountForPlan(plan, cycle);
     const eventRef = db.collection("billingEvents").doc(safeDocId(eventId));
     const orgRef = db.collection("organizations").doc(orgId);
     const invoiceRef = orgRef.collection("invoices").doc(safeDocId(eventId));
@@ -214,8 +216,13 @@ export default function createBillingRouter(db) {
       const org = orgSnap.data();
       const now = Date.now();
       const currentEnd = Number(org.currentPeriodEndMs || 0);
-      const newPeriodEndMs = Math.max(now, currentEnd > now ? currentEnd : now) + periodDays * DAY_MS;
-      const result = { planName: plan.name, seatsLimit: plan.includedSeats, leadsLimit: plan.leadsLimit, currentPeriodEndMs: newPeriodEndMs };
+      // Mid-cycle prorated upgrade: keep the SAME period end (tenant only paid the
+      // difference for the remaining days). Otherwise extend by a full period.
+      const keepPeriodEnd = options.keepPeriodEnd && currentEnd > now;
+      const newPeriodEndMs = keepPeriodEnd
+        ? currentEnd
+        : Math.max(now, currentEnd > now ? currentEnd : now) + periodDays * DAY_MS;
+      const result = { planName: plan.name, seatsLimit: plan.includedSeats, leadsLimit: plan.leadsLimit, currentPeriodEndMs: newPeriodEndMs, prorated: Boolean(keepPeriodEnd), amountCharged: amount };
 
       tx.update(orgRef, {
         planId: plan.id,
@@ -227,6 +234,8 @@ export default function createBillingRouter(db) {
         trialEndsAt: null,
         trialEndsAtMs: 0,
         currentPeriodEndMs: newPeriodEndMs,
+        // Track period start for accurate future proration (only on a fresh period).
+        ...(keepPeriodEnd ? {} : { currentPeriodStartMs: now }),
         pendingPlanChange: null,
         cancelAtPeriodEnd: false,
         renewalRemindedFor: null,
@@ -673,28 +682,88 @@ export default function createBillingRouter(db) {
     }
   });
 
+  // Pro-rata upgrade pricing. When a tenant on an active plan upgrades to a
+  // higher plan MID-CYCLE and in the same billing cycle, they only pay the
+  // difference for the days remaining:
+  //     payable = newPlanPrice − (currentPlanPrice × remainingDays / periodDays)
+  // e.g. Growth ₹1499 taken 15 days ago, upgrading to Scale ₹3499:
+  //     credit = 1499 × 15/30 = ₹749.5 → payable = 3499 − 749.5 = ₹2749.5
+  // The billing period end is preserved (they already paid for these days);
+  // full new-plan price applies from the next renewal. Non-upgrades, expired,
+  // trial, or cycle-switches fall back to full price.
+  async function computeUpgradeCharge(org, targetPlan, cycle) {
+    const fullAmount = amountForPlan(targetPlan, cycle);
+    const now = Date.now();
+    const currentEnd = Number(org?.currentPeriodEndMs || 0);
+    const currentPlanId = org?.planId || "starter";
+    const sameCycle = (org?.billingCycle || "monthly") === cycle;
+    const active = org?.subscriptionStatus === "active" && currentEnd > now;
+
+    if (active && sameCycle && currentPlanId !== targetPlan.id) {
+      const plans = await getMergedPlans(db);
+      const currentPlan = plans[currentPlanId];
+      if (currentPlan) {
+        const currentPrice = amountForPlan(currentPlan, cycle);
+        if (fullAmount > currentPrice) {
+          const periodDays = cycle === "yearly" ? 365 : 30;
+          const remainingDays = Math.max(0, (currentEnd - now) / DAY_MS);
+          const credit = Math.min(currentPrice, currentPrice * (remainingDays / periodDays));
+          const payable = Math.max(1, Math.round(fullAmount - credit));
+          return { prorated: true, fullAmount, credit: Math.round(credit), payable, remainingDays: Math.round(remainingDays) };
+        }
+      }
+    }
+    return { prorated: false, fullAmount, credit: 0, payable: fullAmount, remainingDays: 0 };
+  }
+
+  // Preview the prorated upgrade amount without creating an order (for the UI).
+  router.post("/razorpay/upgrade-preview", requireAuth, requireOrgAdmin, async (req, res) => {
+    try {
+      const { plan, cycle } = await getPlan(db, req.body.planId, req.body.cycle);
+      const orgSnap = await db.collection("organizations").doc(req.body.orgId).get();
+      const org = orgSnap.exists ? orgSnap.data() : {};
+      const p = await computeUpgradeCharge(org, plan, cycle);
+      res.json({ ok: true, planName: plan.name, ...p });
+    } catch (error) {
+      res.status(error.status || 500).json({ error: error.message || "Could not compute upgrade price" });
+    }
+  });
+
   // ----- Razorpay one-time payments -----
   router.post("/razorpay/order", requireAuth, requireOrgAdmin, async (req, res) => {
     try {
       if (!razorpay) throw httpError(503, "Razorpay is not configured on the server");
       const { plan, cycle } = await getPlan(db, req.body.planId, req.body.cycle);
-      const amountPaise = amountForPlan(plan, cycle) * 100;
+      const orgId = req.body.orgId;
+
+      const orgSnap = await db.collection("organizations").doc(orgId).get();
+      const org = orgSnap.exists ? orgSnap.data() : {};
+      const proration = await computeUpgradeCharge(org, plan, cycle);
+      const amountPaise = Math.round(proration.payable * 100);
+
       const order = await razorpay.orders.create({
         amount: amountPaise,
         currency: "INR",
-        receipt: `up_${req.body.orgId}_${Date.now()}`.slice(0, 40),
-        notes: { kind: "upgrade" },
+        receipt: `up_${orgId}_${Date.now()}`.slice(0, 40),
+        notes: { kind: "upgrade", prorated: String(proration.prorated) },
       });
       await createIntent(order.id, {
         kind: "upgrade",
         uid: req.authUser.uid,
-        orgId: req.body.orgId,
+        orgId,
         planId: plan.id,
         cycle,
         amountPaise,
+        prorated: proration.prorated,
+        keepPeriodEnd: proration.prorated,
         expiresAtMs: Date.now() + 30 * 60 * 1000,
       });
-      res.json({ orderId: order.id, amount: amountPaise, currency: "INR", keyId: process.env.RAZORPAY_KEY_ID, planName: plan.name });
+      res.json({
+        orderId: order.id, amount: amountPaise, currency: "INR",
+        keyId: process.env.RAZORPAY_KEY_ID, planName: plan.name,
+        prorated: proration.prorated, fullAmount: proration.fullAmount,
+        credit: proration.credit, payable: proration.payable,
+      });
     } catch (error) {
       console.error("razorpay/order:", error.message);
       res.status(error.status || 500).json({ error: error.message || "Could not create payment order" });
@@ -708,7 +777,13 @@ export default function createBillingRouter(db) {
       if (intent.completed) return res.json({ ok: true, replay: true, ...(intent.outcome || {}) });
       const { payment } = await verifyRazorpayPayment({ orderId, paymentId, signature, intent });
       const { plan, cycle } = await getPlan(db, intent.planId, intent.cycle);
-      const result = await applyPlan(intent.orgId, plan, cycle, { gateway: "razorpay", paymentId: payment.id }, `razorpay_payment_${payment.id}`);
+      const result = await applyPlan(
+        intent.orgId, plan, cycle,
+        { gateway: "razorpay", paymentId: payment.id },
+        `razorpay_payment_${payment.id}`,
+        {},
+        { chargedAmount: Number(intent.amountPaise) / 100, keepPeriodEnd: Boolean(intent.keepPeriodEnd) }
+      );
       await finishIntent(orderId, result);
       res.json({ ok: true, ...result });
     } catch (error) {
