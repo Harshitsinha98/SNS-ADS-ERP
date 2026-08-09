@@ -48,7 +48,7 @@ export default function VoicePnlPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-cream-200 text-left text-xs font-semibold text-ink-muted uppercase tracking-wider">
-                    <th className="pb-3 pr-4">Tenant</th>
+                    <th className="pb-3 pr-4">Organization</th>
                     <th className="pb-3 pr-4 text-right">Calls</th>
                     <th className="pb-3 pr-4 text-right">Connected</th>
                     <th className="pb-3 pr-4 text-right">Connect %</th>
@@ -62,7 +62,7 @@ export default function VoicePnlPage() {
                 <tbody>
                   {tenants.map((t) => (
                     <tr key={t.orgId} className="border-b border-cream-100 hover:bg-cream-50">
-                      <td className="py-2.5 pr-4 font-medium text-ink truncate max-w-[180px]">{t.orgId.slice(0, 12)}…</td>
+                      <td className="py-2.5 pr-4 font-medium text-ink truncate max-w-[180px]">{t.orgName || t.orgId}</td>
                       <td className="py-2.5 pr-4 text-right">{t.totalCalls}</td>
                       <td className="py-2.5 pr-4 text-right">{t.connectedCalls}</td>
                       <td className="py-2.5 pr-4 text-right">

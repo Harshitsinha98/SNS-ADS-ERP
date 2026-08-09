@@ -67,12 +67,22 @@ export async function getVoicePnl({ fromMs, toMs } = {}) {
   const snap = await q.get();
   const byOrg = {};
 
+  // Fetch org names in bulk for display
+  const orgIds = new Set();
+  for (const doc of snap.docs) orgIds.add(doc.data().orgId);
+  const orgNames = {};
+  for (const oid of orgIds) {
+    const orgSnap = await db.collection("organizations").doc(oid).get().catch(() => null);
+    orgNames[oid] = orgSnap?.exists ? (orgSnap.data().organizationName || orgSnap.data().name || oid) : oid;
+  }
+
   for (const doc of snap.docs) {
     const call = doc.data();
     const orgId = call.orgId;
     if (!byOrg[orgId]) {
       byOrg[orgId] = {
         orgId,
+        orgName: orgNames[orgId] || orgId,
         totalCalls: 0,
         connectedCalls: 0,
         failedCalls: 0,
