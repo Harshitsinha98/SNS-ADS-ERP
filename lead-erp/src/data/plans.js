@@ -111,10 +111,6 @@ export const ADD_ONS = [
   { id: "catalogue_pro", name: "Catalogue Pro", price: 499, unit: "500 products", description: "500 products + 5,000 image messages/month" },
   { id: "workflow_unlimited", name: "Unlimited Workflows", price: 299, unit: "unlimited", description: "Unlimited workflow automation rules" },
   { id: "api_access", name: "API & Webhooks", price: 999, unit: "full access", description: "REST API + real-time webhook access" },
-  // ── Codeskate Voice — prepaid, pay-as-you-go. Minutes never expire while your
-  //    plan is active. Billed from the wallet at a flat per-minute rate.
-  { id: "voice_bridge_pack", name: "Bridge Call Wallet", price: 1999, unit: "1,000 mins", description: "1,000 masked & recorded bridge-call minutes. Top up anytime — pay only for what you use." },
-  { id: "voice_ai_pack", name: "AI Voice Bot Wallet", price: 3999, unit: "500 mins", description: "500 minutes of AI voice-bot calling in Hindi & English. Auto-qualify leads and warm-transfer to agents." },
 ];
 
 // Default free-trial length (days).

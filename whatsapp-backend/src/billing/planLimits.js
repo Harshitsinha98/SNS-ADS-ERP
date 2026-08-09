@@ -309,7 +309,7 @@ export const ADD_ONS = {
     unit: 1,
     fields: { apiAccess: true, webhooks: true },
     maxQuantity: 1,
-    availableOn: ["starter", "growth"],
+    availableOn: ["growth"], // Scale/Enterprise get it free; Starter too small for API use
   },
 };
 
