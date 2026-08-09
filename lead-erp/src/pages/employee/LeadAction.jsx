@@ -31,6 +31,9 @@ export default function LeadAction() {
   const [pendingDuration, setPendingDuration] = useState(0);
   const [worknote, setWorknote] = useState("");
 
+  const { bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed, bridgeDetails, startBridgeCall, resetBridgeCall } = useBridgeCall();
+  const prevBridgeStateRef = useRef("idle");
+
   useEffect(() => {
     if (!id || !orgId) return undefined;
     const worknotesQuery = query(
@@ -50,6 +53,18 @@ export default function LeadAction() {
     return () => clearInterval(t);
   }, [callActive, callStart]);
 
+  // Auto-trigger worknote modal when bridge call completes (mandatory)
+  useEffect(() => {
+    if (bridgeState === "completed" && prevBridgeStateRef.current !== "completed") {
+      setPendingDuration(bridgeDuration || bridgeElapsed);
+      resetBridgeCall();
+      setShowWorknoteModal(true);
+    }
+    prevBridgeStateRef.current = bridgeState;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridgeState]);
+
+  // ── All hooks above, early return below ──
   if (!lead || lead.assignedTo !== currentUserId)
     return <Layout title="Lead"><p className="text-danger">Access denied or lead not found.</p></Layout>;
 
@@ -60,20 +75,7 @@ export default function LeadAction() {
     window.location.href = `tel:${lead.phone}`;
   };
 
-  const { bridgeState, bridgeError, bridgeDuration, bridgeRecording, bridgeElapsed, bridgeDetails, startBridgeCall, resetBridgeCall } = useBridgeCall();
   const handleBridgeCall = async () => { const r = await startBridgeCall(lead); if (r?.fallback) startCall(); };
-
-  // Auto-trigger worknote modal when bridge call completes (mandatory)
-  const prevBridgeStateRef = useRef("idle");
-  useEffect(() => {
-    if (bridgeState === "completed" && prevBridgeStateRef.current !== "completed") {
-      setPendingDuration(bridgeDuration || bridgeElapsed);
-      resetBridgeCall();
-      setShowWorknoteModal(true);
-    }
-    prevBridgeStateRef.current = bridgeState;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bridgeState]);
 
   const endCall = () => {
     setPendingDuration(elapsed);
@@ -122,7 +124,7 @@ export default function LeadAction() {
         <div className="bg-white rounded-lg shadow-card border border-paper-line p-5">
           <p className="eyebrow mb-3">Client profile</p>
           <p className="text-sm mb-1"><span className="text-ink/40">Name</span> · {lead.name}</p>
-          <p className="text-sm mb-1 num"><span className="text-ink/40">Phone</span> · {lead.phone}</p>
+          <p className="text-sm mb-1 num"><span className="text-ink/40">Phone</span> · {lead.phone ? lead.phone.slice(0, 4) + "●●●●" + lead.phone.slice(-3) : "—"}</p>
           <p className="text-sm mb-1"><span className="text-ink/40">Source</span> · {lead.source}</p>
           <p className="text-sm mb-4"><span className="text-ink/40">Requirement</span> · {lead.requirement}</p>
 
@@ -158,18 +160,12 @@ export default function LeadAction() {
               <button onClick={handleBridgeCall} className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-blue-700 transition-colors">
                 <PhoneCall size={15} /> Bridge call (masked)
               </button>
-              <button onClick={startCall} className="w-full flex items-center justify-center gap-2 bg-success-600 text-white rounded-md p-2.5 text-sm font-medium hover:bg-success-700 transition-colors">
-                <Phone size={15} /> Direct call
-              </button>
             </div>
           ) : callActive ? (
             <button onClick={endCall} className="w-full flex items-center justify-center gap-2 bg-danger-600 text-white rounded-md p-2.5 text-sm font-medium animate-pulse">
               <PhoneOff size={15} /> End call · {fmtDuration(elapsed)}
             </button>
           ) : null}
-          <button onClick={quickWhatsApp} className="w-full flex items-center justify-center gap-2 bg-success-50 text-success-700 border border-success-200 rounded-md p-2.5 text-sm font-medium mt-2 hover:bg-success-100 transition-colors">
-            <MessageCircle size={15} /> Open WhatsApp
-          </button>
           <div className="mt-4"><WhatsAppConversation lead={lead} showConversation={false} /></div>
         </div>
 
