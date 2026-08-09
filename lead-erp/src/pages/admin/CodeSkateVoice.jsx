@@ -409,12 +409,39 @@ export default function CodeSkateVoice() {
 
         {!loading && !error && data && (
           <div className="space-y-3">
-            {/* All numbers/requests for this org (multiple allowed) */}
-            {(data.numbers || []).map((n) =>
-              n.status === "active"
-                ? <ActiveNumberCard key={n.id} number={n} />
-                : <PendingCard key={n.id} number={n} />
-            )}
+            {/* All numbers/requests, sorted by rent priority (funded first). */}
+            {(() => {
+              const pkey = (n) => (n.priority != null ? Number(n.priority) : (Date.parse(n.createdAt) || 0));
+              const sorted = [...(data.numbers || [])].sort((a, b) => pkey(a) - pkey(b));
+              const paidCount = sorted.filter((n) => (n.monthlyCostInr || 0) > 0).length;
+              const reorder = async (index, dir) => {
+                const j = index + dir;
+                if (j < 0 || j >= sorted.length) return;
+                const newOrder = [...sorted];
+                [newOrder[index], newOrder[j]] = [newOrder[j], newOrder[index]];
+                // Renumber all so priorities stay clean (0 = highest priority).
+                await Promise.all(newOrder.map((n, idx) =>
+                  apiPostJson("/api/v1/voice/priority", { orgId, numberId: n.id, priority: idx })
+                ));
+                load();
+              };
+              return sorted.map((n, i) => (
+                <div key={n.id} className="flex items-stretch gap-2">
+                  {paidCount > 1 && (n.monthlyCostInr || 0) > 0 && (
+                    <div className="flex flex-col items-center justify-center gap-1 px-1">
+                      <button onClick={() => reorder(i, -1)} disabled={i === 0}
+                        className="text-gray-400 hover:text-orange-500 disabled:opacity-30" title="Higher priority">▲</button>
+                      <span className="text-[10px] text-gray-400 font-medium">#{i + 1}</span>
+                      <button onClick={() => reorder(i, 1)} disabled={i === sorted.length - 1}
+                        className="text-gray-400 hover:text-orange-500 disabled:opacity-30" title="Lower priority">▼</button>
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    {n.status === "active" ? <ActiveNumberCard number={n} /> : <PendingCard number={n} />}
+                  </div>
+                </div>
+              ));
+            })()}
 
             {/* Add-number form: shown by default if no numbers, else behind a toggle */}
             {(!data.numbers || data.numbers.length === 0) ? (

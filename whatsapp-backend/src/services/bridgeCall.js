@@ -17,6 +17,7 @@ import { logger } from "../middleware/logger.js";
 import { nowIso, orgCollection } from "./helpers.js";
 import { uploadRecordingToR2 } from "./r2Storage.js";
 import { getActiveNumberForOrg } from "./voiceNumbers.js";
+import { migrateWalletToInr } from "./wallet.js";
 
 const toDigits = (phone) => String(phone || "").replace(/\D/g, "");
 
@@ -354,22 +355,23 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
 }
 
 async function deductWalletMinutes(orgId, minutes, costInr, callId) {
+  // Ensure any legacy minute balance is folded into the rupee balance first.
+  await migrateWalletToInr(orgId).catch(() => {});
+
   const walletRef = db.collection("voiceWallets").doc(orgId);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(walletRef);
-    const wallet = snap.exists ? snap.data() : { balanceMinutes: 0, bridgeMinutes: 0, totalSpentInr: 0 };
-    const newBalance = Math.max(0, (wallet.balanceMinutes || 0) - minutes);
-    const newBridge = Math.max(0, (wallet.bridgeMinutes || 0) - minutes);
+    const wallet = snap.exists ? snap.data() : {};
+    const newBalanceInr = Math.max(0, Number(wallet.balanceInr || 0) - costInr);
     tx.set(walletRef, {
       orgId,
-      balanceMinutes: newBalance,
-      bridgeMinutes: newBridge,
+      balanceInr: newBalanceInr,
       totalSpentInr: (wallet.totalSpentInr || 0) + costInr,
       lastDeductedAt: nowIso(), lastCallId: callId,
     }, { merge: true });
   });
 
-  // Record debit transaction for wallet history
+  // Record debit transaction for wallet history (rupee-denominated).
   await db.collection("walletTransactions").add({
     orgId,
     type: "debit",
@@ -387,9 +389,11 @@ async function deductWalletMinutes(orgId, minutes, costInr, callId) {
 }
 
 export async function checkWalletBalance(orgId) {
+  // Fold legacy minutes into rupees, then gate on having at least one minute's cost.
+  await migrateWalletToInr(orgId).catch(() => {});
   const snap = await db.collection("voiceWallets").doc(orgId).get();
-  const balance = snap.exists ? (snap.data().balanceMinutes || 0) : 0;
-  return { hasBalance: balance > 0, balanceMinutes: balance };
+  const balanceInr = snap.exists ? Number(snap.data().balanceInr || 0) : 0;
+  return { hasBalance: balanceInr >= bridgeCallConfig.costPerMinuteInr, balanceInr };
 }
 
 export async function getBridgeCallStatus(callId) {

@@ -56,14 +56,14 @@ export async function getTransactions(req, res) {
 // ── POST /order ──
 export async function createOrder(req, res) {
   try {
-    const { orgId, packId } = req.body;
-    if (!orgId || !packId) return res.status(400).json({ error: "orgId and packId are required" });
+    const { orgId, packId, amountInr } = req.body;
+    if (!orgId || (!packId && !amountInr)) return res.status(400).json({ error: "orgId and an amount are required" });
 
     if (!(await isOrgAdmin(req.authUser.uid, orgId))) {
       return res.status(403).json({ error: "Organization admin access required" });
     }
 
-    const order = await createWalletOrder({ orgId, packId });
+    const order = await createWalletOrder({ orgId, packId, amountInr });
     return res.json(order);
   } catch (e) {
     const status = e.status || 500;
@@ -74,8 +74,8 @@ export async function createOrder(req, res) {
 // ── POST /verify ──
 export async function verifyPayment(req, res) {
   try {
-    const { orgId, packId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-    if (!orgId || !packId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    const { orgId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    if (!orgId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: "Missing required payment verification fields" });
     }
 
@@ -85,7 +85,6 @@ export async function verifyPayment(req, res) {
 
     const result = await verifyAndCreditWallet({
       orgId,
-      packId,
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,

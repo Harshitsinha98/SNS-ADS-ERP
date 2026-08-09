@@ -53,6 +53,7 @@ export async function createVoiceNumberRequest({
     rejectionReason: null,
     plivoAppId: null,
     status: "pending_review", // awaiting CodeSkate admin action
+    priority: Date.now(), // lower = higher priority (oldest-first default)
     businessName,
     registrationNumber: registrationNumber || "",
     email: email || "",
@@ -164,6 +165,7 @@ export async function registerOwnedNumber({
     rejectionReason: null,
     plivoAppId: null,
     status: "active",
+    priority: Date.now(),
     businessName: businessName || "",
     monthlyCostInr: chargeRent ? monthlyCostInr : 0,
     plivoCostInr: 200,
@@ -214,78 +216,125 @@ export async function activateNumber(complianceId, { phoneNumber, displayNumber,
 }
 
 /**
- * Charge monthly rent for all active numbers whose rent is due.
- * Deducts ₹rent from the org's Voice Wallet rupee balance (balanceInr) and
- * records a walletTransactions debit. If the wallet can't cover the rent, the
- * number is SUSPENDED (bridge calls fall back to the shared number) until the
- * tenant tops up — no silent negative balance.
+ * Set a number's rent priority. Lower number = higher priority = charged first
+ * (stays active when the wallet can't fund every number). Admin-controlled.
+ */
+export async function setNumberPriority(orgId, numberId, priority) {
+  const ref = db.collection(COLLECTION).doc(numberId);
+  const snap = await ref.get();
+  if (!snap.exists || snap.data().orgId !== orgId) return null;
+  await ref.update({ priority: Number(priority), updatedAt: nowIso() });
+  return { ...snap.data(), priority: Number(priority) };
+}
+
+// Sort key: explicit priority first, else oldest-first (createdAt).
+function priorityKey(num) {
+  if (num.priority != null) return Number(num.priority);
+  return Date.parse(num.createdAt || "") || 0;
+}
+
+/**
+ * Charge monthly rent for all numbers whose rent is due, with a PER-ORG
+ * priority-based failsafe:
  *
- * Designed to be idempotent per-period: nextRentAtMs gates re-charging.
+ *   - Numbers are grouped by org and processed in PRIORITY order (lowest
+ *     `priority` first; falls back to oldest-first).
+ *   - Rent is deducted from the org's Voice Wallet rupee balance (balanceInr)
+ *     in that order until the balance can no longer cover the next number.
+ *   - Numbers that can't be funded are SUSPENDED (bridge calls fall back to the
+ *     shared number). No silent negative balance.
+ *   - SUSPENDED numbers are retried every run and REACTIVATED (in priority
+ *     order) as soon as the wallet is topped up enough to cover them.
+ *
+ * So with 4 numbers @ ₹500 and only ₹1000 funded, the top 2 by priority stay
+ * active and the bottom 2 are suspended — deterministic and admin-controlled.
  */
 export async function chargeDueRents() {
   const now = Date.now();
-  const snap = await db.collection(COLLECTION).where("status", "==", "active").get();
-  let charged = 0, suspended = 0;
+  // Consider active (may be due) + suspended (may reactivate on top-up).
+  const snap = await db.collection(COLLECTION).where("status", "in", ["active", "suspended"]).get();
 
+  // Group paid numbers by org.
+  const byOrg = new Map();
   for (const doc of snap.docs) {
     const num = doc.data();
-    if (!num.monthlyCostInr || num.monthlyCostInr <= 0) continue; // free number
-    if ((num.nextRentAtMs || 0) > now) continue; // not due yet
+    if (!num.monthlyCostInr || num.monthlyCostInr <= 0) continue; // free number, skip
+    if (!byOrg.has(num.orgId)) byOrg.set(num.orgId, []);
+    byOrg.get(num.orgId).push({ ref: doc.ref, data: num });
+  }
 
-    const rent = num.monthlyCostInr || DEFAULT_RENT_INR;
-    const walletRef = db.collection("voiceWallets").doc(num.orgId);
+  let charged = 0, suspended = 0, reactivated = 0;
+
+  for (const [orgId, items] of byOrg) {
+    items.sort((a, b) => priorityKey(a.data) - priorityKey(b.data));
+    const walletRef = db.collection("voiceWallets").doc(orgId);
 
     try {
       const outcome = await db.runTransaction(async (tx) => {
         const wSnap = await tx.get(walletRef);
         const wallet = wSnap.exists ? wSnap.data() : {};
-        const balanceInr = Number(wallet.balanceInr || 0);
+        let balanceInr = Number(wallet.balanceInr || 0);
+        let spent = 0;
+        const result = { charged: 0, suspended: 0, reactivated: 0 };
+        const txns = [];
 
-        if (balanceInr < rent) {
-          tx.update(doc.ref, {
-            status: "suspended",
-            rentFailedAt: nowIso(),
-            rejectionReason: "Voice Wallet balance too low for monthly number rent. Top up to reactivate.",
-            updatedAt: nowIso(),
-          });
-          return "suspended";
+        for (const { ref, data: num } of items) {
+          const due = (num.nextRentAtMs || 0) <= now;
+          // Active + not due yet → already paid this cycle, leave alone.
+          if (num.status === "active" && !due) continue;
+
+          const rent = num.monthlyCostInr || DEFAULT_RENT_INR;
+          if (balanceInr >= rent) {
+            balanceInr -= rent;
+            spent += rent;
+            const nextRentAtMs = now + RENT_PERIOD_MS;
+            tx.update(ref, {
+              status: "active",
+              lastRentAtMs: now, lastRentAt: nowIso(),
+              nextRentAtMs, nextRentAt: new Date(nextRentAtMs).toISOString(),
+              rejectionReason: null,
+              updatedAt: nowIso(),
+            });
+            txns.push({
+              orgId, type: "debit", packId: "number_rent", packName: "Number Rent",
+              minutes: 0, amountInr: rent,
+              description: `Number rent — ${num.displayNumber || num.phoneNumber} (30 days)`,
+              createdAt: nowIso(), timestamp: now,
+            });
+            if (num.status === "suspended") result.reactivated++; else result.charged++;
+          } else {
+            // Can't fund → suspend (idempotent if already suspended).
+            if (num.status !== "suspended") {
+              tx.update(ref, {
+                status: "suspended",
+                rentFailedAt: nowIso(),
+                rejectionReason: "Voice Wallet balance too low for monthly rent. Top up to reactivate.",
+                updatedAt: nowIso(),
+              });
+              result.suspended++;
+            }
+          }
         }
 
-        const nextRentAtMs = now + RENT_PERIOD_MS;
-        tx.set(walletRef, {
-          balanceInr: balanceInr - rent,
-          totalSpentInr: (wallet.totalSpentInr || 0) + rent,
-        }, { merge: true });
-
-        tx.update(doc.ref, {
-          lastRentAtMs: now, lastRentAt: nowIso(),
-          nextRentAtMs, nextRentAt: new Date(nextRentAtMs).toISOString(),
-          updatedAt: nowIso(),
-        });
-
-        const txnRef = db.collection("walletTransactions").doc();
-        tx.create(txnRef, {
-          orgId: num.orgId,
-          type: "debit",
-          packId: "number_rent",
-          packName: "Number Rent",
-          minutes: 0,
-          amountInr: rent,
-          description: `Number rent — ${num.displayNumber || num.phoneNumber} (30 days)`,
-          createdAt: nowIso(),
-          timestamp: now,
-        });
-        return "charged";
+        if (spent > 0) {
+          tx.set(walletRef, {
+            balanceInr,
+            totalSpentInr: (wallet.totalSpentInr || 0) + spent,
+          }, { merge: true });
+          for (const t of txns) tx.create(db.collection("walletTransactions").doc(), t);
+        }
+        return result;
       });
 
-      if (outcome === "charged") charged++;
-      else if (outcome === "suspended") suspended++;
+      charged += outcome.charged;
+      suspended += outcome.suspended;
+      reactivated += outcome.reactivated;
     } catch (e) {
-      logger.error({ orgId: num.orgId, err: e.message }, "Rent charge failed for number");
+      logger.error({ orgId, err: e.message }, "Rent charge failed for org");
     }
   }
 
-  return { checked: snap.size, charged, suspended };
+  return { orgs: byOrg.size, charged, suspended, reactivated };
 }
 
 /**

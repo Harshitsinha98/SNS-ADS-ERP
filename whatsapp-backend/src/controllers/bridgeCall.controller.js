@@ -28,7 +28,7 @@ export async function initiateHandler(req, res) {
 
     const wallet = await checkWalletBalance(orgId);
     if (!wallet.hasBalance) {
-      return res.status(402).json({ error: "Voice call wallet is empty. Please top up.", code: "wallet_empty", balanceMinutes: 0 });
+      return res.status(402).json({ error: "Voice Wallet balance is too low. Please top up.", code: "wallet_empty", balanceInr: wallet.balanceInr || 0 });
     }
 
     const employeePhone = req.authUser.phone_number || req.authUser.phoneNumber || "";
@@ -41,7 +41,7 @@ export async function initiateHandler(req, res) {
     });
 
     if (!result.ok) return res.status(502).json(result);
-    return res.json({ ok: true, callId: result.callId, walletBalance: wallet.balanceMinutes });
+    return res.json({ ok: true, callId: result.callId, walletBalanceInr: wallet.balanceInr });
   } catch (e) {
     logger.error({ err: e.message }, "Bridge call initiate error");
     return res.status(500).json({ error: "Could not start bridge call." });

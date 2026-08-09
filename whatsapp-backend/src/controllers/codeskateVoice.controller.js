@@ -26,6 +26,7 @@ import {
   createVoiceNumber,
   createVoiceNumberRequest,
   registerOwnedNumber,
+  setNumberPriority,
   updateComplianceStatus,
   activateNumber,
   getOrgVoiceNumbers,
@@ -216,6 +217,26 @@ export async function complianceWebhookHandler(req, res) {
   } catch (e) {
     logger.error({ err: e.message }, "Compliance webhook error");
     return res.status(200).send("ok"); // always 200 to Plivo
+  }
+}
+
+// ─── POST /priority (admin: reorder which numbers survive underfunding) ──────
+export async function priorityHandler(req, res) {
+  try {
+    const { orgId, numberId, priority } = req.body || {};
+    if (!orgId || !numberId || priority == null) {
+      return res.status(400).json({ error: "orgId, numberId and priority are required." });
+    }
+    const membership = await getActiveMembership(req.authUser.uid, orgId);
+    if (!membership || (membership.role !== "admin" && membership.role !== "owner")) {
+      return res.status(403).json({ error: "Only admins can reorder numbers." });
+    }
+    const updated = await setNumberPriority(orgId, numberId, priority);
+    if (!updated) return res.status(404).json({ error: "Number not found." });
+    return res.json({ ok: true, record: updated });
+  } catch (e) {
+    logger.error({ err: e.message }, "Set priority error");
+    return res.status(500).json({ error: "Could not update priority." });
   }
 }
 

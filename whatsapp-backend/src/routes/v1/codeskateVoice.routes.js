@@ -21,6 +21,7 @@ import {
   complianceWebhookHandler,
   activateHandler,
   registerOwnedHandler,
+  priorityHandler,
 } from "../../controllers/codeskateVoice.controller.js";
 
 // Multer in-memory storage for doc uploads (max 5MB per file, 2 files)
@@ -53,6 +54,7 @@ export function createCodeskateVoiceRoutes() {
   );
   router.get("/status", requireAuth, statusHandler);
   router.get("/numbers", requireAuth, numbersHandler);
+  router.post("/priority", requireAuth, priorityHandler);
 
   // Plivo webhook (no auth — validate signature in production)
   router.post("/compliance-webhook", webhookLimiter, complianceWebhookHandler);
