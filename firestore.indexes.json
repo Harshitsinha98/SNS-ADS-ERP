@@ -317,6 +317,14 @@
         { "fieldPath": "orgId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "bridgeCalls",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "orgId", "order": "ASCENDING" },
+        { "fieldPath": "initiatedAtMs", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

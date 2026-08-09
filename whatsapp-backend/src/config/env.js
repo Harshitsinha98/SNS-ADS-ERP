@@ -197,6 +197,10 @@ export const bridgeCallConfig = {
   publicBackendUrl: process.env.PUBLIC_BACKEND_URL || "",
   maxCallDurationSeconds: Number(process.env.BRIDGE_CALL_MAX_DURATION) || 600,
   ringTimeoutSeconds: Number(process.env.BRIDGE_CALL_RING_TIMEOUT) || 22,
+  // Async AMD (Answering Machine Detection) analysis window, in milliseconds.
+  // Plivo max is 10000ms. Longer = more accurate = fewer false positives on
+  // real humans. Detection runs in the background WITHOUT delaying the bridge.
+  amdDetectionMs: Math.min(Number(process.env.BRIDGE_CALL_AMD_MS) || 10000, 10000),
   recordByDefault: String(process.env.BRIDGE_CALL_RECORD || "true").toLowerCase() === "true",
   costPerMinuteInr: Number(process.env.BRIDGE_CALL_COST_PER_MIN) || 1,
   allowedPlanIds: (process.env.BRIDGE_CALL_ALLOWED_PLANS || "growth,enterprise,enterprise_plus")

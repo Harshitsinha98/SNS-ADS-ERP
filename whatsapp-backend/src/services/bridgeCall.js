@@ -55,11 +55,22 @@ function plivoAuthHeader() {
 }
 
 /**
- * Call the customer (lead) into the conference room, WITH Answering Machine
- * Detection. If a voicemail/machine answers, Plivo hangs up automatically
- * (machine_detection=hangup) and the customer never joins — so the admin is
- * never charged for talking to a voicemail. This is the core of the
- * "pay only when a real human connects" model.
+ * Call the customer (lead) into the conference room, WITH *asynchronous*
+ * Answering Machine Detection.
+ *
+ * Why async (machine_detection: "true") and NOT "hangup":
+ *   - "hangup" mode makes Plivo decide + cut in real time, aggressively. It was
+ *     cutting REAL humans (pauses, background noise) — a bad customer experience.
+ *   - Async mode bridges the customer to the agent INSTANTLY (no hold music, no
+ *     wait) and analyzes the audio in the background for `amdDetectionMs` (10s).
+ *   - Plivo hits `machine_detection_url` (/customer-amd) ONLY when a machine is
+ *     detected. For a real human that URL is never called → the call continues
+ *     untouched. So a real human is NEVER dropped by detection.
+ *   - When a machine IS detected, the SYSTEM cuts both legs and charges nothing.
+ *     The decision is locked to the opening audio by Plivo's algorithm — neither
+ *     the agent nor the admin has any manual lever to game the "no charge" path.
+ *
+ * This is the core of the "pay only when a real human connects" model.
  */
 export async function callCustomerIntoConference(callId, leadPhone) {
   const from = toDigits(bridgeCallConfig.fromNumber);
@@ -68,6 +79,7 @@ export async function callCustomerIntoConference(callId, leadPhone) {
 
   const answerUrl = `${base}/api/v1/bridge-call/customer-answer?callId=${callId}`;
   const hangupUrl = `${base}/api/v1/bridge-call/customer-status?callId=${callId}`;
+  const amdUrl = `${base}/api/v1/bridge-call/customer-amd?callId=${callId}`;
 
   try {
     const res = await fetch(
@@ -82,6 +94,11 @@ export async function callCustomerIntoConference(callId, leadPhone) {
           ring_timeout: bridgeCallConfig.ringTimeoutSeconds,
           time_limit: bridgeCallConfig.maxCallDurationSeconds,
           caller_name: "CodeSkate CRM",
+          // Async AMD — analyze in background, hit /customer-amd only on machine.
+          machine_detection: "true",
+          machine_detection_time: bridgeCallConfig.amdDetectionMs,
+          machine_detection_url: amdUrl,
+          machine_detection_method: "POST",
         }),
       }
     );
@@ -306,7 +323,7 @@ export async function handleCallCompleted(callId, { aLegSeconds, bLegSeconds, di
     }).catch((e) => logger.warn({ err: e.message }, "Bridge call note write failed"));
   }
 
-  logger.info({ callId, aLegBilledMinutes, bLegBilledMinutes, totalBilledMinutes, costInr, dialStatus }, "Bridge call completed — 2-leg billing applied");
+  logger.info({ callId, billedMinutes, costInr, dialStatus, agentSeconds, customerSeconds }, "Bridge call completed — billing applied");
 }
 
 async function deductWalletMinutes(orgId, minutes, costInr, callId) {

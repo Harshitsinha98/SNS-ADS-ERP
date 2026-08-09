@@ -132,6 +132,70 @@ export function customerAnswerHandler(req, res) {
   res.set("Content-Type", "application/xml").send(xml);
 }
 
+// Async AMD result for the customer leg.
+//
+// Plivo runs machine detection in the background (machine_detection: "true",
+// 10s window) and hits THIS url ONLY when a machine / voicemail is detected —
+// for a real human it is never called, so the conference simply continues and
+// a real customer is NEVER dropped by detection.
+//
+// When a machine IS detected, the SYSTEM ends both legs and charges nothing.
+// There is no manual lever (no agent keypress, no admin action) that can reach
+// this "no charge" path, so it can't be gamed. Because the cut happens within
+// the opening ~10s, a rare false positive costs only a redial — never a
+// mid-conversation drop.
+export async function customerAmdHandler(req, res) {
+  try {
+    const callId = req.query.callId || req.body?.callId;
+    const body = req.body || {};
+    const machineRaw = String(body.Machine || body.machine || body.machine_detection || body.AnsweredBy || "").toLowerCase();
+    const isMachine = machineRaw === "true" || machineRaw.includes("machine");
+    logger.info({ callId, machine: machineRaw }, "Customer AMD result webhook");
+
+    const base = bridgeCallConfig.publicBackendUrl.replace(/\/$/, "");
+    const confRoom = `conf_${callId}`;
+
+    if (!isMachine) {
+      // Not a machine (or ambiguous) — bias to connect. Keep the customer in the
+      // conference so a real human is never dropped, even if Plivo calls us.
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Conference startConferenceOnEnter="true" endConferenceOnExit="true" timeLimit="${bridgeCallConfig.maxCallDurationSeconds}">${confRoom}</Conference>
+</Response>`;
+      return res.set("Content-Type", "application/xml").send(xml);
+    }
+
+    // Machine / voicemail — no charge, and the SYSTEM ends both legs.
+    if (callId) {
+      const snap = await db.collection("bridgeCalls").doc(callId).get().catch(() => null);
+      const call = snap && snap.exists ? snap.data() : null;
+      const terminal = ["wallet-deducted", "customer_voicemail", "no-answer", "agent_no_confirm"];
+      if (call && !terminal.includes(call.status)) {
+        await db.collection("bridgeCalls").doc(callId).update({
+          status: "customer_voicemail",
+          completedAt: nowIso(), completedAtMs: Date.now(),
+          durationSeconds: 0, customerSeconds: 0, billedMinutes: 0, costInr: 0,
+          amdResult: "machine",
+          failureReason: "Customer voicemail detected (async AMD) — no charge.",
+        }).catch(() => {});
+      }
+      // Belt-and-suspenders: also end the agent's waiting leg (and the customer
+      // leg) via the Plivo API, in case the Hangup XML below isn't executed.
+      if (call?.plivoCallUuid) hangupPlivoCall(call.plivoCallUuid).catch(() => {});
+      if (call?.plivoBLegUuid) hangupPlivoCall(call.plivoBLegUuid).catch(() => {});
+    }
+
+    // Hang up the customer leg immediately (endConferenceOnExit ends the agent's
+    // wait too). The status is already marked customer_voicemail above, so the
+    // subsequent hangup webhook will skip billing.
+    const xml = `<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>`;
+    return res.set("Content-Type", "application/xml").send(xml);
+  } catch (e) {
+    logger.error({ err: e.message }, "Customer AMD webhook error");
+    return res.set("Content-Type", "application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><Response></Response>`);
+  }
+}
+
 // Customer leg ended — this tells us if it was voicemail / no-answer / real talk.
 export async function customerStatusHandler(req, res) {
   try {
