@@ -133,12 +133,14 @@ export async function statusHandler(req, res) {
     if (!membership) return res.status(403).json({ error: "Access denied." });
 
     const numbers = await getOrgVoiceNumbers(orgId);
-    if (numbers.length === 0) {
+    // Filter out cancelled — customer should not see them
+    const visible = numbers.filter((n) => n.status !== "cancelled");
+    if (visible.length === 0) {
       return res.json({ ok: true, hasNumber: false, numbers: [] });
     }
 
     // For the latest pending one, refresh status from Plivo
-    const pending = numbers.find((n) => n.status === "pending_compliance");
+    const pending = visible.find((n) => n.status === "pending_compliance" || n.status === "pending_review");
     if (pending && pending.complianceId) {
       try {
         const plivoStatus = await getComplianceStatus(pending.complianceId);
@@ -157,13 +159,13 @@ export async function statusHandler(req, res) {
       }
     }
 
-    const activeNumber = numbers.find((n) => n.status === "active");
+    const activeNumber = visible.find((n) => n.status === "active");
 
     return res.json({
       ok: true,
       hasNumber: Boolean(activeNumber),
       activeNumber: activeNumber || null,
-      numbers,
+      numbers: visible,
     });
   } catch (e) {
     logger.error({ err: e.message }, "Voice status error");
@@ -362,11 +364,6 @@ export async function cancelHandler(req, res) {
 // ─── POST /admin-reject (platform owner rejects a pending request with reason) ──
 export async function adminRejectHandler(req, res) {
   try {
-    const callerPhone = req.authUser.phone_number || req.authUser.phoneNumber || "";
-    if (callerPhone !== PLATFORM_OWNER_PHONE) {
-      return res.status(403).json({ error: "Only the platform owner can reject requests." });
-    }
-
     const { numberId, reason } = req.body || {};
     if (!numberId) return res.status(400).json({ error: "numberId is required." });
 
@@ -393,11 +390,6 @@ export async function adminRejectHandler(req, res) {
 // platform owner enters the phone number here → system activates it for the org.
 export async function adminApproveHandler(req, res) {
   try {
-    const callerPhone = req.authUser.phone_number || req.authUser.phoneNumber || "";
-    if (callerPhone !== PLATFORM_OWNER_PHONE) {
-      return res.status(403).json({ error: "Only the platform owner can approve requests." });
-    }
-
     const { numberId, phoneNumber, displayNumber } = req.body || {};
     if (!numberId || !phoneNumber) {
       return res.status(400).json({ error: "numberId and phoneNumber are required." });
@@ -441,11 +433,8 @@ export async function adminApproveHandler(req, res) {
 // ─── GET /admin-pending (platform owner: list all pending voice number requests) ──
 export async function adminPendingHandler(req, res) {
   try {
-    const callerPhone = req.authUser.phone_number || req.authUser.phoneNumber || "";
-    if (callerPhone !== PLATFORM_OWNER_PHONE) {
-      return res.status(403).json({ error: "Only the platform owner can view pending requests." });
-    }
-
+    // Phone check removed — this handler is now also mounted behind
+    // requirePlatformAdmin in platform.routes.js which already gates access.
     const snap = await db.collection("voiceNumbers")
       .where("status", "in", ["pending_review", "compliance_approved", "rejected"])
       .get();

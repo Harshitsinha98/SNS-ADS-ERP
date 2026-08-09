@@ -23,6 +23,7 @@ import {
   getVoicePnlHandler,
 } from "../../controllers/platform.controller.js";
 import { getPlatformAIStats } from "../../controllers/ai.controller.js";
+import { adminPendingHandler, adminApproveHandler, adminRejectHandler } from "../../controllers/codeskateVoice.controller.js";
 
 export function createPlatformRoutes() {
   const router = Router();
@@ -75,6 +76,11 @@ export function createPlatformRoutes() {
 
   // Voice P&L — per-tenant profit/loss for bridge calling
   router.get("/voice-pnl", getVoicePnlHandler);
+
+  // Voice Number admin — approve/reject/list pending requests
+  router.get("/voice-requests", adminPendingHandler);
+  router.post("/voice-approve", adminApproveHandler);
+  router.post("/voice-reject", adminRejectHandler);
 
   return router;
 }

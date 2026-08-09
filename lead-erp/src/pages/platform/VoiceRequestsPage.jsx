@@ -55,7 +55,7 @@ export default function VoiceRequestsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const d = await authedGet("/api/v1/voice/admin-pending");
+      const d = await authedGet("/api/v1/platform/voice-requests");
       setRequests(d.requests || []);
       setError(null);
     } catch (e) {
@@ -72,7 +72,7 @@ export default function VoiceRequestsPage() {
     setActionBusy(numberId);
     setMsg("");
     try {
-      await authedPost("/api/v1/voice/admin-approve", { numberId, phoneNumber: phoneInput.trim() });
+      await authedPost("/api/v1/platform/voice-approve", { numberId, phoneNumber: phoneInput.trim() });
       setApproveForm(null);
       setPhoneInput("");
       setMsg("Approved and activated.");
@@ -88,7 +88,7 @@ export default function VoiceRequestsPage() {
     setActionBusy(numberId);
     setMsg("");
     try {
-      await authedPost("/api/v1/voice/admin-reject", { numberId, reason: reasonInput || "Documents could not be verified." });
+      await authedPost("/api/v1/platform/voice-reject", { numberId, reason: reasonInput || "Documents could not be verified." });
       setRejectForm(null);
       setReasonInput("");
       setMsg("Request rejected.");
