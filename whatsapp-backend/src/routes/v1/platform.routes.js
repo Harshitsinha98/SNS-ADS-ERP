@@ -97,20 +97,16 @@ export function createPlatformRoutes() {
       const result = await replyToTicket(req.params.id, { from: "platform_admin", text: req.body.text || "" });
       if (!result) return res.status(404).json({ error: "Ticket not found" });
 
-      // Also push reply to the linked org-internal ticket (if exists)
+      // Sync reply to linked org-internal ticket (direct ID lookup)
       const ticket = await getTicket(req.params.id);
-      if (ticket?.orgId && ticket?.subject) {
+      if (ticket?.linkedOrgId && ticket?.linkedOrgTicketId) {
         try {
           const { db: fireDb } = await import("../../bootstrap/firebase.js");
-          const orgTicketsSnap = await fireDb.collection("organizations").doc(ticket.orgId)
-            .collection("tickets")
-            .where("subject", "==", `[Support] ${ticket.subject}`)
-            .limit(1)
-            .get();
-          if (!orgTicketsSnap.empty) {
-            const orgTicketRef = orgTicketsSnap.docs[0].ref;
-            const orgTicketData = orgTicketsSnap.docs[0].data();
-            const replies = orgTicketData.replies || [];
+          const orgTicketRef = fireDb.collection("organizations").doc(ticket.linkedOrgId)
+            .collection("tickets").doc(ticket.linkedOrgTicketId);
+          const orgTicketSnap = await orgTicketRef.get();
+          if (orgTicketSnap.exists) {
+            const replies = orgTicketSnap.data().replies || [];
             replies.push({ from: "support_team", fromName: "CodeSkate Support", text: req.body.text || "", at: new Date().toISOString() });
             await orgTicketRef.update({ replies, updatedAt: new Date().toISOString() });
           }
@@ -127,19 +123,14 @@ export function createPlatformRoutes() {
 
       // Sync status to linked org-internal ticket
       const ticket = await getTicket(req.params.id);
-      if (ticket?.orgId && ticket?.subject) {
+      if (ticket?.linkedOrgId && ticket?.linkedOrgTicketId) {
         try {
           const { db: fireDb } = await import("../../bootstrap/firebase.js");
-          const orgTicketsSnap = await fireDb.collection("organizations").doc(ticket.orgId)
-            .collection("tickets")
-            .where("subject", "==", `[Support] ${ticket.subject}`)
-            .limit(1)
-            .get();
-          if (!orgTicketsSnap.empty) {
-            const update = { status: req.body.status || "resolved", updatedAt: new Date().toISOString() };
-            if (req.body.status === "resolved") update.resolvedAt = new Date().toISOString();
-            await orgTicketsSnap.docs[0].ref.update(update);
-          }
+          const orgTicketRef = fireDb.collection("organizations").doc(ticket.linkedOrgId)
+            .collection("tickets").doc(ticket.linkedOrgTicketId);
+          const update = { status: req.body.status || "resolved", updatedAt: new Date().toISOString() };
+          if (req.body.status === "resolved") update.resolvedAt = new Date().toISOString();
+          await orgTicketRef.update(update);
         } catch { /* non-fatal */ }
       }
 

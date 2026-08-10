@@ -156,7 +156,7 @@ export async function createTicketHandler(req, res) {
     if (orgId) {
       try {
         const { createOrgTicket } = await import("../services/orgTickets.js");
-        await createOrgTicket({
+        const orgTicket = await createOrgTicket({
           orgId,
           raisedBy: uid,
           raisedByName: userName,
@@ -164,7 +164,13 @@ export async function createTicketHandler(req, res) {
           subject: `[Support] ${subject || "Support request"}`,
           description: description || (conversationHistory || []).filter(m => m.role === "user").map(m => m.text).join(" | ") || "",
           priority: priority || "medium",
+          linkedSupportTicketId: ticket.id, // link back to platform ticket
         });
+        // Also store the org-ticket reference on the platform ticket
+        await db.collection("supportTickets").doc(ticket.id).update({
+          linkedOrgTicketId: orgTicket.id,
+          linkedOrgId: orgId,
+        }).catch(() => {});
       } catch { /* non-fatal */ }
     }
 

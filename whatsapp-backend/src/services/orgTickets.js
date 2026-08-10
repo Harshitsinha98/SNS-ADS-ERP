@@ -40,7 +40,7 @@ async function getNextOrgTicketNumber(orgId) {
 /**
  * Create an internal ticket.
  */
-export async function createOrgTicket({ orgId, raisedBy, raisedByName, raisedByRole, subject, description, priority }) {
+export async function createOrgTicket({ orgId, raisedBy, raisedByName, raisedByRole, subject, description, priority, linkedSupportTicketId }) {
   const col = ticketsCol(orgId);
   const ref = col.doc();
   const ticketNumber = await getNextOrgTicketNumber(orgId);
@@ -55,6 +55,7 @@ export async function createOrgTicket({ orgId, raisedBy, raisedByName, raisedByR
     description: description || "",
     status: "open",
     priority: priority || "medium",
+    linkedSupportTicketId: linkedSupportTicketId || null,
     replies: [],
     createdAt: nowIso(),
     createdAtMs: Date.now(),
