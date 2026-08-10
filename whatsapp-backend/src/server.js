@@ -28,6 +28,7 @@ import { runEscalationCheck } from "./services/escalationService.js";
 import { runScheduledBroadcasts } from "./services/broadcast.js";
 import { chargeDueRents } from "./services/voiceNumbers.js";
 import { runPlatformAlerts } from "./services/platformAlerts.js";
+import { cleanupResolvedOrgTickets } from "./services/orgTickets.js";
 
 // ── Cron Jobs ──────────────────────────────────────────────────────
 
@@ -139,6 +140,14 @@ cron.schedule("0 7 * * *", () => {
         logger.info(summary, "Voice number rent charged");
       }
       return summary;
+    })
+  );
+
+  // Cleanup resolved org-internal tickets older than 24 hours
+  runMonitoredCron("orgTicketCleanup", () =>
+    withLease("orgTicketCleanup", 30 * 60 * 1000, async () => {
+      await recordCronStart("orgTicketCleanup");
+      return cleanupResolvedOrgTickets();
     })
   );
 }, { timezone: "Asia/Kolkata" });

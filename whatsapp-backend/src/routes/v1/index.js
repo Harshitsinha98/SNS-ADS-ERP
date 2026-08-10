@@ -27,6 +27,7 @@ import { createWalletRoutes } from "./wallet.routes.js";
 import { createBroadcastRoutes } from "./broadcast.routes.js";
 import { createCodeskateVoiceRoutes } from "./codeskateVoice.routes.js";
 import { createSupportRoutes } from "./support.routes.js";
+import { createOrgTicketRoutes } from "./orgTickets.routes.js";
 import { publicChatMessage } from "../../controllers/publicChat.controller.js";
 
 export function createV1Router() {
@@ -55,6 +56,9 @@ export function createV1Router() {
 
   // Support — AI chat + ticket system for logged-in customers
   router.use("/support", createSupportRoutes());
+
+  // Org-internal tickets — employees raise issues to admin
+  router.use("/org-tickets", createOrgTicketRoutes());
 
   // WhatsApp management
   router.use("/whatsapp", createWhatsAppRoutes());

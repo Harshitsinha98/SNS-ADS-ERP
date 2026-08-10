@@ -21,6 +21,7 @@ import BroadcastDetail from "./pages/admin/BroadcastDetail";
 import CallHistory from "./pages/admin/CallHistory";
 import Recordings from "./pages/admin/Recordings";
 import CodeSkateVoice from "./pages/admin/CodeSkateVoice";
+import InternalTickets from "./pages/shared/InternalTickets";
 import TeamInbox from "./pages/TeamInbox";
 import WhatsApp from "./pages/admin/WhatsApp";
 import WebsiteLeadIntegration from "./pages/admin/WebsiteLeadIntegration";
@@ -99,6 +100,7 @@ export default function App() {
         <Route path="/admin/call-history" element={<ProtectedRoute role="admin"><CallHistory /></ProtectedRoute>} />
         <Route path="/admin/recordings" element={<ProtectedRoute role="admin"><Recordings /></ProtectedRoute>} />
         <Route path="/admin/voice" element={<ProtectedRoute role="admin"><CodeSkateVoice /></ProtectedRoute>} />
+        <Route path="/admin/tickets" element={<ProtectedRoute role="admin"><InternalTickets /></ProtectedRoute>} />
         <Route path="/admin/inbox" element={<ProtectedRoute role="admin"><TeamInbox /></ProtectedRoute>} />
         <Route path="/admin/broadcast" element={<ProtectedRoute role="admin"><Broadcast /></ProtectedRoute>} />
         <Route path="/admin/broadcast/:broadcastId" element={<ProtectedRoute role="admin"><BroadcastDetail /></ProtectedRoute>} />
@@ -140,6 +142,7 @@ export default function App() {
         <Route path="/app/inbox" element={<ProtectedRoute role="employee"><TeamInbox /></ProtectedRoute>} />
         <Route path="/app/conversations" element={<ProtectedRoute role="employee"><Conversations /></ProtectedRoute>} />
         <Route path="/app/tasks" element={<ProtectedRoute role="employee"><Tasks /></ProtectedRoute>} />
+        <Route path="/app/tickets" element={<ProtectedRoute role="employee"><InternalTickets /></ProtectedRoute>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

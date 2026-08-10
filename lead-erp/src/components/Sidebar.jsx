@@ -43,6 +43,7 @@ const adminLinks = [
   { to: "/admin/call-history", label: "Call History", icon: PhoneCall },
   { to: "/admin/recordings", label: "Recordings", icon: Mic },
   { to: "/admin/voice", label: "CodeSkate Voice", icon: Phone },
+  { to: "/admin/tickets", label: "Tickets", icon: ClipboardList },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
@@ -52,6 +53,7 @@ const empLinks = [
   { to: "/app/leads", label: "My Leads", icon: Inbox },
   { to: "/app/conversations", label: "My Conversations", icon: MessageCircle },
   { to: "/app/tasks", label: "My Follow-ups", icon: ClipboardList },
+  { to: "/app/tickets", label: "Tickets", icon: ClipboardList },
 ];
 
 export default function Sidebar({ isOpen = false, onClose = () => {} }) {
