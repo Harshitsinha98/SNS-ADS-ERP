@@ -68,6 +68,19 @@ export function createOrgTicketRoutes() {
       });
 
       if (!result) return res.status(404).json({ error: "Ticket not found." });
+
+      // Reverse sync: if this org ticket is linked to a platform support ticket,
+      // push the reply there too so the platform owner sees it.
+      if (result.linkedSupportTicketId) {
+        try {
+          const { replyToTicket } = await import("../../services/supportTickets.js");
+          await replyToTicket(result.linkedSupportTicketId, {
+            from: `${membership.role}_${req.authUser.uid}`,
+            text: `[${membership.displayName || membership.name || membership.role}] ${text}`,
+          });
+        } catch { /* non-fatal */ }
+      }
+
       return res.json({ ok: true, ticket: result });
     } catch (e) {
       return res.status(500).json({ error: e.message || "Could not reply." });
