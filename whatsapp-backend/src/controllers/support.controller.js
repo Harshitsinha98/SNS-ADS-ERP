@@ -152,6 +152,22 @@ export async function createTicketHandler(req, res) {
       priority: priority || "medium",
     });
 
+    // Also create an org-internal ticket so it shows in /admin/tickets + /app/tickets
+    if (orgId) {
+      try {
+        const { createOrgTicket } = await import("../services/orgTickets.js");
+        await createOrgTicket({
+          orgId,
+          raisedBy: uid,
+          raisedByName: userName,
+          raisedByRole: userRole,
+          subject: `[Support] ${subject || "Support request"}`,
+          description: description || (conversationHistory || []).filter(m => m.role === "user").map(m => m.text).join(" | ") || "",
+          priority: priority || "medium",
+        });
+      } catch { /* non-fatal */ }
+    }
+
     return res.status(201).json({ ok: true, ticket });
   } catch (e) {
     logger.error({ err: e.message }, "Create ticket error");
