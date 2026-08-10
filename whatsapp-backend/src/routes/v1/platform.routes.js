@@ -93,16 +93,56 @@ export function createPlatformRoutes() {
   });
   router.post("/support-tickets/:id/reply", async (req, res) => {
     try {
-      const { replyToTicket } = await import("../../services/supportTickets.js");
+      const { replyToTicket, getTicket } = await import("../../services/supportTickets.js");
       const result = await replyToTicket(req.params.id, { from: "platform_admin", text: req.body.text || "" });
       if (!result) return res.status(404).json({ error: "Ticket not found" });
+
+      // Also push reply to the linked org-internal ticket (if exists)
+      const ticket = await getTicket(req.params.id);
+      if (ticket?.orgId && ticket?.subject) {
+        try {
+          const { db: fireDb } = await import("../../bootstrap/firebase.js");
+          const orgTicketsSnap = await fireDb.collection("organizations").doc(ticket.orgId)
+            .collection("tickets")
+            .where("subject", "==", `[Support] ${ticket.subject}`)
+            .limit(1)
+            .get();
+          if (!orgTicketsSnap.empty) {
+            const orgTicketRef = orgTicketsSnap.docs[0].ref;
+            const orgTicketData = orgTicketsSnap.docs[0].data();
+            const replies = orgTicketData.replies || [];
+            replies.push({ from: "support_team", fromName: "CodeSkate Support", text: req.body.text || "", at: new Date().toISOString() });
+            await orgTicketRef.update({ replies, updatedAt: new Date().toISOString() });
+          }
+        } catch { /* non-fatal */ }
+      }
+
       res.json({ ok: true, ticket: result });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });
   router.post("/support-tickets/:id/status", async (req, res) => {
     try {
-      const { updateTicketStatus } = await import("../../services/supportTickets.js");
+      const { updateTicketStatus, getTicket } = await import("../../services/supportTickets.js");
       const result = await updateTicketStatus(req.params.id, req.body.status || "resolved");
+
+      // Sync status to linked org-internal ticket
+      const ticket = await getTicket(req.params.id);
+      if (ticket?.orgId && ticket?.subject) {
+        try {
+          const { db: fireDb } = await import("../../bootstrap/firebase.js");
+          const orgTicketsSnap = await fireDb.collection("organizations").doc(ticket.orgId)
+            .collection("tickets")
+            .where("subject", "==", `[Support] ${ticket.subject}`)
+            .limit(1)
+            .get();
+          if (!orgTicketsSnap.empty) {
+            const update = { status: req.body.status || "resolved", updatedAt: new Date().toISOString() };
+            if (req.body.status === "resolved") update.resolvedAt = new Date().toISOString();
+            await orgTicketsSnap.docs[0].ref.update(update);
+          }
+        } catch { /* non-fatal */ }
+      }
+
       res.json({ ok: true, ...result });
     } catch (e) { res.status(500).json({ error: e.message }); }
   });

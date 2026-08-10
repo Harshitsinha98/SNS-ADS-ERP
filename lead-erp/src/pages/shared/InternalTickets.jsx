@@ -107,11 +107,14 @@ function TicketCard({ ticket, orgId, isAdmin, onUpdate }) {
               className="w-8 h-8 rounded-lg bg-orange-500 text-white flex items-center justify-center disabled:opacity-40">
               {replying ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
             </button>
-            {isAdmin && ticket.status === "open" && (
+            {isAdmin && ticket.status === "open" && !ticket.subject?.startsWith("[Support]") && (
               <button onClick={() => handleStatus("in_progress")} className="text-[10px] bg-blue-50 text-blue-700 px-2 py-1 rounded font-medium whitespace-nowrap">In Progress</button>
             )}
-            {isAdmin && ticket.status !== "resolved" && (
+            {isAdmin && ticket.status !== "resolved" && !ticket.subject?.startsWith("[Support]") && (
               <button onClick={() => handleStatus("resolved")} className="text-[10px] bg-green-50 text-green-700 px-2 py-1 rounded font-medium whitespace-nowrap">Resolve</button>
+            )}
+            {ticket.subject?.startsWith("[Support]") && ticket.status !== "resolved" && (
+              <span className="text-[10px] text-ink-muted italic">Managed by CodeSkate support</span>
             )}
           </div>
         </div>
