@@ -65,14 +65,41 @@ export default function LeadAction() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bridgeState]);
 
+  // Resume detection: if user was on a call and app went to background/killed,
+  // recover the session on next mount and show worknote prompt.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("codeskate_active_call");
+      if (!saved) return;
+      const session = JSON.parse(saved);
+      // Only recover if it's for THIS lead and not stale (< 24h)
+      if (session.leadId === id && (Date.now() - session.callStartMs) < 24 * 60 * 60 * 1000) {
+        const duration = Math.floor((Date.now() - session.callStartMs) / 1000);
+        setPendingDuration(duration);
+        setShowWorknoteModal(true);
+        localStorage.removeItem("codeskate_active_call");
+      } else if ((Date.now() - session.callStartMs) >= 24 * 60 * 60 * 1000) {
+        // Stale session (> 24h) — discard
+        localStorage.removeItem("codeskate_active_call");
+      }
+    } catch {}
+  }, [id]);
+
   // ── All hooks above, early return below ──
   if (!lead || lead.assignedTo !== currentUserId)
     return <Layout title="Lead"><p className="text-danger">Access denied or lead not found.</p></Layout>;
 
   const startCall = () => {
-    setCallStart(Date.now());
+    const now = Date.now();
+    setCallStart(now);
     setElapsed(0);
     setCallActive(true);
+    // Persist call session so we can recover if app goes to background/killed
+    try {
+      localStorage.setItem("codeskate_active_call", JSON.stringify({
+        leadId: lead.id, leadName: lead.name, callStartMs: now,
+      }));
+    } catch {}
     window.location.href = `tel:${lead.phone}`;
   };
 
@@ -82,6 +109,7 @@ export default function LeadAction() {
     setPendingDuration(elapsed);
     setCallActive(false);
     setShowWorknoteModal(true);
+    try { localStorage.removeItem("codeskate_active_call"); } catch {}
   };
 
   const saveCallLog = () => {
@@ -95,6 +123,7 @@ export default function LeadAction() {
     setShowWorknoteModal(false);
     setWorknote("");
     setPendingDuration(0);
+    try { localStorage.removeItem("codeskate_active_call"); } catch {}
   };
 
   const setStatus = (status) => updateLeadStatus(lead.id, status, user);

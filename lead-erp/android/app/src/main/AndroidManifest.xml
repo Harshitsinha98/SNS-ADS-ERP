@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-<uses-permission android:name="android.permission.READ_PHONE_STATE"/>
-<uses-permission android:name="android.permission.READ_CALL_LOG"/>
+
+    <!-- Only INTERNET needed for Play Store build. Call tracking permissions
+         (READ_PHONE_STATE, READ_CALL_LOG) removed to avoid Play Store rejection.
+         Enterprise sideload APK can re-add them. -->
 
     <application
         android:allowBackup="true"
@@ -38,6 +40,5 @@
     </application>
 
     <!-- Permissions -->
-
     <uses-permission android:name="android.permission.INTERNET" />
 </manifest>
