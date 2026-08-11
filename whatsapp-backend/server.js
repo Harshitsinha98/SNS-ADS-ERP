@@ -59,6 +59,13 @@ const allowedOrigins = new Set(
     process.env.FRONTEND_URL,
     process.env.PUBLIC_FRONTEND_URL,
     "http://localhost:5173",
+    // Capacitor native app WebView origins (Android/iOS). The mobile app runs
+    // from these local schemes, so its cross-origin API calls MUST be allowed
+    // or the browser blocks them (and OTP/login silently fails on device).
+    "https://localhost",
+    "http://localhost",
+    "capacitor://localhost",
+    "ionic://localhost",
   ]
     .filter(Boolean)
     .join(",")
@@ -68,8 +75,12 @@ const allowedOrigins = new Set(
 );
 app.use(cors({
   origin(origin, callback) {
+    // Allow requests with no origin (curl, native HTTP, server-to-server) and
+    // any explicitly allowed origin. For disallowed origins we return `false`
+    // (a clean CORS rejection) instead of throwing — throwing an Error here
+    // bubbles up as an HTTP 500, which broke OTP requests from the mobile app.
     if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-    return callback(new Error("Origin is not allowed"));
+    return callback(null, false);
   },
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],

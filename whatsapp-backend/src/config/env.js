@@ -30,6 +30,12 @@ export const corsConfig = {
     process.env.FRONTEND_URL,
     process.env.PUBLIC_FRONTEND_URL,
     "http://localhost:5173",
+    // Capacitor native app WebView origins (Android/iOS) — required so the
+    // mobile app's API calls (OTP, login, etc.) aren't blocked by CORS.
+    "https://localhost",
+    "http://localhost",
+    "capacitor://localhost",
+    "ionic://localhost",
   ]
     .filter(Boolean)
     .join(",")

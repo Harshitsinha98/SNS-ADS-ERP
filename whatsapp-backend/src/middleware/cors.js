@@ -16,8 +16,12 @@ export function createCors() {
   return cors({
     origin(origin, callback) {
       // Allow requests with no origin (mobile apps, curl, server-to-server)
+      // and any allow-listed origin. For disallowed origins return `false`
+      // (clean CORS rejection) rather than throwing — a thrown Error surfaces
+      // as HTTP 500, which broke OTP/login requests coming from the Capacitor
+      // native app (Origin: https://localhost).
       if (!origin || allowedOrigins.has(origin)) return callback(null, true);
-      return callback(new Error("Origin is not allowed"));
+      return callback(null, false);
     },
     methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],

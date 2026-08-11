@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
-  Phone, ShieldCheck, ArrowRight, ArrowLeft, Loader2, Shield, Users, XCircle,
+  Phone, ShieldCheck, ArrowRight, ArrowLeft, Loader2, XCircle,
   MessageCircle, Smartphone, PhoneCall, CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -18,7 +18,6 @@ export default function Login() {
   const { user, requestOtp, verifyOtp, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [portal, setPortal] = useState(null);
   const [step, setStep] = useState("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
@@ -29,7 +28,7 @@ export default function Login() {
   const [channel, setChannel] = useState(null);
   const [resending, setResending] = useState(null);
   const [voiceAvailable, setVoiceAvailable] = useState(false);
-  const [roleError, setRoleError] = useState("");
+  const [accountError, setAccountError] = useState("");
 
   useEffect(() => {
     getOtpConfig()
@@ -37,16 +36,27 @@ export default function Login() {
       .catch(() => {});
   }, []);
 
+  // Backend auto-detects the role — we just route wherever the user belongs.
   useEffect(() => {
     if (!user) return;
-    if (user.isPlatformOwner && !user.role) { navigate("/platform", { replace: true }); return; }
-    if (user.needsSetup) { setRoleError("No workspace found. Please sign up first."); logout(); return; }
+
+    // Platform owner → platform console
+    if (user.isPlatformOwner && !user.role) {
+      navigate("/platform", { replace: true });
+      return;
+    }
+
+    // No workspace found for this number
+    if (user.needsSetup) {
+      setAccountError("No account found for this number. Please sign up first, or use the number linked to your workspace.");
+      logout();
+      return;
+    }
+
+    // Role decided by backend (membership): admin/owner → /admin, else → /app
     const isAdminish = user.role === "admin" || user.role === "owner";
-    if (!portal) { navigate(isAdminish ? "/admin" : "/app", { replace: true }); return; }
-    if (portal === "admin" && !isAdminish) { setRoleError("Access denied — you're an employee."); logout(); return; }
-    if (portal === "employee" && isAdminish) { setRoleError("Access denied — you're an admin."); logout(); return; }
     navigate(isAdminish ? "/admin" : "/app", { replace: true });
-  }, [user, portal, navigate, logout]);
+  }, [user, navigate, logout]);
 
   const sendOtp = async (e) => {
     e.preventDefault();
@@ -76,111 +86,54 @@ export default function Login() {
     if (!res.ok) setErr(res.error);
   };
 
-  const resetToPortal = () => {
-    setPortal(null); setStep("phone"); setPhone(""); setOtp("");
-    setErr(""); setInfo(""); setRoleError(""); setConfirmation(null); setChannel(null);
+  const reset = () => {
+    setStep("phone"); setPhone(""); setOtp("");
+    setErr(""); setInfo(""); setAccountError(""); setConfirmation(null); setChannel(null);
   };
 
   return (
     <div className="login-screen">
       <div id="recaptcha-container" />
 
-      {/* ─── ROLE ERROR ─── */}
-      {roleError ? (
+      {accountError ? (
+        /* ─── ACCOUNT ERROR ─── */
         <div className="login-content">
           <div className="flex-1 flex flex-col items-center justify-center px-8">
             <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mb-6">
               <XCircle className="w-10 h-10 text-red-400" />
             </div>
-            <h1 className="text-xl font-bold text-white mb-2 text-center">Access Denied</h1>
-            <p className="text-sm text-white/60 mb-8 text-center">{roleError}</p>
-            <button onClick={resetToPortal} className="login-btn w-full">Try again</button>
-          </div>
-        </div>
-      ) : !portal ? (
-        /* ─── PORTAL SELECTOR ─── */
-        <div className="login-content">
-          {/* Brand */}
-          <div className="pt-16 pb-8 flex flex-col items-center">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/30 mb-5">
-              <span className="text-white font-bold text-2xl font-display">C</span>
-            </div>
-            <h1 className="text-2xl font-bold text-white font-display">Codeskate CRM</h1>
-            <p className="text-sm text-white/50 mt-1">Sign in to continue</p>
-          </div>
-
-          {/* Role Selection */}
-          <div className="flex-1 px-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-white/40 mb-4 px-1">Choose your role</p>
-
-            <button
-              onClick={() => setPortal("admin")}
-              className="login-role-card mb-3"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shrink-0">
-                <Shield className="text-white" size={22} />
-              </div>
-              <div className="flex-1 text-left">
-                <p className="font-bold text-white text-[15px]">Admin</p>
-                <p className="text-xs text-white/50 mt-0.5">Manage team & business</p>
-              </div>
-              <ArrowRight size={18} className="text-white/30" />
-            </button>
-
-            <button
-              onClick={() => setPortal("employee")}
-              className="login-role-card"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
-                <Users className="text-orange-400" size={22} />
-              </div>
-              <div className="flex-1 text-left">
-                <p className="font-bold text-white text-[15px]">Employee</p>
-                <p className="text-xs text-white/50 mt-0.5">Work on your leads</p>
-              </div>
-              <ArrowRight size={18} className="text-white/30" />
-            </button>
-          </div>
-
-          {/* Footer */}
-          <div className="pb-10 pt-6 text-center">
-            <p className="text-sm text-white/40">
-              New here? <Link to="/signup" className="text-orange-400 font-semibold">Start free trial</Link>
-            </p>
+            <h1 className="text-xl font-bold text-white mb-2 text-center">Account not found</h1>
+            <p className="text-sm text-white/60 mb-8 text-center">{accountError}</p>
+            <button onClick={reset} className="login-btn w-full">Try again</button>
+            <Link to="/signup" className="text-sm text-orange-400 font-semibold mt-5">Start free trial</Link>
           </div>
         </div>
       ) : (
-        /* ─── PHONE / OTP ENTRY ─── */
         <div className="login-content">
-          {/* Top bar with back */}
-          <div className="pt-14 px-6 pb-4">
-            <button
-              onClick={step === "otp" ? () => { setStep("phone"); setOtp(""); setErr(""); setInfo(""); } : resetToPortal}
-              className="flex items-center gap-1.5 text-sm text-white/60 press-scale mb-8"
-            >
-              <ArrowLeft size={18} /> Back
-            </button>
-
-            {/* Role indicator */}
-            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mb-5 ${
-              portal === "admin" ? "bg-orange-500/20 text-orange-400" : "bg-white/10 text-white/70"
-            }`}>
-              {portal === "admin" ? <Shield size={12} /> : <Users size={12} />}
-              {portal === "admin" ? "Admin" : "Employee"}
+          {/* ─── BRAND HEADER ─── */}
+          <div className="pt-16 pb-10 flex flex-col items-center">
+            <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/30 mb-5">
+              <span className="text-white font-bold text-3xl font-display">C</span>
             </div>
-
-            <h1 className="text-2xl font-bold text-white font-display mb-1.5">
-              {step === "phone" ? "Enter your number" : "Enter OTP"}
-            </h1>
-            <p className="text-sm text-white/50">
-              {step === "phone"
-                ? "We'll send a verification code"
-                : <>Sent to <span className="text-white font-medium">+91 {phone}</span>{channelLabel(channel) ? ` via ${channelLabel(channel)}` : ""}</>}
+            <h1 className="text-2xl font-bold text-white font-display">Codeskate CRM</h1>
+            <p className="text-sm text-white/50 mt-1.5">
+              {step === "phone" ? "Sign in to your account" : "Verify your number"}
             </p>
           </div>
 
-          {/* Error / Info */}
-          <div className="px-6">
+          {/* ─── FORM AREA ─── */}
+          <div className="flex-1 px-6 flex flex-col">
+            {/* Back button (OTP step only) */}
+            {step === "otp" && (
+              <button
+                onClick={() => { setStep("phone"); setOtp(""); setErr(""); setInfo(""); }}
+                className="flex items-center gap-1.5 text-sm text-white/60 press-scale mb-6 self-start"
+              >
+                <ArrowLeft size={18} /> Change number
+              </button>
+            )}
+
+            {/* Error / Info messages */}
             {err && (
               <div className="bg-red-500/15 border border-red-500/30 text-red-300 text-sm px-4 py-3 rounded-xl mb-4 flex items-start gap-2">
                 <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" /><span>{err}</span>
@@ -191,75 +144,79 @@ export default function Login() {
                 <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /><span>{info}</span>
               </div>
             )}
-          </div>
 
-          {/* Forms */}
-          <div className="flex-1 px-6 flex flex-col">
             {step === "phone" ? (
+              /* ─── PHONE ENTRY ─── */
               <form onSubmit={sendOtp} className="flex-1 flex flex-col">
-                <div className="mb-8">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-3">Phone number</label>
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-white/60">
-                      <Phone size={16} />
-                      <span className="text-sm font-semibold">+91</span>
-                      <div className="w-px h-5 bg-white/20" />
-                    </div>
-                    <input
-                      type="tel"
-                      className="login-input pl-[6rem]"
-                      placeholder="98765 43210"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
-                      maxLength={10}
-                      required
-                      disabled={loading}
-                      autoFocus
-                      inputMode="numeric"
-                    />
+                <label className="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-3">
+                  Mobile number
+                </label>
+                <div className="relative mb-3">
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-white/60">
+                    <Phone size={16} />
+                    <span className="text-sm font-semibold">+91</span>
+                    <div className="w-px h-5 bg-white/20" />
                   </div>
+                  <input
+                    type="tel"
+                    className="login-input pl-[6rem]"
+                    placeholder="98765 43210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                    maxLength={10}
+                    required
+                    disabled={loading}
+                    autoFocus
+                    inputMode="numeric"
+                  />
                 </div>
+                <p className="text-xs text-white/40 leading-relaxed">
+                  We'll send a one-time code. Your role is detected automatically — no need to choose.
+                </p>
 
                 <div className="mt-auto pb-10">
                   <button disabled={loading || phone.length !== 10} className="login-btn w-full">
                     {loading
                       ? <><Loader2 size={18} className="animate-spin" /> Sending...</>
-                      : <>Get OTP <ArrowRight size={18} /></>}
+                      : <>Continue <ArrowRight size={18} /></>}
                   </button>
                 </div>
               </form>
             ) : (
+              /* ─── OTP ENTRY ─── */
               <div className="flex-1 flex flex-col">
-                <form onSubmit={confirmOtp} className="flex-1 flex flex-col">
-                  <div className="mb-8">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-3">6-digit code</label>
-                    <input
-                      className="login-input text-center text-2xl tracking-[0.5em] font-mono"
-                      placeholder="● ● ● ● ● ●"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                      maxLength={6}
-                      required
-                      autoFocus
-                      disabled={loading}
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                    />
-                  </div>
+                <p className="text-sm text-white/50 mb-5">
+                  Code sent to <span className="text-white font-semibold">+91 {phone}</span>
+                  {channelLabel(channel) ? ` via ${channelLabel(channel)}` : ""}
+                </p>
 
-                  <div className="mt-auto pb-4">
-                    <button disabled={loading || otp.length !== 6} className="login-btn w-full">
-                      {loading
-                        ? <><Loader2 size={18} className="animate-spin" /> Verifying...</>
-                        : <>Verify & Sign In</>}
-                    </button>
-                  </div>
+                <form onSubmit={confirmOtp} className="flex flex-col">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-white/40 mb-3">
+                    Enter 6-digit code
+                  </label>
+                  <input
+                    className="login-input text-center text-2xl tracking-[0.5em] font-mono mb-4"
+                    placeholder="● ● ● ● ● ●"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    maxLength={6}
+                    required
+                    autoFocus
+                    disabled={loading}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                  />
+                  <button disabled={loading || otp.length !== 6} className="login-btn w-full">
+                    {loading
+                      ? <><Loader2 size={18} className="animate-spin" /> Verifying...</>
+                      : <>Verify & Sign In</>}
+                  </button>
                 </form>
 
-                {/* Resend */}
-                <div className="pb-10 pt-3 border-t border-white/10">
+                {/* Resend options */}
+                <div className="mt-auto pb-10 pt-6 border-t border-white/10">
                   <p className="text-xs text-white/40 mb-3">Didn't get the code?</p>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <button type="button" onClick={() => resend("whatsapp")} disabled={!!resending || loading}
                       className="login-resend-btn">
                       {resending === "whatsapp" ? <Loader2 size={13} className="animate-spin" /> : <MessageCircle size={13} className="text-green-400" />}
@@ -274,7 +231,7 @@ export default function Login() {
                       <button type="button" onClick={() => resend("voice")} disabled={!!resending || loading}
                         className="login-resend-btn">
                         {resending === "voice" ? <Loader2 size={13} className="animate-spin" /> : <PhoneCall size={13} />}
-                        Call
+                        Call me
                       </button>
                     )}
                   </div>
