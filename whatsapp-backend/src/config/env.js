@@ -151,8 +151,10 @@ export const otpConfig = {
   codeLength: Number(process.env.OTP_CODE_LENGTH) || 6,
   ttlSeconds: Number(process.env.OTP_TTL_SECONDS) || 300, // 5 min
   maxAttempts: Number(process.env.OTP_MAX_ATTEMPTS) || 5,
-  resendCooldownSeconds: Number(process.env.OTP_RESEND_COOLDOWN) || 30,
-  maxSendsPerWindow: Number(process.env.OTP_MAX_SENDS_PER_WINDOW) || 5,
+  // NOTE: Raised for the testing phase. Revert to production values before
+  // launch: resendCooldown 30, maxSendsPerWindow 5, sendWindow 3600.
+  resendCooldownSeconds: Number(process.env.OTP_RESEND_COOLDOWN) || 10,
+  maxSendsPerWindow: Number(process.env.OTP_MAX_SENDS_PER_WINDOW) || 100,
   sendWindowSeconds: Number(process.env.OTP_SEND_WINDOW_SECONDS) || 3600, // 1 hr
 
   // True when a direct-Meta WhatsApp OTP sender is fully configured.
