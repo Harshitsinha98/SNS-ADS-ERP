@@ -233,9 +233,15 @@ export function AuthProvider({ children }) {
     // while the WhatsApp authentication template is pending Meta approval (or
     // SMS DLT isn't registered), so login keeps working without touching the
     // backend deployment. Remove it to restore the normal multi-channel flow.
+    // On native (Capacitor) the kill-switch is IGNORED: Firebase Phone Auth
+    // relies on reCAPTCHA, which cannot render inside the Android WebView (it
+    // pops an external browser and then fails). Native must always use the
+    // backend multi-channel OTP flow.
+    const isNative = Boolean(window?.Capacitor?.isNativePlatform?.());
     const forceFirebase =
+      !isNative &&
       String(import.meta.env.VITE_OTP_FORCE_FIREBASE || "").toLowerCase() === "true";
-    const useFirebaseSms = via === "sms_firebase";
+    const useFirebaseSms = !isNative && via === "sms_firebase";
 
     // Try multi-channel OTP first — unless forced/asked to use Firebase.
     if (!forceFirebase && !useFirebaseSms) {
@@ -253,6 +259,15 @@ export function AuthProvider({ children }) {
     }
 
     // Firebase Phone Auth (SMS via reCAPTCHA) — default fallback or explicit SMS.
+    // Never attempt this on native: reCAPTCHA opens an external browser inside
+    // Capacitor and then fails, which looks broken to the user.
+    if (isNative) {
+      return {
+        ok: false,
+        error: "Could not send the code right now. Please check your internet and try again.",
+      };
+    }
+
     const phoneId = toE164(phone);
     if (!import.meta.env.VITE_FIREBASE_API_KEY) {
       return {
