@@ -13,7 +13,6 @@ import {
   Area,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
 } from "recharts";
 import {
@@ -30,7 +29,7 @@ import {
   CheckCheck,
   Eye,
   MessageCircle,
-  ArrowRight,
+  ChevronRight,
   Activity as ActivityIcon,
   Users,
   Flame,
@@ -40,7 +39,6 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CLOSED = ["Closed-Won", "Lost"];
 
-// "3d late" / "5h late" / "just now" — avoids showing "0d late" for recent misses.
 const lateLabel = (dueAt) => {
   const ms = Date.now() - new Date(dueAt).getTime();
   if (ms < 0) return "due soon";
@@ -60,7 +58,6 @@ export default function Dashboard() {
 
   const [waStats, setWaStats] = useState(null);
 
-  // WhatsApp broadcast engagement — optional, fails silently if unavailable.
   useEffect(() => {
     if (!orgId) return;
     let cancelled = false;
@@ -78,7 +75,6 @@ export default function Dashboard() {
     const lost = active.filter((l) => l.status === "Lost");
     const open = active.filter((l) => !CLOSED.includes(l.status));
 
-    // ── Today's pulse ──
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     const tomorrow = new Date(todayStart.getTime() + DAY_MS);
     const now = new Date();
@@ -96,14 +92,12 @@ export default function Dashboard() {
       .filter((l) => daysSince(l.lastUpdated) >= 3)
       .sort((a, b) => daysSince(b.lastUpdated) - daysSince(a.lastUpdated));
 
-    // ── Pipeline health ──
     const conversionRate = active.length ? Math.round((won.length / active.length) * 100) : 0;
     const avgDaysToClose = won.length
       ? Math.round(won.reduce((s, l) => s + Math.max(0, (new Date(l.lastUpdated) - new Date(l.createdAt)) / DAY_MS), 0) / won.length)
       : 0;
     const hotLeads = open.filter((l) => l.priority === "Hot").length;
 
-    // ── Revenue (only surfaced when actually tracked) ──
     const wonValue = won.reduce((s, l) => s + revenueOf(l), 0);
     const pipelineValue = open.reduce((s, l) => s + revenueOf(l), 0);
     const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
@@ -114,7 +108,6 @@ export default function Dashboard() {
     const hasRevenue = wonValue > 0 || pipelineValue > 0;
     const wonMissingRevenue = won.filter((l) => revenueOf(l) <= 0);
 
-    // ── 14-day lead inflow trend ──
     const trend = [];
     for (let i = 13; i >= 0; i--) {
       const d = new Date(todayStart.getTime() - i * DAY_MS);
@@ -133,7 +126,6 @@ export default function Dashboard() {
       value: active.filter((l) => l.status === s).length,
     }));
 
-    // ── Team performance (lead-first, revenue optional) ──
     const team = users
       .filter((u) => u.role === "employee")
       .map((u) => {
@@ -151,9 +143,8 @@ export default function Dashboard() {
           revenue: uWon.reduce((s, l) => s + revenueOf(l), 0),
         };
       })
-      .sort((a, b) => (b.revenue - a.revenue) || (b.wins - a.wins) || (b.assigned - a.assigned));
+      .sort((a, b) => (b.revenue - a.revenue) || (b.wins - a.wins));
 
-    // ── Source performance ──
     const srcMap = {};
     active.forEach((l) => {
       const src = l.source || "Unknown";
@@ -176,421 +167,276 @@ export default function Dashboard() {
 
   const waTotals = waStats?.totals;
   const waRates = waStats?.rates;
-  const waBench = waStats?.benchmarks;
   const hasBroadcasts = Boolean(waTotals && waTotals.sent > 0);
 
   return (
-    <Layout title="Business Command Center">
-      {/* ═══ TODAY'S PULSE — what needs attention right now ═══ */}
+    <Layout title="Dashboard">
+
+      {/* ═══ TODAY'S PULSE ═══ */}
       <SectionLabel icon={Flame} text="Today's Pulse" />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
-        <PulseCard
-          label="New Leads Today" value={m.newToday} icon={UserPlus} tone="primary"
-          onClick={() => navigate("/admin/leads")}
-        />
-        <PulseCard
-          label="Due Today" value={m.dueToday.length} icon={CalendarClock} tone="info"
-          sub="follow-ups" onClick={() => navigate("/admin/follow-ups")}
-        />
-        <PulseCard
-          label="Overdue" value={m.overdue.length} icon={CalendarX2}
-          tone={m.overdue.length > 0 ? "danger" : "ok"} sub="follow-ups"
-          onClick={() => navigate("/admin/follow-ups")}
-        />
-        <PulseCard
-          label="Untouched 3d+" value={m.untouched.length} icon={AlertTriangle}
-          tone={m.untouched.length > 0 ? "warn" : "ok"} sub="SLA risk"
-          onClick={() => navigate("/admin/follow-ups")}
-        />
+      <div className="grid grid-cols-2 gap-2.5 mb-4">
+        <PulseCard label="New Today" value={m.newToday} icon={UserPlus} tone="primary" onClick={() => navigate("/admin/leads")} />
+        <PulseCard label="Due Today" value={m.dueToday.length} icon={CalendarClock} tone="info" onClick={() => navigate("/admin/follow-ups")} />
+        <PulseCard label="Overdue" value={m.overdue.length} icon={CalendarX2} tone={m.overdue.length > 0 ? "danger" : "ok"} onClick={() => navigate("/admin/follow-ups")} />
+        <PulseCard label="Untouched 3d+" value={m.untouched.length} icon={AlertTriangle} tone={m.untouched.length > 0 ? "warn" : "ok"} onClick={() => navigate("/admin/follow-ups")} />
       </div>
 
       {/* ═══ PIPELINE HEALTH ═══ */}
-      <SectionLabel icon={Target} text="Pipeline Health" />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
-        <PulseCard label="Active Pipeline" value={m.open} icon={Layers} tone="primary" sub={`of ${m.total} total leads`} onClick={() => navigate("/admin/leads")} />
-        <PulseCard label="Conversion Rate" value={`${m.conversionRate}%`} icon={TrendingUp} tone="ok" sub={`${m.won} won · ${m.lost} lost`} />
-        <PulseCard label="Avg Days to Close" value={m.avgDaysToClose || "—"} icon={Timer} tone="signal" sub={m.won ? `across ${m.won} won deals` : "no wins yet"} />
-        <PulseCard label="Hot Leads" value={m.hotLeads} icon={Flame} tone="danger" sub="high priority, open" onClick={() => navigate("/admin/leads")} />
+      <SectionLabel icon={Target} text="Pipeline" />
+      <div className="grid grid-cols-2 gap-2.5 mb-4">
+        <PulseCard label="Active" value={m.open} icon={Layers} tone="primary" sub={`of ${m.total}`} onClick={() => navigate("/admin/leads")} />
+        <PulseCard label="Conv. Rate" value={`${m.conversionRate}%`} icon={TrendingUp} tone="ok" sub={`${m.won} won`} />
+        <PulseCard label="Avg Close" value={m.avgDaysToClose || "—"} icon={Timer} tone="signal" sub="days" />
+        <PulseCard label="Hot" value={m.hotLeads} icon={Flame} tone="danger" onClick={() => navigate("/admin/leads")} />
       </div>
 
-      {/* ═══ WHATSAPP BROADCAST ═══ */}
-      <SectionLabel
-        icon={MessageCircle}
-        text="WhatsApp Broadcast"
-        action={{ label: hasBroadcasts ? "Full broadcast dashboard" : "Create broadcast", to: "/admin/broadcast" }}
-      />
-
-      {!hasBroadcasts ? (
-        /* Empty state — keeps the capability discoverable */
-        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 mb-7 flex flex-col sm:flex-row sm:items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shrink-0">
-            <Megaphone className="text-white" size={22} />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-display font-bold text-base text-ink">No broadcasts sent yet</h3>
-            <p className="text-sm text-ink-muted mt-0.5">
-              Reach all {m.total} of your leads at once with an approved WhatsApp template. Delivery, read and
-              response rates will appear here automatically.
-            </p>
-          </div>
-          <Link to="/admin/broadcast" className="btn btn-primary text-sm whitespace-nowrap flex items-center gap-1.5">
-            <Send size={15} /> Send first broadcast
-          </Link>
-        </div>
-      ) : (
-        <>
-          {/* Engagement KPIs with industry benchmark comparison */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <PulseCard
-              label="Messages Sent" value={waTotals.sent.toLocaleString("en-IN")} icon={Send} tone="info"
-              sub={`across ${waTotals.broadcasts} campaigns`} onClick={() => navigate("/admin/broadcast")}
-            />
-            <PulseCard
-              label="Delivery Rate" value={`${waRates.deliveryRate}%`} icon={CheckCheck} tone="ok"
-              sub={`${waTotals.delivered.toLocaleString("en-IN")} delivered`}
-              benchmark={waBench?.deliveryRate} higherIsBetter
-            />
-            <PulseCard
-              label="Read Rate" value={`${waRates.readRate}%`} icon={Eye} tone="primary"
-              sub={`${waTotals.read.toLocaleString("en-IN")} read`}
-              benchmark={waBench?.readRate} higherIsBetter
-            />
-            <PulseCard
-              label="Response Rate" value={`${waRates.responseRate}%`} icon={MessageCircle} tone="signal"
-              sub={`${(waTotals.replied || 0).toLocaleString("en-IN")} replied`}
-              benchmark={waBench?.responseRate} higherIsBetter
-            />
-          </div>
-
-          <div className="grid lg:grid-cols-3 gap-4 mb-7">
-            {/* Delivery funnel */}
-            <div className="lg:col-span-2 bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-display font-bold text-base text-ink">Message Delivery Funnel</h3>
-                <span className="text-xs text-ink-muted">all campaigns</span>
-              </div>
-              <div className="space-y-3">
-                {[
-                  { label: "Sent", value: waTotals.sent, color: "bg-blue-500" },
-                  { label: "Delivered", value: waTotals.delivered, color: "bg-green-500" },
-                  { label: "Read", value: waTotals.read, color: "bg-orange-500" },
-                  { label: "Replied", value: waTotals.replied || 0, color: "bg-purple-500" },
-                ].map((s) => {
-                  const pct = waTotals.sent > 0 ? Math.round((s.value / waTotals.sent) * 100) : 0;
-                  return (
-                    <div key={s.label}>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-ink">{s.label}</span>
-                        <span className="text-sm text-ink-soft">
-                          <span className="num font-semibold text-ink">{s.value.toLocaleString("en-IN")}</span>
-                          <span className="text-ink-muted"> · {pct}%</span>
-                        </span>
-                      </div>
-                      <div className="w-full bg-cream-200 rounded-full h-2">
-                        <div className={`h-2 rounded-full ${s.color} transition-all`} style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-                {waTotals.failed > 0 && (
-                  <div className="pt-2 border-t border-cream-200 flex items-center justify-between text-sm">
-                    <span className="text-danger-600 flex items-center gap-1.5">
-                      <AlertTriangle size={14} /> Failed
-                    </span>
-                    <span className="num font-semibold text-danger-600">
-                      {waTotals.failed.toLocaleString("en-IN")} ({waRates.failureRate}%)
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Spend + best time + recent campaigns */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <PulseCard
-                  label="Est. Spend" value={`₹${(waTotals.costInr || 0).toLocaleString("en-IN")}`}
-                  icon={IndianRupee} tone="ok"
-                />
-                <PulseCard
-                  label="Best Time"
-                  value={waStats?.bestHour ? `${String(waStats.bestHour.hour).padStart(2, "0")}:00` : "—"}
-                  icon={Timer} tone="info"
-                  sub={waStats?.bestHour ? `${waStats.bestHour.readRate}% read` : "need more data"}
-                />
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">Recent Campaigns</h4>
-                  <Link to="/admin/broadcast" className="text-xs text-orange-600 hover:text-orange-700">All</Link>
-                </div>
-                {(waStats?.recent || []).length === 0 ? (
-                  <p className="text-sm text-ink-muted">No campaigns yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {waStats.recent.slice(0, 4).map((b) => {
-                      const done = (b.sent || 0) + (b.failed || 0);
-                      const pct = b.totalRecipients > 0 ? Math.round((done / b.totalRecipients) * 100) : 0;
-                      const live = b.status === "processing" || b.status === "queued";
-                      return (
-                        <Link
-                          key={b.id}
-                          to={`/admin/broadcast/${b.id}`}
-                          className="block rounded-lg border border-cream-200 px-3 py-2 hover:bg-cream-50 transition"
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <p className="text-sm font-medium text-ink truncate">{b.name || b.templateName}</p>
-                            {live
-                              ? <span className="text-[10px] font-medium text-blue-600 whitespace-nowrap animate-pulse">● live</span>
-                              : <span className="text-[10px] text-ink-muted num whitespace-nowrap">{b.read || 0} read</span>}
-                          </div>
-                          {live ? (
-                            <div className="w-full bg-cream-200 rounded-full h-1">
-                              <div className="h-1 rounded-full bg-gradient-to-r from-orange-400 to-amber-500" style={{ width: `${pct}%` }} />
-                            </div>
-                          ) : (
-                            <p className="text-[11px] text-ink-muted num">
-                              {(b.sent || 0).toLocaleString("en-IN")} sent · {(b.delivered || 0).toLocaleString("en-IN")} delivered
-                            </p>
-                          )}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ═══ REVENUE (only when actually tracked) ═══ */}
+      {/* ═══ REVENUE (only when tracked) ═══ */}
       {m.hasRevenue && (
         <>
           <SectionLabel icon={IndianRupee} text="Revenue" />
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7">
-            <PulseCard label="Revenue Won" value={fmtMoney(m.wonValue)} icon={IndianRupee} tone="ok" />
-            <PulseCard label="This Month" value={fmtMoney(m.revenueThisMonth)} icon={CalendarClock} tone="info" />
-            <PulseCard label="Open Pipeline Value" value={fmtMoney(m.pipelineValue)} icon={Layers} tone="signal" />
+          <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-1 mb-4 -mx-4 px-4">
+            <PulseCard label="Won" value={fmtMoney(m.wonValue)} icon={IndianRupee} tone="ok" className="min-w-[140px]" />
+            <PulseCard label="This month" value={fmtMoney(m.revenueThisMonth)} icon={CalendarClock} tone="info" className="min-w-[140px]" />
+            <PulseCard label="Pipeline" value={fmtMoney(m.pipelineValue)} icon={Layers} tone="signal" className="min-w-[140px]" />
           </div>
         </>
       )}
 
-      {/* ═══ ACTION CENTER — the single most useful block ═══ */}
+      {/* ═══ ACTION CENTER ═══ */}
       {(m.overdue.length > 0 || m.untouched.length > 0 || m.wonMissingRevenue.length > 0) && (
-        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6 mb-7">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-danger-50 flex items-center justify-center">
-              <AlertTriangle size={16} className="text-danger-600" />
+        <div className="card p-4 mb-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg bg-danger-50 flex items-center justify-center">
+              <AlertTriangle size={14} className="text-danger-600" />
             </div>
-            <h3 className="font-display font-bold text-base text-ink">Needs Your Attention</h3>
+            <h3 className="text-sm font-bold text-ink">Needs Attention</h3>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Overdue follow-ups */}
-            {m.overdue.length > 0 && (
-              <ActionList
-                title={`Overdue follow-ups (${m.overdue.length})`}
-                to="/admin/follow-ups"
-                items={m.overdue.slice(0, 5).map((t) => ({
-                  key: t.id,
-                  primary: t.leadName || t.title || "Follow-up",
-                  secondary: t.assignedToName || "Unassigned",
-                  badge: lateLabel(t.dueAt),
-                  tone: "danger",
-                  link: t.leadId ? `/admin/leads/${t.leadId}` : "/admin/follow-ups",
-                }))}
-              />
-            )}
+          {/* Overdue */}
+          {m.overdue.length > 0 && (
+            <ActionList
+              title={`Overdue (${m.overdue.length})`}
+              to="/admin/follow-ups"
+              items={m.overdue.slice(0, 3).map((t) => ({
+                key: t.id,
+                primary: t.leadName || t.title || "Follow-up",
+                secondary: t.assignedToName || "Unassigned",
+                badge: lateLabel(t.dueAt),
+                tone: "danger",
+                link: t.leadId ? `/admin/leads/${t.leadId}` : "/admin/follow-ups",
+              }))}
+            />
+          )}
 
-            {/* Untouched leads */}
-            {m.untouched.length > 0 && (
-              <ActionList
-                title={`Untouched leads (${m.untouched.length})`}
-                to="/admin/leads"
-                items={m.untouched.slice(0, 5).map((l) => ({
-                  key: l.id,
-                  primary: l.name || "Lead",
-                  secondary: l.assignedToName || "Unassigned",
-                  badge: `${daysSince(l.lastUpdated)}d idle`,
-                  tone: "warn",
-                  link: `/admin/leads/${l.id}`,
-                }))}
-              />
-            )}
+          {/* Untouched */}
+          {m.untouched.length > 0 && (
+            <ActionList
+              title={`Untouched (${m.untouched.length})`}
+              to="/admin/leads"
+              items={m.untouched.slice(0, 3).map((l) => ({
+                key: l.id,
+                primary: l.name || "Lead",
+                secondary: l.assignedToName || "Unassigned",
+                badge: `${daysSince(l.lastUpdated)}d`,
+                tone: "warn",
+                link: `/admin/leads/${l.id}`,
+              }))}
+            />
+          )}
 
-            {/* Won deals missing revenue */}
-            {m.wonMissingRevenue.length > 0 && (
-              <ActionList
-                title={`Won deals missing revenue (${m.wonMissingRevenue.length})`}
-                to="/admin/leads"
-                items={m.wonMissingRevenue.slice(0, 5).map((l) => ({
-                  key: l.id,
-                  primary: l.name || "Lead",
-                  secondary: "Add deal value",
-                  badge: "no ₹",
-                  tone: "info",
-                  link: `/admin/leads/${l.id}`,
-                }))}
-              />
-            )}
-          </div>
+          {/* Missing revenue */}
+          {m.wonMissingRevenue.length > 0 && (
+            <ActionList
+              title={`Missing ₹ (${m.wonMissingRevenue.length})`}
+              to="/admin/leads"
+              items={m.wonMissingRevenue.slice(0, 3).map((l) => ({
+                key: l.id,
+                primary: l.name || "Lead",
+                secondary: "Add deal value",
+                badge: "no ₹",
+                tone: "info",
+                link: `/admin/leads/${l.id}`,
+              }))}
+            />
+          )}
         </div>
       )}
 
-      {/* ═══ TRENDS ═══ */}
-      <div className="grid lg:grid-cols-3 gap-6 mb-7">
-        <div className="lg:col-span-2 bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
-          <h3 className="font-display font-bold text-base text-ink mb-1">Lead Inflow (Last 14 Days)</h3>
-          <p className="text-xs text-ink-muted mb-4">New leads captured vs deals won</p>
-          <ResponsiveContainer width="100%" height={250}>
-            <AreaChart data={m.trend} margin={{ top: 5, right: 5, left: -22, bottom: 0 }}>
-              <defs>
-                <linearGradient id="dLeads" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#F04E00" stopOpacity={0.28} />
-                  <stop offset="95%" stopColor="#F04E00" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="dWon" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#2BAE66" stopOpacity={0.28} />
-                  <stop offset="95%" stopColor="#2BAE66" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E6E1D6" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={1} />
-              <YAxis tick={{ fontSize: 10 }} allowDecimals={false} />
-              <Tooltip />
-              <Area type="monotone" dataKey="leads" name="New leads" stroke="#F04E00" fill="url(#dLeads)" strokeWidth={2} />
-              <Area type="monotone" dataKey="won" name="Won" stroke="#2BAE66" fill="url(#dWon)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
-          <h3 className="font-display font-bold text-base text-ink mb-1">Status Distribution</h3>
-          <p className="text-xs text-ink-muted mb-2">Where your pipeline sits</p>
-          {m.statusData.length === 0
-            ? <p className="text-sm text-ink-muted text-center py-16">No leads yet.</p>
-            : <StatusPie data={m.statusData} />}
-        </div>
-      </div>
-
-      {/* ═══ TEAM + SOURCE ═══ */}
-      <div className="grid lg:grid-cols-2 gap-6 mb-7">
-        {/* Team performance */}
-        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 overflow-hidden">
-          <div className="px-6 py-4 border-b border-cream-200 flex items-center gap-2">
-            <Users size={16} className="text-orange-500" />
-            <h3 className="font-display font-bold text-base text-ink">Team Performance</h3>
+      {/* ═══ WHATSAPP BROADCAST ═══ */}
+      <SectionLabel icon={MessageCircle} text="WhatsApp" action={{ label: "View all", to: "/admin/broadcast" }} />
+      {!hasBroadcasts ? (
+        <Link to="/admin/broadcast" className="card p-4 mb-4 flex items-center gap-3 press-scale">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shrink-0">
+            <Megaphone className="text-white" size={18} />
           </div>
-          {m.team.length === 0 ? (
-            <p className="text-center text-sm text-ink-muted py-10">Add team members to see performance.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-cream-50">
-                  <tr className="text-xs text-ink-muted">
-                    <th className="text-left px-6 py-2.5 font-medium">Employee</th>
-                    <th className="text-right px-3 py-2.5 font-medium">Open</th>
-                    <th className="text-right px-3 py-2.5 font-medium">Won</th>
-                    <th className="text-right px-3 py-2.5 font-medium">Conv.</th>
-                    <th className="text-right px-6 py-2.5 font-medium">Stale</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-cream-100">
-                  {m.team.slice(0, 6).map((e) => (
-                    <tr key={e.id} className="hover:bg-cream-50">
-                      <td className="px-6 py-3">
-                        <p className="font-medium text-ink truncate max-w-[140px]">{e.name}</p>
-                        {m.hasRevenue && e.revenue > 0 && <p className="text-xs text-success-600">{fmtMoney(e.revenue)}</p>}
-                      </td>
-                      <td className="px-3 py-3 text-right num text-ink-soft">{e.open}</td>
-                      <td className="px-3 py-3 text-right num text-success-600 font-medium">{e.wins}</td>
-                      <td className="px-3 py-3 text-right">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${e.conversion >= 20 ? "bg-green-100 text-green-700" : "bg-cream-200 text-ink-soft"}`}>
-                          {e.conversion}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-right num">
-                        <span className={e.stale > 0 ? "text-danger-600 font-medium" : "text-ink-muted"}>{e.stale}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Source performance */}
-        <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 overflow-hidden">
-          <div className="px-6 py-4 border-b border-cream-200 flex items-center gap-2">
-            <Target size={16} className="text-orange-500" />
-            <h3 className="font-display font-bold text-base text-ink">Lead Source Performance</h3>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-ink">Send first broadcast</p>
+            <p className="text-[11px] text-ink-muted">Reach {m.total} leads via WhatsApp</p>
           </div>
-          {m.sources.length === 0 ? (
-            <p className="text-center text-sm text-ink-muted py-10">No leads yet.</p>
-          ) : (
-            <div className="divide-y divide-cream-100">
-              {m.sources.slice(0, 6).map((s) => {
-                const max = m.sources[0].total || 1;
+          <ChevronRight size={16} className="text-ink-muted" />
+        </Link>
+      ) : (
+        <div className="mb-4">
+          {/* WA Stats horizontal scroll */}
+          <div className="flex gap-2.5 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 mb-3">
+            <PulseCard label="Sent" value={waTotals.sent.toLocaleString("en-IN")} icon={Send} tone="info" className="min-w-[120px]" />
+            <PulseCard label="Delivered" value={`${waRates.deliveryRate}%`} icon={CheckCheck} tone="ok" className="min-w-[120px]" />
+            <PulseCard label="Read" value={`${waRates.readRate}%`} icon={Eye} tone="primary" className="min-w-[120px]" />
+            <PulseCard label="Replied" value={`${waRates.responseRate}%`} icon={MessageCircle} tone="signal" className="min-w-[120px]" />
+          </div>
+
+          {/* Delivery funnel */}
+          <div className="card p-4">
+            <p className="eyebrow mb-3">Delivery funnel</p>
+            <div className="space-y-2.5">
+              {[
+                { label: "Sent", value: waTotals.sent, color: "bg-blue-500" },
+                { label: "Delivered", value: waTotals.delivered, color: "bg-green-500" },
+                { label: "Read", value: waTotals.read, color: "bg-orange-500" },
+                { label: "Replied", value: waTotals.replied || 0, color: "bg-purple-500" },
+              ].map((s) => {
+                const pct = waTotals.sent > 0 ? Math.round((s.value / waTotals.sent) * 100) : 0;
                 return (
-                  <div key={s.source} className="px-6 py-3">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-medium text-ink">{s.source}</span>
-                      <span className="text-xs text-ink-muted">
-                        <span className="num text-ink-soft">{s.total}</span> leads ·{" "}
-                        <span className="text-success-600 font-medium num">{s.won}</span> won ·{" "}
-                        <span className="num">{s.rate}%</span>
-                        {m.hasRevenue && s.revenue > 0 && <> · <span className="text-ink font-medium">{fmtMoney(s.revenue)}</span></>}
-                      </span>
+                  <div key={s.label}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-ink">{s.label}</span>
+                      <span className="text-xs num text-ink-soft">{s.value.toLocaleString("en-IN")} · {pct}%</span>
                     </div>
                     <div className="w-full bg-cream-200 rounded-full h-1.5">
-                      <div className="h-1.5 rounded-full bg-gradient-to-r from-orange-400 to-amber-500" style={{ width: `${Math.round((s.total / max) * 100)}%` }} />
+                      <div className={`h-1.5 rounded-full ${s.color}`} style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 );
               })}
             </div>
-          )}
+          </div>
         </div>
+      )}
+
+      {/* ═══ TREND CHART ═══ */}
+      <div className="card p-4 mb-4">
+        <p className="eyebrow mb-1">Lead inflow · 14 days</p>
+        <p className="text-[10px] text-ink-muted mb-3">New leads vs won</p>
+        <ResponsiveContainer width="100%" height={160}>
+          <AreaChart data={m.trend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <defs>
+              <linearGradient id="gLeads" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#F04E00" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#F04E00" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="gWon" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10B981" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis dataKey="date" tick={{ fontSize: 9 }} interval={2} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 9 }} allowDecimals={false} axisLine={false} tickLine={false} />
+            <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
+            <Area type="monotone" dataKey="leads" name="New" stroke="#F04E00" fill="url(#gLeads)" strokeWidth={2} dot={false} />
+            <Area type="monotone" dataKey="won" name="Won" stroke="#10B981" fill="url(#gWon)" strokeWidth={2} dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
       </div>
 
-      {/* ═══ RECENT ACTIVITY ═══ */}
-      <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <ActivityIcon size={16} className="text-orange-500" />
-          <h3 className="font-display font-bold text-base text-ink">Recent Activity</h3>
+      {/* ═══ STATUS PIE ═══ */}
+      <div className="card p-4 mb-4">
+        <p className="eyebrow mb-2">Status split</p>
+        {m.statusData.length === 0
+          ? <p className="text-xs text-ink-muted text-center py-8">No leads yet</p>
+          : <StatusPie data={m.statusData} />}
+      </div>
+
+      {/* ═══ TEAM PERFORMANCE ═══ */}
+      <SectionLabel icon={Users} text="Team" action={{ label: "Manage", to: "/admin/employees" }} />
+      {m.team.length === 0 ? (
+        <div className="card p-4 mb-4">
+          <p className="text-xs text-ink-muted text-center py-4">Add team members to see performance</p>
         </div>
+      ) : (
+        <div className="space-y-2 mb-4">
+          {m.team.slice(0, 5).map((e) => (
+            <div key={e.id} className="card p-3.5 flex items-center gap-3">
+              <div className="avatar-sm shrink-0">
+                {(e.name || "?")[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-ink truncate">{e.name}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] num text-ink-muted">{e.open} open</span>
+                  <span className="text-[10px] num text-success-600">{e.wins} won</span>
+                  <span className="text-[10px] num text-ink-muted">{e.conversion}%</span>
+                  {e.stale > 0 && <span className="text-[10px] num text-danger-600">{e.stale} stale</span>}
+                </div>
+              </div>
+              {m.hasRevenue && e.revenue > 0 && (
+                <span className="text-xs font-semibold text-success-600 num">{fmtMoney(e.revenue)}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ═══ SOURCES ═══ */}
+      <SectionLabel icon={Target} text="Sources" />
+      {m.sources.length === 0 ? (
+        <div className="card p-4 mb-4">
+          <p className="text-xs text-ink-muted text-center py-4">No leads yet</p>
+        </div>
+      ) : (
+        <div className="card p-4 mb-4">
+          <div className="space-y-3">
+            {m.sources.slice(0, 5).map((s) => {
+              const max = m.sources[0].total || 1;
+              return (
+                <div key={s.source}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-ink">{s.source}</span>
+                    <span className="text-[10px] num text-ink-muted">
+                      {s.total} · <span className="text-success-600">{s.won} won</span> · {s.rate}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-cream-200 rounded-full h-1.5">
+                    <div className="h-1.5 rounded-full bg-gradient-orange" style={{ width: `${Math.round((s.total / max) * 100)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ RECENT ACTIVITY ═══ */}
+      <SectionLabel icon={ActivityIcon} text="Activity" />
+      <div className="card p-4 mb-2">
         {activity.length === 0 ? (
-          <p className="text-sm text-ink-muted text-center py-8">No activity yet.</p>
+          <p className="text-xs text-ink-muted text-center py-6">No activity yet</p>
         ) : (
-          <ul className="space-y-2.5 max-h-72 overflow-y-auto">
-            {activity.slice(0, 15).map((a) => (
-              <li key={a.id} className="flex items-start gap-3 text-sm border-l-2 border-orange-200 pl-4 py-0.5">
-                <span className="text-ink-soft flex-1">{a.text}</span>
-                <span className="text-xs text-ink-muted num whitespace-nowrap">{fmtDate(a.at)}</span>
-              </li>
+          <div className="space-y-2.5">
+            {activity.slice(0, 8).map((a) => (
+              <div key={a.id} className="flex items-start gap-2.5 text-xs border-l-2 border-orange-200 pl-3 py-0.5">
+                <span className="text-ink-soft flex-1 leading-relaxed">{a.text}</span>
+                <span className="text-ink-muted num whitespace-nowrap shrink-0">{fmtDate(a.at)}</span>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </Layout>
   );
 }
 
-/* ─────────────── UI primitives ─────────────── */
+/* ─────────────── UI PRIMITIVES ─────────────── */
 
 function SectionLabel({ icon: Icon, text, action }) {
   return (
-    <div className="flex items-center justify-between mb-3">
-      <div className="flex items-center gap-2">
-        <Icon size={15} className="text-orange-500" />
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-muted">{text}</h2>
+    <div className="flex items-center justify-between mb-2 mt-1">
+      <div className="flex items-center gap-1.5">
+        <Icon size={13} className="text-orange-500" />
+        <h2 className="section-title">{text}</h2>
       </div>
       {action && (
-        <Link to={action.to} className="text-xs font-medium text-orange-600 hover:text-orange-700 flex items-center gap-1">
-          {action.label} <ArrowRight size={12} />
+        <Link to={action.to} className="text-[11px] font-semibold text-orange-600 flex items-center gap-0.5 press-scale">
+          {action.label} <ChevronRight size={11} />
         </Link>
       )}
     </div>
@@ -598,81 +444,56 @@ function SectionLabel({ icon: Icon, text, action }) {
 }
 
 const TONES = {
-  primary: { bar: "bg-orange-500", bg: "bg-orange-50", fg: "text-orange-600" },
-  ok: { bar: "bg-green-500", bg: "bg-green-50", fg: "text-green-600" },
-  danger: { bar: "bg-red-500", bg: "bg-red-50", fg: "text-red-600" },
-  warn: { bar: "bg-amber-500", bg: "bg-amber-50", fg: "text-amber-600" },
-  info: { bar: "bg-blue-500", bg: "bg-blue-50", fg: "text-blue-600" },
-  signal: { bar: "bg-purple-500", bg: "bg-purple-50", fg: "text-purple-600" },
+  primary: { bg: "bg-orange-50", fg: "text-orange-600", accent: "text-orange-700" },
+  ok: { bg: "bg-success-50", fg: "text-success-600", accent: "text-success-700" },
+  danger: { bg: "bg-danger-50", fg: "text-danger-600", accent: "text-danger-700" },
+  warn: { bg: "bg-amber-50", fg: "text-amber-600", accent: "text-amber-700" },
+  info: { bg: "bg-blue-50", fg: "text-blue-600", accent: "text-blue-700" },
+  signal: { bg: "bg-purple-50", fg: "text-purple-600", accent: "text-purple-700" },
 };
 
-function PulseCard({ label, value, icon: Icon, tone = "primary", sub, onClick, benchmark, higherIsBetter }) {
+function PulseCard({ label, value, icon: Icon, tone = "primary", sub, onClick, className = "" }) {
   const t = TONES[tone] || TONES.primary;
-
-  // Optional "vs industry average" badge for rate-style metrics.
-  let badge = null;
-  if (benchmark != null) {
-    const num = parseFloat(String(value).replace(/[^0-9.]/g, ""));
-    if (!Number.isNaN(num)) {
-      const beats = higherIsBetter ? num >= benchmark : num <= benchmark;
-      badge = (
-        <span
-          title={`Industry average: ${benchmark}%`}
-          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
-            beats ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-          }`}
-        >
-          {beats ? "▲" : "▼"} {benchmark}% avg
-        </span>
-      );
-    }
-  }
 
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-xl shadow-card border border-cream-300/60 p-4 relative overflow-hidden transition-all ${
-        onClick ? "cursor-pointer hover:shadow-card-hover hover:border-orange-200" : ""
-      }`}
+      className={`card p-3 transition-transform duration-100 ${onClick ? "press-scale cursor-pointer" : ""} ${className}`}
     >
-      <span className={`absolute left-0 top-0 bottom-0 w-[3px] ${t.bar}`} />
-      <div className="flex items-start justify-between mb-2">
-        <div className={`w-9 h-9 ${t.bg} rounded-lg flex items-center justify-center`}>
-          <Icon size={16} className={t.fg} />
-        </div>
-        {badge || (onClick && <ArrowRight size={13} className="text-ink-muted/50" />)}
+      <div className={`w-8 h-8 ${t.bg} rounded-lg flex items-center justify-center mb-2`}>
+        <Icon size={15} strokeWidth={2.2} className={t.fg} />
       </div>
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted mb-0.5">{label}</p>
-      <p className="text-2xl font-display font-bold text-ink num leading-tight">{value}</p>
-      {sub && <p className="text-[11px] text-ink-muted mt-0.5 truncate">{sub}</p>}
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted mb-0.5 truncate">{label}</p>
+      <p className={`text-lg font-display font-bold num leading-tight ${t.accent}`}>{value}</p>
+      {sub && <p className="text-[10px] text-ink-muted mt-0.5 truncate">{sub}</p>}
     </div>
   );
 }
 
 function ActionList({ title, items, to }) {
   const toneMap = {
-    danger: "border-danger-100 bg-danger-50/50 text-danger-700",
-    warn: "border-warning-200 bg-warning-50/50 text-warning-700",
-    info: "border-blue-100 bg-blue-50/50 text-blue-700",
+    danger: "border-danger-100 bg-danger-50/60",
+    warn: "border-warning-200 bg-warning-50/60",
+    info: "border-blue-100 bg-blue-50/60",
   };
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-ink">{title}</p>
-        <Link to={to} className="text-xs text-orange-600 hover:text-orange-700">View all</Link>
+    <div className="mb-3 last:mb-0">
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-xs font-bold text-ink">{title}</p>
+        <Link to={to} className="text-[10px] font-semibold text-orange-600 press-scale">View all</Link>
       </div>
       <div className="space-y-1.5">
         {items.map((it) => (
           <Link
             key={it.key}
             to={it.link}
-            className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 hover:brightness-95 transition ${toneMap[it.tone] || toneMap.info}`}
+            className={`flex items-center justify-between rounded-xl border px-3 py-2.5 press-scale ${toneMap[it.tone] || toneMap.info}`}
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-ink truncate">{it.primary}</p>
-              <p className="text-[11px] opacity-80 truncate">{it.secondary}</p>
+              <p className="text-[10px] text-ink-muted truncate">{it.secondary}</p>
             </div>
-            <span className="text-[11px] font-mono font-medium whitespace-nowrap">{it.badge}</span>
+            <span className="text-[10px] font-mono font-semibold whitespace-nowrap ml-2">{it.badge}</span>
           </Link>
         ))}
       </div>

@@ -5,119 +5,271 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --nav-height: 4rem;
+    --topbar-height: 3.5rem;
+  }
+
+  html {
+    /* Prevent pull-to-refresh on Android Chrome */
+    overscroll-behavior-y: contain;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   body {
     @apply bg-cream-100 text-ink font-body antialiased;
     font-feature-settings: 'cv11', 'ss01', 'ss03';
+    padding-top: var(--safe-top);
+    padding-bottom: var(--safe-bottom);
+    /* Prevent text zoom on iOS when rotating */
+    -webkit-text-size-adjust: 100%;
+    /* Smooth scrolling */
+    -webkit-overflow-scrolling: touch;
   }
 
+  /* Hide scrollbars for mobile-native feel */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    display: none;
   }
-  ::-webkit-scrollbar-track {
-    @apply bg-cream-200;
-  }
-  ::-webkit-scrollbar-thumb {
-    @apply bg-orange-300 rounded-full hover:bg-orange-400;
+  * {
+    scrollbar-width: none;
   }
 
+  /* Remove focus ring on touch, keep for keyboard */
   *:focus-visible {
-    @apply outline-none ring-2 ring-orange-500 ring-offset-2 ring-offset-cream-100;
+    @apply outline-none ring-2 ring-orange-500/50 ring-offset-1 ring-offset-cream-100;
+  }
+  *:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
+
+  /* Prevent long-press context menu on mobile */
+  img, a, button {
+    -webkit-touch-callout: none;
+  }
+
+  /* Inputs should not zoom on iOS */
+  input, select, textarea {
+    font-size: 16px !important;
   }
 }
 
 @layer components {
-  .eyebrow {
-    @apply text-xs font-semibold uppercase tracking-[0.18em] text-orange-600;
+  /* ─── NATIVE APP BAR ─── */
+  .app-topbar {
+    @apply fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md;
+    padding-top: var(--safe-top);
+    height: calc(var(--topbar-height) + var(--safe-top));
   }
 
-  .num {
-    @apply font-mono;
+  .app-topbar-inner {
+    @apply flex items-center justify-between px-4 h-14;
   }
 
+  /* ─── BOTTOM NAV ─── */
+  .app-bottomnav {
+    @apply fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-cream-200/80 shadow-nav;
+    padding-bottom: var(--safe-bottom);
+  }
+
+  .app-bottomnav-inner {
+    @apply flex items-center justify-around;
+    height: var(--nav-height);
+  }
+
+  /* ─── CONTENT AREA ─── */
+  .app-content {
+    padding-top: calc(var(--topbar-height) + var(--safe-top));
+    padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 0.5rem);
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  /* ─── CARDS ─── */
   .card {
-    @apply bg-white rounded-2xl shadow-card border border-cream-300/60 overflow-hidden;
+    @apply bg-white rounded-2xl shadow-card border border-cream-200/60 overflow-hidden;
+  }
+  .card-pressed {
+    @apply bg-cream-50 shadow-card-pressed scale-[0.98] transition-transform duration-100;
   }
 
+  /* ─── BUTTONS ─── */
   .btn {
-    @apply px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 inline-flex items-center justify-center gap-2;
+    @apply px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-150 inline-flex items-center justify-center gap-2 min-h-touch;
+    /* Active press state for mobile */
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active {
+    @apply scale-[0.97] opacity-90;
   }
 
   .btn-primary {
-    @apply bg-gradient-orange text-white shadow-button hover:shadow-button-hover hover:-translate-y-0.5;
+    @apply bg-gradient-orange text-white shadow-button;
+  }
+  .btn-primary:active {
+    @apply shadow-none scale-[0.97];
   }
 
   .btn-secondary {
-    @apply bg-white text-ink border border-cream-400/70 hover:border-orange-300 hover:bg-cream-50;
+    @apply bg-white text-ink border border-cream-300;
+  }
+  .btn-secondary:active {
+    @apply bg-cream-100;
   }
 
   .btn-ghost {
-    @apply text-ink-soft hover:text-orange-600 hover:bg-orange-50;
+    @apply text-ink-soft;
+  }
+  .btn-ghost:active {
+    @apply bg-cream-100 text-orange-600;
   }
 
+  /* ─── INPUTS ─── */
   .input {
-    @apply w-full px-4 py-3 rounded-xl border border-cream-400/70 bg-white text-ink placeholder:text-ink-muted/60 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 transition-all outline-none;
+    @apply w-full px-4 py-3.5 rounded-xl border border-cream-300 bg-white text-ink placeholder:text-ink-muted/50 transition-all outline-none min-h-touch;
+  }
+  .input:focus {
+    @apply border-orange-400 ring-4 ring-orange-100;
   }
 
+  /* ─── BADGES ─── */
   .badge {
-    @apply px-3 py-1 rounded-full text-xs font-semibold;
+    @apply px-2.5 py-1 rounded-full text-xs font-semibold;
   }
   .badge-primary { @apply bg-orange-100 text-orange-700; }
   .badge-success { @apply bg-success-100 text-success-700; }
   .badge-warning { @apply bg-warning-100 text-warning-700; }
   .badge-danger  { @apply bg-danger-100 text-danger-700; }
 
+  /* ─── EYEBROW / LABEL ─── */
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-muted;
+  }
+
+  .num {
+    @apply font-mono tabular-nums;
+  }
+
+  /* ─── TEXT GRADIENT ─── */
   .text-gradient {
     @apply bg-gradient-to-r from-orange-500 via-orange-600 to-ember-500 bg-clip-text text-transparent;
   }
 
-  .glass {
-    @apply bg-white/70 backdrop-blur-xl border border-white/40;
+  /* ─── SHEET (bottom sheet style) ─── */
+  .sheet-backdrop {
+    @apply fixed inset-0 bg-black/30 backdrop-blur-sm z-50;
+  }
+  .sheet {
+    @apply fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-sheet z-50 animate-sheet-up;
+    padding-bottom: var(--safe-bottom);
+    max-height: 85vh;
+    max-height: 85dvh;
+  }
+  .sheet-handle {
+    @apply w-10 h-1 bg-cream-400 rounded-full mx-auto mt-3 mb-2;
+  }
+
+  /* ─── LIST ITEM (native-style tappable rows) ─── */
+  .list-item {
+    @apply flex items-center gap-3 px-4 py-3 min-h-touch transition-colors duration-100;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .list-item:active {
+    @apply bg-cream-100;
+  }
+
+  /* ─── SECTION HEADER ─── */
+  .section-header {
+    @apply flex items-center justify-between px-4 py-2;
+  }
+  .section-title {
+    @apply text-xs font-bold uppercase tracking-wider text-ink-muted;
+  }
+
+  /* ─── PILL NAV (horizontal scrollable tabs) ─── */
+  .pill-nav {
+    @apply flex gap-2 overflow-x-auto px-4 py-2 scrollbar-hide;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pill {
+    @apply px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-150;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pill-active {
+    @apply bg-orange-500 text-white shadow-button;
+  }
+  .pill-inactive {
+    @apply bg-white text-ink-soft border border-cream-300;
+  }
+  .pill-inactive:active {
+    @apply bg-cream-100;
+  }
+
+  /* ─── AVATAR ─── */
+  .avatar {
+    @apply w-10 h-10 rounded-full bg-gradient-orange flex items-center justify-center text-white font-bold text-sm;
+  }
+  .avatar-sm {
+    @apply w-8 h-8 rounded-full bg-cream-300 flex items-center justify-center text-ink-soft font-semibold text-xs;
   }
 }
 
 @layer utilities {
-  /* Grain / paper texture overlay */
-  .texture-grain {
-    position: relative;
-  }
-  .texture-grain::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.4;
-    mix-blend-mode: multiply;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.12'/%3E%3C/svg%3E");
-  }
-
-  /* Warm dotted pattern */
-  .pattern-dots {
-    background-image: radial-gradient(circle, rgba(240, 78, 0, 0.12) 1px, transparent 1px);
-    background-size: 22px 22px;
-  }
-
-  /* Subtle grid */
-  .pattern-grid {
-    background-image:
-      linear-gradient(to right, rgba(180, 146, 92, 0.10) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(180, 146, 92, 0.10) 1px, transparent 1px);
-    background-size: 48px 48px;
-  }
-
-  .shimmer-text {
-    background: linear-gradient(90deg, #C73C05 25%, #FF8A3D 50%, #C73C05 75%);
-    background-size: 200% auto;
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
   .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  /* Safe area padding utilities */
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+
+  /* Touch-optimized area */
+  .touch-area {
+    position: relative;
+  }
+  .touch-area::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    bottom: -8px;
+    left: -8px;
+  }
+
+  /* Pull-to-refresh visual indicator */
+  .ptr-indicator {
+    @apply w-8 h-8 rounded-full bg-white shadow-card flex items-center justify-center mx-auto;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply bg-cream-200 animate-pulse rounded-lg;
+  }
+
+  /* iOS-style rubber-band scroll container */
+  .scroll-rubber {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: auto;
+  }
+
+  /* Native-style pressed state */
+  .press-scale:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
+  }
+
+  /* Haptic-ready tap (visual only, actual haptic via JS) */
+  .tap-highlight:active {
+    @apply bg-cream-100;
+  }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -125,28 +277,4 @@
       transition: none !important;
     }
   }
-}
-
-
-/* CodeSkate Signature-C mark: one-time draw-in reveal */
-@keyframes sk-draw {
-  from { stroke-dashoffset: 78; }
-  to { stroke-dashoffset: 0; }
-}
-@keyframes sk-tile-in {
-  from { opacity: 0; transform: scale(0.6) rotate(-8deg); }
-  to { opacity: 1; transform: scale(1) rotate(0); }
-}
-@keyframes sk-glow {
-  0%, 100% { box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35); }
-  50% { box-shadow: 0 6px 22px rgba(249, 115, 22, 0.55); }
-}
-.sk-draw {
-  stroke-dasharray: 78;
-  stroke-dashoffset: 78;
-  animation: sk-draw 1s cubic-bezier(0.35, 0, 0.2, 1) 0.15s forwards;
-}
-.sk-tile {
-  animation: sk-tile-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards,
-             sk-glow 3.5s ease-in-out 1.2s infinite;
 }

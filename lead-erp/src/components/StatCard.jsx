@@ -1,67 +1,62 @@
 const TONE = {
   ink: {
-    bg: "bg-gray-100",
-    icon: "text-gray-600",
-    dot: "bg-gray-400",
+    bg: "bg-cream-100",
+    icon: "text-ink-soft",
+    accent: "text-ink",
   },
   primary: {
-    bg: "bg-primary-50",
-    icon: "text-primary-600",
-    dot: "bg-primary-500",
+    bg: "bg-orange-50",
+    icon: "text-orange-600",
+    accent: "text-orange-700",
   },
   signal: {
     bg: "bg-purple-50",
     icon: "text-purple-600",
-    dot: "bg-purple-500",
+    accent: "text-purple-700",
   },
   ok: {
     bg: "bg-success-50",
     icon: "text-success-600",
-    dot: "bg-success-500",
+    accent: "text-success-700",
   },
   danger: {
     bg: "bg-danger-50",
     icon: "text-danger-600",
-    dot: "bg-danger-500",
+    accent: "text-danger-700",
   },
   info: {
     bg: "bg-blue-50",
     icon: "text-blue-600",
-    dot: "bg-blue-500",
+    accent: "text-blue-700",
   },
 };
 
 export default function StatCard({ label, value, tone = "ink", icon: Icon, onClick }) {
-  const toneStyles = TONE[tone] || TONE.ink;
+  const t = TONE[tone] || TONE.ink;
 
   return (
     <div
       onClick={onClick}
-      className={`bg-white rounded-xl shadow-card border border-gray-100 p-5 relative overflow-hidden hover:shadow-card-hover hover:border-gray-200 transition-all ${
-        onClick ? "cursor-pointer" : ""
+      className={`card p-3.5 flex items-center gap-3 transition-transform duration-100 ${
+        onClick ? "cursor-pointer press-scale" : ""
       }`}
     >
-      {/* Accent dot */}
-      <span
-        className={`absolute left-0 top-0 bottom-0 w-[3px] ${toneStyles.dot}`}
-      />
-
-      {/* Icon */}
+      {/* Icon Circle */}
       {Icon && (
-        <div className={`w-10 h-10 ${toneStyles.bg} rounded-lg flex items-center justify-center mb-3`}>
-          <Icon size={18} className={toneStyles.icon} />
+        <div className={`w-9 h-9 ${t.bg} rounded-xl flex items-center justify-center shrink-0`}>
+          <Icon size={17} strokeWidth={2.2} className={t.icon} />
         </div>
       )}
 
-      {/* Label */}
-      <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
-        {label}
-      </p>
-
-      {/* Value */}
-      <p className="text-2xl font-display font-bold text-gray-800 num">
-        {value}
-      </p>
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted truncate">
+          {label}
+        </p>
+        <p className={`text-xl font-display font-bold num leading-tight ${t.accent}`}>
+          {value}
+        </p>
+      </div>
     </div>
   );
 }

@@ -8,7 +8,6 @@ import { useAuth } from "../context/AuthContext";
 import { getOtpConfig } from "../utils/otpApi";
 import Logo from "../components/marketing/Logo";
 
-// Map an internal channel key to a friendly label for the verify screen.
 function channelLabel(ch) {
   if (ch === "whatsapp_meta" || ch === "whatsapp") return "WhatsApp";
   if (ch === "sms") return "SMS";
@@ -20,65 +19,51 @@ export default function Login() {
   const { user, requestOtp, verifyOtp, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [portal, setPortal] = useState(null); // 'admin' | 'employee' | null
+  const [portal, setPortal] = useState(null);
   const [step, setStep] = useState("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [err, setErr] = useState("");
-  const [info, setInfo] = useState("");           // success/resend confirmation
+  const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
   const [confirmation, setConfirmation] = useState(null);
-  const [channel, setChannel] = useState(null);   // channel the code was sent on
-  const [resending, setResending] = useState(null); // which fallback is in-flight
+  const [channel, setChannel] = useState(null);
+  const [resending, setResending] = useState(null);
   const [voiceAvailable, setVoiceAvailable] = useState(false);
-  const [roleError, setRoleError] = useState(""); // portal ↔ role mismatch
+  const [roleError, setRoleError] = useState("");
 
-  // Discover whether a voice/call channel is configured on the backend so we
-  // only offer the "Get a call" option when it can actually work.
   useEffect(() => {
     getOtpConfig()
       .then((cfg) => setVoiceAvailable(Array.isArray(cfg?.availableChannels) && cfg.availableChannels.includes("voice")))
       .catch(() => {});
   }, []);
 
-  // Route (or reject) once AuthContext resolves the user's real role.
   useEffect(() => {
     if (!user) return;
-
-    // Platform owner always goes to the platform dashboard.
     if (user.isPlatformOwner && !user.role) {
       navigate("/platform", { replace: true });
       return;
     }
-
-    // Authenticated but no workspace → not a valid login (must sign up).
     if (user.needsSetup) {
-      setRoleError("No workspace found for this number. Please sign up first or use the correct number.");
+      setRoleError("No workspace found for this number. Please sign up first.");
       logout();
       return;
     }
-
     const isAdminish = user.role === "admin" || user.role === "owner";
-
-    // If they didn't go through a portal (already logged in), route normally.
     if (!portal) {
       navigate(isAdminish ? "/admin" : "/app", { replace: true });
       return;
     }
-
-    // Portal ↔ role verification (backend truth = membership role).
     if (portal === "admin" && !isAdminish) {
-      setRoleError("Access denied — you're an employee. You can't use the admin login. Please choose employee login.");
+      setRoleError("Access denied — you're an employee. Choose employee login.");
       logout();
       return;
     }
     if (portal === "employee" && isAdminish) {
-      setRoleError("Access denied — you're an admin. Please use the admin login.");
+      setRoleError("Access denied — you're an admin. Use admin login.");
       logout();
       return;
     }
-
-    // Match → go to the right dashboard.
     navigate(isAdminish ? "/admin" : "/app", { replace: true });
   }, [user, portal, navigate, logout]);
 
@@ -91,7 +76,6 @@ export default function Login() {
     else setErr(res.error);
   };
 
-  // Resend the code through a specific channel ("whatsapp" | "sms_firebase" | "voice").
   const resend = async (via) => {
     if (resending || loading) return;
     setErr(""); setInfo(""); setResending(via);
@@ -102,7 +86,7 @@ export default function Login() {
       setChannel(res.channel || null);
       setOtp("");
       const label = channelLabel(res.channel);
-      setInfo(label ? `A new code has been sent via ${label}.` : "A new code has been sent.");
+      setInfo(label ? `New code sent via ${label}` : "New code sent");
     } else {
       setErr(res.error);
     }
@@ -114,7 +98,6 @@ export default function Login() {
     const res = await verifyOtp(confirmation, otp.trim(), phone.trim());
     setLoading(false);
     if (!res.ok) setErr(res.error);
-    // success → AuthContext sets user → useEffect routes/verifies
   };
 
   const resetToPortal = () => {
@@ -123,160 +106,216 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4 relative overflow-hidden texture-grain">
-      <div className="absolute top-0 right-0 w-96 h-96 bg-orange-300/25 rounded-full blur-3xl -translate-y-1/3 translate-x-1/3 animate-blob pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-ember-300/20 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 animate-blob pointer-events-none" style={{ animationDelay: "4s" }} />
-      <div className="absolute inset-0 pattern-dots opacity-40 pointer-events-none" />
+    <div className="min-h-screen min-h-[100dvh] bg-cream-100 flex flex-col pt-safe">
       <div id="recaptcha-container" />
 
-      <div className="w-full max-w-md relative z-10">
-        <div className="flex justify-center mb-8"><Link to="/"><Logo size="lg" animate /></Link></div>
+      {/* Top section — Logo */}
+      <div className="flex-shrink-0 pt-12 pb-6 flex flex-col items-center px-6">
+        <Link to="/"><Logo size="lg" animate /></Link>
+      </div>
 
-        {/* Role mismatch / no-account screen */}
+      {/* Main content card */}
+      <div className="flex-1 flex flex-col px-5 pb-8">
+
+        {/* Role mismatch error */}
         {roleError ? (
-          <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 overflow-hidden">
-            <div className="h-1.5 bg-danger-500" />
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-danger-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                <XCircle className="w-9 h-9 text-danger-600" />
-              </div>
-              <h1 className="font-display font-bold text-xl text-ink mb-2">Access denied</h1>
-              <p className="text-sm text-ink-soft mb-6">{roleError}</p>
-              <button onClick={resetToPortal} className="btn btn-primary w-full">Try again</button>
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="w-16 h-16 bg-danger-50 rounded-full flex items-center justify-center mb-5 animate-bounce-in">
+              <XCircle className="w-8 h-8 text-danger-600" />
             </div>
+            <h1 className="font-display font-bold text-xl text-ink mb-2 text-center">Access Denied</h1>
+            <p className="text-sm text-ink-soft mb-8 text-center max-w-[260px]">{roleError}</p>
+            <button onClick={resetToPortal} className="btn btn-primary w-full max-w-[280px]">Try again</button>
           </div>
         ) : !portal ? (
-          /* Portal selector */
-          <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 overflow-hidden">
-            <div className="h-1.5 bg-gradient-orange" />
-            <div className="p-7 sm:p-9">
-              <h1 className="font-display font-bold text-2xl text-ink mb-1 text-center">Sign in to Codeskate CRM</h1>
-              <p className="text-sm text-ink-soft mb-7 text-center">Which role are you signing in as?</p>
-              <div className="space-y-3">
-                <button onClick={() => setPortal("admin")}
-                  className="w-full flex items-center gap-4 p-4 rounded-2xl border border-cream-300 hover:border-orange-300 hover:bg-orange-50 transition-all text-left group">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-orange flex items-center justify-center shrink-0 shadow-glow">
-                    <Shield className="text-white" size={22} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-display font-semibold text-ink">Admin login</p>
-                    <p className="text-xs text-ink-muted">Manage organization, team & billing</p>
-                  </div>
-                  <ArrowRight size={18} className="text-ink-muted group-hover:text-orange-600" />
-                </button>
-
-                <button onClick={() => setPortal("employee")}
-                  className="w-full flex items-center gap-4 p-4 rounded-2xl border border-cream-300 hover:border-orange-300 hover:bg-orange-50 transition-all text-left group">
-                  <div className="w-12 h-12 rounded-xl bg-ink flex items-center justify-center shrink-0">
-                    <Users className="text-orange-400" size={22} />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-display font-semibold text-ink">Employee login</p>
-                    <p className="text-xs text-ink-muted">Work on your assigned leads</p>
-                  </div>
-                  <ArrowRight size={18} className="text-ink-muted group-hover:text-orange-600" />
-                </button>
-              </div>
-              <p className="text-center text-sm text-ink-muted mt-6">
-                New here? <Link to="/signup" className="text-orange-600 font-semibold hover:underline">Start free trial</Link>
-              </p>
+          /* ─── PORTAL SELECTOR ─── */
+          <div className="flex-1 flex flex-col">
+            <div className="mb-8">
+              <h1 className="font-display font-bold text-2xl text-ink text-center">Welcome back</h1>
+              <p className="text-sm text-ink-muted mt-1 text-center">Choose your role to sign in</p>
             </div>
-          </div>
-        ) : (
-          /* Phone / OTP */
-          <div className="bg-white rounded-3xl shadow-soft border border-cream-300/60 overflow-hidden">
-            <div className="h-1.5 bg-gradient-orange" />
-            <div className="p-7 sm:p-9">
-              <button onClick={step === "otp" ? () => { setStep("phone"); setOtp(""); setErr(""); setInfo(""); } : resetToPortal}
-                className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-orange-600 mb-4">
-                <ArrowLeft size={15} /> Back
+
+            <div className="space-y-3 flex-1">
+              {/* Admin Card */}
+              <button
+                onClick={() => setPortal("admin")}
+                className="card w-full p-5 flex items-center gap-4 text-left press-scale"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-gradient-orange flex items-center justify-center shadow-glow shrink-0">
+                  <Shield className="text-white" size={24} />
+                </div>
+                <div className="flex-1">
+                  <p className="font-display font-bold text-base text-ink">Admin</p>
+                  <p className="text-xs text-ink-muted mt-0.5">Manage organization & team</p>
+                </div>
+                <ArrowRight size={18} className="text-ink-muted" />
               </button>
 
-              <div className={`inline-flex items-center gap-2 badge mb-3 ${portal === "admin" ? "badge-primary" : "bg-ink text-orange-300"}`}>
-                {portal === "admin" ? <Shield size={13} /> : <Users size={13} />}
-                {portal === "admin" ? "Admin" : "Employee"} login
-              </div>
-
-              <h1 className="font-display font-bold text-2xl text-ink mb-1">
-                {step === "phone" ? "Enter your number" : "Enter your code"}
-              </h1>
-              <p className="text-sm text-ink-soft mb-6">
-                {step === "phone"
-                  ? "Secure sign in with OTP."
-                  : channelLabel(channel)
-                    ? <>Code sent to <span className="font-semibold text-ink">+91{phone}</span> via {channelLabel(channel)}</>
-                    : <>Code sent to <span className="font-semibold text-ink">+91{phone}</span></>}
-              </p>
-
-              {err && (
-                <div className="bg-danger-50 text-danger-600 text-sm px-4 py-3 rounded-xl mb-4 border border-danger-100 flex items-start gap-2">
-                  <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" />{err}
+              {/* Employee Card */}
+              <button
+                onClick={() => setPortal("employee")}
+                className="card w-full p-5 flex items-center gap-4 text-left press-scale"
+              >
+                <div className="w-14 h-14 rounded-2xl bg-ink flex items-center justify-center shrink-0">
+                  <Users className="text-orange-400" size={24} />
                 </div>
-              )}
-
-              {info && !err && (
-                <div className="bg-success-50 text-success-700 text-sm px-4 py-3 rounded-xl mb-4 border border-success-100 flex items-start gap-2">
-                  <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />{info}
+                <div className="flex-1">
+                  <p className="font-display font-bold text-base text-ink">Employee</p>
+                  <p className="text-xs text-ink-muted mt-0.5">Work on assigned leads</p>
                 </div>
-              )}
-
-              {step === "phone" ? (
-                <form onSubmit={sendOtp} className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-medium text-ink mb-1.5">Mobile number</label>
-                    <div className="relative">
-                      <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted" size={18} />
-                      <span className="absolute left-11 top-1/2 -translate-y-1/2 text-ink-soft font-medium text-sm">+91</span>
-                      <input type="tel" className="input pl-[4.5rem]" placeholder="98XXXXXXXX" value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))} maxLength={10} required disabled={loading} />
-                    </div>
-                  </div>
-                  <button disabled={loading || phone.length !== 10} className="btn btn-primary w-full py-3.5 text-base">
-                    {loading ? <><Loader2 size={18} className="animate-spin" /> Sending…</> : <>Send code <ArrowRight size={18} /></>}
-                  </button>
-                </form>
-              ) : (
-                <>
-                  <form onSubmit={confirmOtp} className="space-y-5">
-                    <input className="input text-center text-2xl tracking-[0.5em] font-mono" placeholder="000000" value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} maxLength={6} required autoFocus disabled={loading} />
-                    <button disabled={loading || otp.length !== 6} className="btn btn-primary w-full py-3.5 text-base">
-                      {loading ? <><Loader2 size={18} className="animate-spin" /> Verifying…</> : <>Verify & sign in <ArrowRight size={18} /></>}
-                    </button>
-                  </form>
-
-                  {/* Didn't receive it? — alternate delivery channels */}
-                  <div className="mt-5 pt-4 border-t border-cream-200">
-                    <p className="text-xs text-ink-muted mb-2.5">Didn't receive the code?</p>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => resend("whatsapp")} disabled={!!resending || loading}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-cream-300 hover:border-orange-300 hover:bg-orange-50 text-ink-soft disabled:opacity-50 transition-colors">
-                        {resending === "whatsapp" ? <Loader2 size={13} className="animate-spin" /> : <MessageCircle size={13} className="text-green-600" />}
-                        Resend on WhatsApp
-                      </button>
-                      <button type="button" onClick={() => resend("sms_firebase")} disabled={!!resending || loading}
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-cream-300 hover:border-orange-300 hover:bg-orange-50 text-ink-soft disabled:opacity-50 transition-colors">
-                        {resending === "sms_firebase" ? <Loader2 size={13} className="animate-spin" /> : <Smartphone size={13} />}
-                        Send on phone (SMS)
-                      </button>
-                      {voiceAvailable && (
-                        <button type="button" onClick={() => resend("voice")} disabled={!!resending || loading}
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-cream-300 hover:border-orange-300 hover:bg-orange-50 text-ink-soft disabled:opacity-50 transition-colors">
-                          {resending === "voice" ? <Loader2 size={13} className="animate-spin" /> : <PhoneCall size={13} />}
-                          Get a call
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
+                <ArrowRight size={18} className="text-ink-muted" />
+              </button>
             </div>
+
+            <p className="text-center text-sm text-ink-muted mt-8">
+              New here? <Link to="/signup" className="text-orange-600 font-bold">Start free trial</Link>
+            </p>
+          </div>
+        ) : (
+          /* ─── PHONE / OTP ─── */
+          <div className="flex-1 flex flex-col">
+            {/* Back button */}
+            <button
+              onClick={step === "otp" ? () => { setStep("phone"); setOtp(""); setErr(""); setInfo(""); } : resetToPortal}
+              className="flex items-center gap-1 text-sm text-ink-muted mb-6 self-start press-scale"
+            >
+              <ArrowLeft size={16} /> Back
+            </button>
+
+            {/* Role badge */}
+            <div className={`inline-flex items-center gap-1.5 badge self-start mb-4 ${
+              portal === "admin" ? "badge-primary" : "bg-ink text-orange-300"
+            }`}>
+              {portal === "admin" ? <Shield size={12} /> : <Users size={12} />}
+              {portal === "admin" ? "Admin" : "Employee"}
+            </div>
+
+            <h1 className="font-display font-bold text-2xl text-ink mb-1">
+              {step === "phone" ? "Enter your number" : "Verify code"}
+            </h1>
+            <p className="text-sm text-ink-muted mb-6">
+              {step === "phone"
+                ? "We'll send you a one-time code"
+                : channelLabel(channel)
+                  ? <>Code sent to <span className="font-semibold text-ink">+91{phone}</span> via {channelLabel(channel)}</>
+                  : <>Code sent to <span className="font-semibold text-ink">+91{phone}</span></>}
+            </p>
+
+            {/* Error */}
+            {err && (
+              <div className="bg-danger-50 text-danger-700 text-sm px-4 py-3 rounded-xl mb-4 border border-danger-100 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" /><span>{err}</span>
+              </div>
+            )}
+
+            {/* Success info */}
+            {info && !err && (
+              <div className="bg-success-50 text-success-700 text-sm px-4 py-3 rounded-xl mb-4 border border-success-100 flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /><span>{info}</span>
+              </div>
+            )}
+
+            {step === "phone" ? (
+              <form onSubmit={sendOtp} className="flex-1 flex flex-col">
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-ink mb-2">Mobile number</label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-ink-soft">
+                      <Phone size={16} />
+                      <span className="text-sm font-medium">+91</span>
+                    </div>
+                    <input
+                      type="tel"
+                      className="input pl-[5rem] text-lg font-medium"
+                      placeholder="98XXXXXXXX"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                      maxLength={10}
+                      required
+                      disabled={loading}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+                <div className="mt-auto">
+                  <button
+                    disabled={loading || phone.length !== 10}
+                    className="btn btn-primary w-full py-4 text-base"
+                  >
+                    {loading
+                      ? <><Loader2 size={18} className="animate-spin" /> Sending…</>
+                      : <>Send code <ArrowRight size={18} /></>}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex-1 flex flex-col">
+                <form onSubmit={confirmOtp} className="flex-1 flex flex-col">
+                  {/* OTP Input */}
+                  <input
+                    className="input text-center text-3xl tracking-[0.6em] font-mono py-4 mb-6"
+                    placeholder="000000"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    maxLength={6}
+                    required
+                    autoFocus
+                    disabled={loading}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                  />
+
+                  <div className="mt-auto">
+                    <button
+                      disabled={loading || otp.length !== 6}
+                      className="btn btn-primary w-full py-4 text-base"
+                    >
+                      {loading
+                        ? <><Loader2 size={18} className="animate-spin" /> Verifying…</>
+                        : <>Verify & sign in</>}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Resend options */}
+                <div className="mt-5 pt-4 border-t border-cream-200">
+                  <p className="text-xs text-ink-muted mb-3">Didn't receive the code?</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => resend("whatsapp")}
+                      disabled={!!resending || loading}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-cream-200 text-ink-soft disabled:opacity-50 min-h-touch press-scale"
+                    >
+                      {resending === "whatsapp" ? <Loader2 size={13} className="animate-spin" /> : <MessageCircle size={13} className="text-green-600" />}
+                      WhatsApp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resend("sms_firebase")}
+                      disabled={!!resending || loading}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-cream-200 text-ink-soft disabled:opacity-50 min-h-touch press-scale"
+                    >
+                      {resending === "sms_firebase" ? <Loader2 size={13} className="animate-spin" /> : <Smartphone size={13} />}
+                      SMS
+                    </button>
+                    {voiceAvailable && (
+                      <button
+                        type="button"
+                        onClick={() => resend("voice")}
+                        disabled={!!resending || loading}
+                        className="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-cream-200 text-ink-soft disabled:opacity-50 min-h-touch press-scale"
+                      >
+                        {resending === "voice" ? <Loader2 size={13} className="animate-spin" /> : <PhoneCall size={13} />}
+                        Call
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
-
-        <p className="text-center text-xs text-ink-muted mt-6">
-          {portal ? "Wrong role? Go back and choose the other login." : "Your role is verified by the backend."}
-        </p>
       </div>
     </div>
   );

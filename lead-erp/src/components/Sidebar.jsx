@@ -9,7 +9,6 @@ import {
   ClipboardList,
   LogOut,
   X,
-  ChevronRight,
   CreditCard,
   MessageCircle,
   Globe2,
@@ -23,6 +22,8 @@ import {
   PhoneCall,
   Mic,
   Phone,
+  ChevronRight,
+  Package,
 } from "lucide-react";
 
 const adminLinks = [
@@ -36,8 +37,9 @@ const adminLinks = [
   { to: "/admin/inbox", label: "Team Inbox", icon: Inbox },
   { to: "/admin/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { to: "/admin/broadcast", label: "Broadcast", icon: Radio },
-  { to: "/admin/website-lead-integration", label: "Website Lead Integration", icon: Globe2 },
+  { to: "/admin/website-lead-integration", label: "Website Leads", icon: Globe2 },
   { to: "/admin/ad-leads", label: "Meta & Google Ads", icon: Megaphone },
+  { to: "/admin/products", label: "Products", icon: Package },
   { to: "/admin/billing", label: "Billing", icon: CreditCard },
   { to: "/admin/voice-wallet", label: "Voice Wallet", icon: Wallet },
   { to: "/admin/call-history", label: "Call History", icon: PhoneCall },
@@ -51,8 +53,8 @@ const empLinks = [
   { to: "/app", label: "Workspace", end: true, icon: LayoutDashboard },
   { to: "/app/inbox", label: "Team Inbox", icon: Inbox },
   { to: "/app/leads", label: "My Leads", icon: Inbox },
-  { to: "/app/conversations", label: "My Conversations", icon: MessageCircle },
-  { to: "/app/tasks", label: "My Follow-ups", icon: ClipboardList },
+  { to: "/app/conversations", label: "Conversations", icon: MessageCircle },
+  { to: "/app/tasks", label: "Follow-ups", icon: ClipboardList },
   { to: "/app/tickets", label: "Tickets", icon: ClipboardList },
 ];
 
@@ -62,48 +64,49 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
 
   return (
     <>
-      {/* Mobile backdrop */}
+      {/* Backdrop */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-gray-900/20 backdrop-blur-sm z-40 lg:hidden"
+          className="sheet-backdrop"
           onClick={onClose}
         />
       )}
 
+      {/* Drawer Panel */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 min-h-screen flex flex-col
-          transform transition-transform duration-200 ease-out lg:translate-x-0
+        className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-white flex flex-col
+          transform transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
           ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        {/* Logo */}
-        <div className="px-5 pt-6 pb-5 flex items-center justify-between border-b border-gray-100">
+        {/* Header */}
+        <div className="px-5 pt-5 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <SkateMark size={40} />
+            <SkateMark size={36} />
             <div>
-              <p className="font-display font-bold text-lg bg-gradient-to-r from-primary-600 to-accent-600 bg-clip-text text-transparent">
+              <p className="font-display font-bold text-base text-gradient">
                 Codeskate CRM
               </p>
-              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
-                {user?.role === "admin" || user?.role === "owner" ? "Admin Portal" : "Sales Desk"}
+              <p className="text-[10px] text-ink-muted font-medium uppercase tracking-wider">
+                {user?.role === "admin" || user?.role === "owner" ? "Admin" : "Sales"}
               </p>
             </div>
           </div>
-          {/* Close button - mobile only */}
           <button
             onClick={onClose}
-            className="lg:hidden text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-cream-100 tap-highlight"
           >
-            <X size={18} />
+            <X size={16} className="text-ink-muted" />
           </button>
         </div>
 
         {/* Organization Switcher */}
         {user?.memberships && user.memberships.length > 1 && (
-          <div className="px-3 py-3 border-b border-gray-100">
+          <div className="px-4 pb-3">
             <select
               value={user.activeOrgId}
               onChange={(e) => switchOrg(e.target.value)}
-              className="w-full text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-300"
+              className="w-full text-sm font-medium text-ink bg-cream-50 border border-cream-200 rounded-xl px-3 py-2.5 min-h-touch"
             >
               {user.memberships.map((m) => (
                 <option key={m.orgId} value={m.orgId}>
@@ -114,8 +117,8 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
           </div>
         )}
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        {/* Navigation List */}
+        <nav className="flex-1 overflow-y-auto scroll-rubber px-3 py-2">
           {links.map((link) => {
             const Icon = link.icon;
             return (
@@ -125,10 +128,10 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
                 end={link.end}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all group ${
+                  `list-item rounded-xl mb-0.5 ${
                     isActive
-                      ? "bg-gradient-to-r from-primary-50 to-accent-50 text-primary-700"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                      ? "bg-orange-50 text-orange-700"
+                      : "text-ink-soft"
                   }`
                 }
               >
@@ -136,11 +139,11 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
                   <>
                     <Icon
                       size={18}
-                      strokeWidth={2}
-                      className={isActive ? "text-primary-600" : "text-gray-400 group-hover:text-gray-600"}
+                      strokeWidth={isActive ? 2.2 : 1.8}
+                      className={isActive ? "text-orange-600" : "text-ink-muted"}
                     />
-                    <span className="flex-1">{link.label}</span>
-                    {isActive && <ChevronRight size={16} className="text-primary-400" />}
+                    <span className="flex-1 text-sm font-medium">{link.label}</span>
+                    {isActive && <ChevronRight size={14} className="text-orange-400" />}
                   </>
                 )}
               </NavLink>
@@ -148,23 +151,25 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
           })}
         </nav>
 
-        {/* User Profile */}
-        <div className="px-4 py-4 border-t border-gray-100">
-          <div className="bg-gray-50 rounded-lg p-3 mb-3">
-            <p className="text-sm font-semibold text-gray-800 truncate">
-              {user?.displayName || user?.name || "User"}
-            </p>
-            <p className="text-xs text-gray-500 font-mono mt-0.5">{user?.phone}</p>
-            {user?.activeOrgName && (
-              <p className="text-xs text-gray-400 mt-1">{user.activeOrgName}</p>
-            )}
+        {/* User Profile Footer */}
+        <div className="px-4 py-4 border-t border-cream-100" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="avatar">
+              {(user?.displayName || user?.name || "U")[0].toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-ink truncate">
+                {user?.displayName || user?.name || "User"}
+              </p>
+              <p className="text-xs text-ink-muted num">{user?.phone}</p>
+            </div>
           </div>
           <button
             onClick={logout}
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-danger-600 hover:bg-danger-50 rounded-lg px-3 py-2 transition-colors w-full"
+            className="list-item rounded-xl text-danger-600 w-full -mx-1"
           >
-            <LogOut size={16} />
-            <span>Sign out</span>
+            <LogOut size={18} />
+            <span className="text-sm font-medium">Sign out</span>
           </button>
         </div>
       </aside>

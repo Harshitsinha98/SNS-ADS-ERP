@@ -3,8 +3,7 @@ import { Clock, AlertTriangle, ArrowRight } from "lucide-react";
 import { useBilling } from "../context/BillingContext";
 import { useAuth } from "../context/AuthContext";
 
-// Slim banner shown across the app while an org is on trial or expired.
-// Only admins/owners get the upgrade CTA (they can change the plan).
+// Compact mobile banner — minimal height, essential info only.
 export default function TrialBanner() {
   const { isTrialing, isExpired, trialDaysLeft, planName } = useBilling();
   const { user } = useAuth();
@@ -12,16 +11,14 @@ export default function TrialBanner() {
 
   if (isExpired) {
     return (
-      <div className="bg-danger-50 border border-danger-200 rounded-xl px-4 py-3 mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="flex items-start gap-2.5 flex-1">
-          <AlertTriangle size={18} className="text-danger-600 mt-0.5 shrink-0" />
-          <p className="text-sm text-danger-700">
-            Your trial/subscription has ended. Activate a plan to add new leads and team members.
-          </p>
-        </div>
+      <div className="bg-danger-50 border border-danger-200 rounded-xl px-3 py-2.5 mb-3 flex items-center gap-2.5">
+        <AlertTriangle size={16} className="text-danger-600 shrink-0" />
+        <p className="text-xs text-danger-700 flex-1">
+          Trial ended. {isAdminish ? "Activate a plan." : "Contact admin."}
+        </p>
         {isAdminish && (
-          <Link to="/admin/billing" className="btn btn-primary text-sm whitespace-nowrap">
-            Upgrade now <ArrowRight size={15} />
+          <Link to="/admin/billing" className="text-xs font-bold text-danger-700 whitespace-nowrap press-scale">
+            Upgrade
           </Link>
         )}
       </div>
@@ -31,19 +28,16 @@ export default function TrialBanner() {
   if (isTrialing) {
     const urgent = trialDaysLeft <= 3;
     return (
-      <div className={`rounded-xl px-4 py-3 mb-5 flex flex-col sm:flex-row sm:items-center gap-3 border ${
-        urgent ? "bg-warning-50 border-warning-200" : "bg-orange-50 border-orange-200"
+      <div className={`rounded-xl px-3 py-2.5 mb-3 flex items-center gap-2.5 border ${
+        urgent ? "bg-warning-50 border-warning-200" : "bg-orange-50 border-orange-100"
       }`}>
-        <div className="flex items-center gap-2.5 flex-1">
-          <Clock size={18} className={urgent ? "text-warning-600" : "text-orange-600"} />
-          <p className="text-sm text-ink-soft">
-            <span className="font-semibold text-ink">{trialDaysLeft} days</span> left in your free trial
-            <span className="text-ink-muted"> · {planName} plan</span>
-          </p>
-        </div>
+        <Clock size={16} className={urgent ? "text-warning-600" : "text-orange-500"} />
+        <p className="text-xs text-ink-soft flex-1">
+          <span className="font-bold text-ink">{trialDaysLeft}d</span> left · {planName}
+        </p>
         {isAdminish && (
-          <Link to="/admin/billing" className="text-sm font-semibold text-orange-600 hover:underline whitespace-nowrap">
-            Upgrade / manage plan →
+          <Link to="/admin/billing" className="text-xs font-bold text-orange-600 whitespace-nowrap press-scale">
+            Upgrade
           </Link>
         )}
       </div>
