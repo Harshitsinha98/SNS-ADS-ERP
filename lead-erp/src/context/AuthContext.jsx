@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { RecaptchaVerifier, signInWithPhoneNumber, signInWithCustomToken, signOut, onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { Capacitor } from "@capacitor/core";
 import { auth, db } from "../firebase";
 import { withTimeout } from "../utils/withTimeout";
 import { claimTeamInvites } from "../utils/billingApi";
@@ -237,24 +238,27 @@ export function AuthProvider({ children }) {
     // relies on reCAPTCHA, which cannot render inside the Android WebView (it
     // pops an external browser and then fails). Native must always use the
     // backend multi-channel OTP flow.
-    const isNative = Boolean(window?.Capacitor?.isNativePlatform?.());
+    const isNative = Capacitor.isNativePlatform();
     const forceFirebase =
       !isNative &&
       String(import.meta.env.VITE_OTP_FORCE_FIREBASE || "").toLowerCase() === "true";
     const useFirebaseSms = !isNative && via === "sms_firebase";
 
     // Try multi-channel OTP first — unless forced/asked to use Firebase.
+    console.log("[OTP DEBUG] isNative:", isNative, "forceFirebase:", forceFirebase, "useFirebaseSms:", useFirebaseSms);
     if (!forceFirebase && !useFirebaseSms) {
       try {
         const cfg = await getOtpConfig();
+        console.log("[OTP DEBUG] otp config:", JSON.stringify(cfg));
         if (cfg?.enabled) {
           const channel = ["whatsapp", "sms", "voice"].includes(via) ? via : undefined;
           const r = await sendOtpRequest(phone, channel);
+          console.log("[OTP DEBUG] sendOtpRequest result:", JSON.stringify(r));
           if (r.ok) return { ok: true, mode: "multi", channel: r.channel, devCode: r.devCode };
           return { ok: false, mode: "multi", error: r.error, retryAfter: r.retryAfter };
         }
       } catch (e) {
-        console.warn("Multi-channel OTP unavailable, falling back to Firebase:", e?.message);
+        console.warn("[OTP DEBUG] Multi-channel OTP threw an exception, falling back to Firebase:", e?.message, e);
       }
     }
 
