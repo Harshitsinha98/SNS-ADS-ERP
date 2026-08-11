@@ -30,7 +30,7 @@ function formatDate(iso) {
 
 async function apiPostJson(path, body) {
   const token = await auth.currentUser?.getIdToken();
-  const res = await fetch(`${import.meta.env.VITE_BACKEND_URL || ""}${path}`, {
+  const res = await fetch(`${import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com"}${path}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -91,7 +91,7 @@ function RegisterOwnedForm({ orgId, onSuccess }) {
   );
 }
 
-const BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BASE = import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com";
 
 async function apiGet(path) {
   const token = await auth.currentUser?.getIdToken();

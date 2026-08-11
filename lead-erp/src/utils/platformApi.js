@@ -13,7 +13,7 @@
 
 import { auth } from "../firebase";
 
-const BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BASE = import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com";
 
 async function platformPost(path, body) {
   const user = auth.currentUser;

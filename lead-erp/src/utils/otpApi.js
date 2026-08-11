@@ -5,7 +5,7 @@
  * When the backend reports the feature is not configured, callers fall back
  * to Firebase Phone Auth (handled in AuthContext).
  */
-const BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BASE = import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com";
 
 async function postJson(path, body) {
   const res = await fetch(`${BASE}${path}`, {

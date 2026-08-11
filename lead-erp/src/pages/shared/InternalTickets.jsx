@@ -11,7 +11,7 @@ import {
   TicketPlus, Loader2, CheckCircle2, Clock, AlertCircle, Send, ChevronDown, ChevronUp, Plus,
 } from "lucide-react";
 
-const BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BASE = import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com";
 
 async function authedGet(path) {
   const user = auth.currentUser;

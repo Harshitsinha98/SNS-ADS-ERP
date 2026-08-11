@@ -11,7 +11,7 @@ import {
   Send, ChevronDown, ChevronUp, User, Building2,
 } from "lucide-react";
 
-const BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BASE = import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com";
 
 async function platformGet(path) {
   const user = auth.currentUser;

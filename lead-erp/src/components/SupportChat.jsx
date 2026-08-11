@@ -12,7 +12,7 @@ import { useState, useRef, useEffect } from "react";
 import { auth } from "../firebase";
 import { MessageCircle, X, Send, Loader2, TicketPlus, ChevronDown } from "lucide-react";
 
-const BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BASE = import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com";
 
 async function authedPost(path, body) {
   const user = auth.currentUser;

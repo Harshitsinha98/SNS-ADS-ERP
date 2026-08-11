@@ -9,7 +9,7 @@
 import { useState, useRef, useEffect } from "react";
 import { MessageCircle, X, Send, Loader2, Bot, Sparkles } from "lucide-react";
 
-const BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BASE = import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com";
 
 const QUICK_QUESTIONS = [
   "What does Codeskate CRM do?",

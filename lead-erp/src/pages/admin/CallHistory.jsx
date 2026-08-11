@@ -9,7 +9,7 @@ import { useAuth } from "../../context/AuthContext";
 import { Phone, Play, Loader2, ChevronDown, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import { auth } from "../../firebase";
 
-const BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BASE = import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com";
 
 async function fetchCallHistory(orgId, cursor) {
   const token = await auth.currentUser?.getIdToken();

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { CheckCircle2, LoaderCircle, ShieldCheck } from "lucide-react";
 
-const BACKEND_URL = String(import.meta.env.VITE_BACKEND_URL || "").replace(/\/$/, "");
+const BACKEND_URL = String(import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com").replace(/\/$/, "");
 
 function loadTurnstileScript() {
   if (window.turnstile) return Promise.resolve(window.turnstile);

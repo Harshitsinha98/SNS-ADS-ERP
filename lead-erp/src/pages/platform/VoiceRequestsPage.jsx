@@ -10,7 +10,7 @@ import {
   Phone, CheckCircle2, XCircle, Loader2, FileText, ExternalLink,
 } from "lucide-react";
 
-const BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BASE = import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com";
 
 // Uses the same token pattern as platformApi.js but for these specific endpoints
 async function platformGet(path) {

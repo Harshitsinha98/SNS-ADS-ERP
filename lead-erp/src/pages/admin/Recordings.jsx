@@ -10,7 +10,7 @@ import { auth } from "../../firebase";
 import Layout from "../../components/Layout";
 import { Mic, Play, Pause, Download, Loader2, Search, ChevronDown } from "lucide-react";
 
-const BASE = import.meta.env.VITE_BACKEND_URL || "";
+const BASE = import.meta.env.VITE_BACKEND_URL || "https://api.codeskate.com";
 
 async function fetchRecordings(orgId, cursor, filters = {}) {
   const token = await auth.currentUser?.getIdToken();
