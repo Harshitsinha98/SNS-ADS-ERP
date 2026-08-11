@@ -15,17 +15,17 @@ import { createRateLimiter } from "../../middleware/rateLimiter.js";
 const otpSendLimiter = createRateLimiter({
   namespace: "otp-send",
   windowMs: 15 * 60_000,  // 15 minutes
-  max: 10,                 // max 10 send requests per IP per 15 min
+  max: 50,                 // raised for testing (was 10); revert to 10 before going live
   message: "Too many OTP requests from this network. Please wait a few minutes.",
-  blockMs: 5 * 60_000,    // block IP for 5 min after exceeding
+  blockMs: 60_000,         // block IP for 1 min after exceeding (was 5 min)
 });
 
 const otpVerifyLimiter = createRateLimiter({
   namespace: "otp-verify",
   windowMs: 15 * 60_000,
-  max: 15,                 // max 15 verify attempts per IP per 15 min
+  max: 50,                 // raised for testing (was 15); revert to 15 before going live
   message: "Too many verification attempts from this network. Please wait.",
-  blockMs: 5 * 60_000,
+  blockMs: 60_000,         // was 5 min
 });
 
 // Plivo answer URL limiter — only Plivo should hit this; legitimate traffic
