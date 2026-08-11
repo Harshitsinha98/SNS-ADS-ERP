@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Landing from "./pages/marketing/Landing";
 import Pricing from "./pages/marketing/Pricing";
@@ -77,7 +78,10 @@ export default function App() {
 
       <Routes>
         {/* --- PUBLIC MARKETING --- */}
-        <Route path="/" element={<Landing />} />
+        {/* Native app (Android/iOS) has no use for the marketing landing page —
+            it goes straight into the product at /login instead of feeling like
+            a website wrapped in an app. */}
+        <Route path="/" element={Capacitor.isNativePlatform() ? <Navigate to="/login" replace /> : <Landing />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/privacy" element={<Privacy />} />
