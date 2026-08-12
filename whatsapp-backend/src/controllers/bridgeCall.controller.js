@@ -4,6 +4,7 @@
 import { bridgeCallConfig } from "../config/env.js";
 import { isOrgAdmin, getActiveMembership } from "../middleware/auth.js";
 import { initiateBridgeCall, handleCallCompleted, checkWalletBalance, getBridgeCallStatus, callCustomerIntoConference, hangupPlivoCall } from "../services/bridgeCall.js";
+import { getActiveNumberForOrg } from "../services/voiceNumbers.js";
 import { logger } from "../middleware/logger.js";
 import { db } from "../bootstrap/firebase.js";
 import { nowIso } from "../services/helpers.js";
@@ -45,6 +46,42 @@ export async function initiateHandler(req, res) {
   } catch (e) {
     logger.error({ err: e.message }, "Bridge call initiate error");
     return res.status(500).json({ error: "Could not start bridge call." });
+  }
+}
+
+/**
+ * Lightweight capability check so clients (mobile app) can SHOW/HIDE the
+ * "Bridge call" option without attempting a call. Returns why it's unavailable
+ * so the UI can hide the option entirely (no upsell noise on the call button).
+ * GET /api/v1/bridge-call/availability?orgId=...
+ * Response: { available: bool, reason: 'plan'|'number'|'wallet'|null, balanceInr }
+ */
+export async function availabilityHandler(req, res) {
+  try {
+    const orgId = req.query.orgId;
+    if (!orgId) return res.status(400).json({ available: false, reason: "bad_request" });
+
+    const membership = await getActiveMembership(req.authUser.uid, orgId);
+    if (!membership) return res.status(403).json({ available: false, reason: "no_membership" });
+
+    // 1) Plan gate (Growth+).
+    if (!(await orgHasBridgeAccess(orgId))) {
+      return res.json({ available: false, reason: "plan" });
+    }
+    // 2) Org must have its own active CodeSkate Voice number.
+    const number = await getActiveNumberForOrg(orgId).catch(() => null);
+    if (!number) {
+      return res.json({ available: false, reason: "number" });
+    }
+    // 3) Wallet must have at least one minute of balance.
+    const wallet = await checkWalletBalance(orgId);
+    if (!wallet.hasBalance) {
+      return res.json({ available: false, reason: "wallet", balanceInr: wallet.balanceInr || 0 });
+    }
+    return res.json({ available: true, balanceInr: wallet.balanceInr || 0 });
+  } catch (e) {
+    logger.error({ err: e.message }, "Bridge availability error");
+    return res.status(500).json({ available: false, reason: "error" });
   }
 }
 
