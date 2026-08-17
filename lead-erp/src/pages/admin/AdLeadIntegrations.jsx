@@ -123,17 +123,22 @@ export default function AdLeadIntegrations() {
   };
 
   const chooseMetaPage = async () => {
-    if (!META_LEAD_LOGIN_CONFIG_ID) {
-      setError("Meta Lead Ads Login Configuration is not connected yet. Ask the platform administrator to set VITE_META_LEAD_LOGIN_CONFIG_ID in Vercel after creating the configuration in Meta.");
+    if (!META_APP_ID) {
+      setError("Meta App ID is not configured. Ask the platform administrator to set VITE_META_APP_ID.");
       return;
     }
     setBusy("meta-login"); setError(""); setNotice("");
     try {
       const FB = await loadMetaSdk();
-      const response = await new Promise((resolve) => FB.login(resolve, {
-        config_id: META_LEAD_LOGIN_CONFIG_ID,
-        return_scopes: true,
-      }));
+      // Use inline scope request (authorization code flow). Login Configurations
+      // that were created before Meta deprecated response_type=token break with
+      // "Invalid parameter: response_type must be a valid enum." — so we fall
+      // back to the standard FB.login scope approach when config_id is missing
+      // or doesn't work.
+      const loginOptions = META_LEAD_LOGIN_CONFIG_ID
+        ? { config_id: META_LEAD_LOGIN_CONFIG_ID, response_type: 'code', override_default_response_type: true, return_scopes: true }
+        : { scope: 'pages_show_list,pages_read_engagement,leads_retrieval', return_scopes: true };
+      const response = await new Promise((resolve) => FB.login(resolve, loginOptions));
       const accessToken = response?.authResponse?.accessToken;
       if (!accessToken) throw new Error("Meta login was cancelled. Please approve Page and Lead Ads access to continue.");
       const result = await listMetaLeadPages({ orgId, userAccessToken: accessToken });
