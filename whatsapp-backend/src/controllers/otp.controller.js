@@ -16,6 +16,7 @@
  * built-in Firebase Phone Auth flow.
  */
 import { adminAuth } from "../bootstrap/firebase.js";
+import { db } from "../bootstrap/firebase.js";
 import { otpConfig } from "../config/env.js";
 import { sendOtp, verifyOtp } from "../services/otpService.js";
 import { logger } from "../middleware/logger.js";
@@ -61,6 +62,41 @@ export async function verifyOtpHandler(req, res) {
     let userRecord = await adminAuth.getUserByPhoneNumber(e164).catch(() => null);
     if (!userRecord) {
       userRecord = await adminAuth.createUser({ phoneNumber: e164 });
+    }
+
+    // ── Test account: auto-create workspace membership if missing ──────────
+    // This ensures the Meta App Review test account lands on the admin dashboard
+    // instead of the "no account found" screen.
+    const TEST_PHONE = process.env.OTP_TEST_PHONE || "9999999999";
+    const TEST_E164 = "+91" + TEST_PHONE.replace(/\D/g, "").slice(-10);
+    if (e164 === TEST_E164) {
+      const uid = userRecord.uid;
+      const existingMembership = await db.collection("memberships")
+        .where("uid", "==", uid).where("active", "==", true).limit(1).get();
+
+      if (existingMembership.empty) {
+        // Find the first active organization to attach the test user to
+        const testOrgId = process.env.OTP_TEST_ORG_ID || null;
+        let orgId = testOrgId;
+        if (!orgId) {
+          const orgSnap = await db.collection("organizations").limit(1).get();
+          if (!orgSnap.empty) orgId = orgSnap.docs[0].id;
+        }
+        if (orgId) {
+          const membershipId = `${uid}_${orgId}`;
+          await db.collection("memberships").doc(membershipId).set({
+            uid, orgId, role: "admin", active: true,
+            displayName: "App Reviewer",
+            createdAt: Date.now(),
+          });
+          // Also ensure a user doc exists
+          await db.collection("users").doc(uid).set(
+            { phone: e164, displayName: "App Reviewer", defaultOrgId: orgId },
+            { merge: true }
+          );
+          logger.info({ uid, orgId }, "Test user membership auto-created");
+        }
+      }
     }
 
     const customToken = await adminAuth.createCustomToken(userRecord.uid, { phone: e164 });
