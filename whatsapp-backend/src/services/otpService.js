@@ -26,6 +26,13 @@ import { logger } from "../middleware/logger.js";
 const COLLECTION = "otpVerifications";
 const isProd = process.env.NODE_ENV === "production";
 
+// ── Reviewer / test account bypass ────────────────────────────────────
+// A fixed test number + code that skips delivery entirely.
+// Used for Meta App Review so the reviewer can log in without a real phone.
+const TEST_PHONE = process.env.OTP_TEST_PHONE || "9999999999";
+const TEST_CODE = process.env.OTP_TEST_CODE || "123456";
+const TEST_E164 = "+91" + TEST_PHONE.replace(/\D/g, "").slice(-10);
+
 const toE164 = (phone) => "+91" + String(phone || "").replace(/\D/g, "").slice(-10);
 const nowMs = () => Date.now();
 
@@ -49,6 +56,12 @@ function hashCode(code, e164) {
 export async function sendOtp(phone, preferredChannel = null) {
   const e164 = toE164(phone);
   if (e164.length !== 13) return { ok: false, error: "Invalid phone number." };
+
+  // ── Test account bypass: skip delivery, respond instantly ──
+  if (e164 === TEST_E164) {
+    logger.info({ e164 }, "Test OTP send — skipping delivery");
+    return { ok: true, channel: "test" };
+  }
 
   const ref = db.collection(COLLECTION).doc(e164);
   const snap = await ref.get();
@@ -122,6 +135,16 @@ export async function sendOtp(phone, preferredChannel = null) {
  */
 export async function verifyOtp(phone, code) {
   const e164 = toE164(phone);
+
+  // ── Test account bypass: accept the fixed code without Firestore ──
+  if (e164 === TEST_E164) {
+    if (String(code || "").trim() === TEST_CODE) {
+      logger.info({ e164 }, "Test OTP verified");
+      return { ok: true, e164 };
+    }
+    return { ok: false, error: "Incorrect code. Please check and try again." };
+  }
+
   const ref = db.collection(COLLECTION).doc(e164);
   const snap = await ref.get();
   if (!snap.exists) return { ok: false, error: "No code found. Please request a new one." };
