@@ -7,9 +7,9 @@ import { useAuth } from "../../context/AuthContext";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
 import { mergePlansWithConfig, isUpgrade, getPlanById } from "../../data/plans";
 import {
-  getBillingConfig, createRazorpayOrder, verifyRazorpayPayment, getPayuHash,
+  getBillingConfig, createRazorpayOrder, verifyRazorpayPayment,
   createSubscription, verifySubscription, cancelAutopay,
-  loadRazorpayScript, submitPayuForm,
+  loadRazorpayScript,
   createAddOnOrder, verifyAddOnPayment, getQuotaStatus,
 } from "../../utils/billingApi";
 import {
@@ -27,9 +27,8 @@ export default function Billing() {
   const location = useLocation();
 
   const [config, setConfig] = useState(null);
-  const [gateways, setGateways] = useState({ razorpay: false, payu: false });
+  const [gateways, setGateways] = useState({ razorpay: false });
   const [cycle, setCycle] = useState(b.billingCycle || "monthly");
-  const [method, setMethod] = useState("razorpay");
   const [autopayWanted, setAutopayWanted] = useState(false);
   const [busy, setBusy] = useState(null);
   const [msg, setMsg] = useState("");
@@ -48,17 +47,11 @@ export default function Billing() {
     fetchPlatformConfig().then(setConfig);
     getBillingConfig().then((g) => {
       setGateways(g);
-      setMethod(g.razorpay ? "razorpay" : g.payu ? "payu" : "razorpay");
     });
-    const params = new URLSearchParams(location.search);
-    const payu = params.get("payu");
-    if (payu === "success") setMsg("✅ Payment successful — your plan is now active!");
-    else if (payu === "failed") setMsg("❌ PayU payment failed.");
-    else if (payu === "error") setMsg("⚠️ Something went wrong with the PayU payment.");
   }, [location.search]);
 
   const { plans } = mergePlansWithConfig(config);
-  const anyGateway = gateways.razorpay || gateways.payu;
+  const anyGateway = gateways.razorpay;
   const currentPlan = plans.find((p) => p.id === b.planId) || plans[0];
 
   // Post-purchase = active or past_due → upgrade-only view.
@@ -87,7 +80,7 @@ export default function Billing() {
     if (!anyGateway) {
       throw new Error("Payments are temporarily unavailable. Contact support to activate your plan.");
     }
-    if (method === "razorpay" && gateways.razorpay) {
+    if (gateways.razorpay) {
       const ok = await loadRazorpayScript();
       if (!ok) throw new Error("Razorpay checkout failed to load.");
       if (autopay) {
@@ -142,11 +135,6 @@ export default function Billing() {
           rzp.open();
         });
       }
-    } else if (method === "payu" && gateways.payu) {
-      const { action, params } = await getPayuHash({ orgId: b.org.id, planId: plan.id, cycle,
-        firstname: user?.displayName || "Customer", email: "customer@codeskate.app", phone: (user?.phone || "").replace("+91", "") });
-      submitPayuForm(action, params);
-      return "redirect";
     }
   };
 
@@ -162,8 +150,7 @@ export default function Billing() {
   const handleRenew = () => handlePay(currentPlan, { autopay: false });
 
   // Add-on packs are one-time Razorpay charges that raise a plan limit for the
-  // current billing period. Only Razorpay is wired for these (PayU's redirect
-  // flow would lose the add-on context on return).
+  // current billing period.
   const handleBuyAddOn = async (addOn) => {
     if (!gateways.razorpay) { setMsg("Add-on purchases need Razorpay, which is currently unavailable."); return; }
     setBusy(`addon-${addOn.id}`);
@@ -392,12 +379,6 @@ export default function Billing() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <p className="eyebrow">{hasPaid ? "Upgrade your plan" : "Choose a plan"}</p>
         <div className="flex items-center gap-3">
-          {anyGateway && (
-            <div className="inline-flex bg-cream-200 rounded-full p-1 text-sm">
-              {gateways.razorpay && <button onClick={() => setMethod("razorpay")} className={`px-3 py-1.5 rounded-full font-medium ${method === "razorpay" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>Razorpay</button>}
-              {gateways.payu && <button onClick={() => setMethod("payu")} className={`px-3 py-1.5 rounded-full font-medium ${method === "payu" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>PayU</button>}
-            </div>
-          )}
           <div className="inline-flex bg-cream-200 rounded-full p-1 text-sm">
             <button onClick={() => setCycle("monthly")} className={`px-4 py-1.5 rounded-full font-medium ${cycle === "monthly" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>Monthly</button>
             <button onClick={() => setCycle("yearly")} className={`px-4 py-1.5 rounded-full font-medium ${cycle === "yearly" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>Yearly</button>

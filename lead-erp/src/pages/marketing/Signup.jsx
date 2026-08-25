@@ -12,8 +12,8 @@ import Logo from "../../components/marketing/Logo";
 import { TRIAL_DAYS, mergePlansWithConfig } from "../../data/plans";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
 import {
-  getAccountStatus, getBillingConfig, createSignupOrder, verifySignupPayment, getSignupPayuHash,
-  provisionTrialWorkspace, loadRazorpayScript, submitPayuForm,
+  getAccountStatus, getBillingConfig, createSignupOrder, verifySignupPayment,
+  provisionTrialWorkspace, loadRazorpayScript,
 } from "../../utils/billingApi";
 
 export default function Signup() {
@@ -35,8 +35,7 @@ export default function Signup() {
   const [err, setErr] = useState("");
 
   const [config, setConfig] = useState(null);
-  const [gateways, setGateways] = useState({ razorpay: false, payu: false });
-  const [method, setMethod] = useState("razorpay");
+  const [gateways, setGateways] = useState({ razorpay: false });
   const [trialAvailable, setTrialAvailable] = useState(true);
   const [payBusy, setPayBusy] = useState(false);
 
@@ -44,7 +43,6 @@ export default function Signup() {
     fetchPlatformConfig().then(setConfig);
     getBillingConfig().then((g) => {
       setGateways(g);
-      setMethod(g.razorpay ? "razorpay" : g.payu ? "payu" : "razorpay");
     });
   }, []);
 
@@ -62,7 +60,7 @@ export default function Signup() {
   const price = cycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
   const planIsStarter = plan.id === "starter";
   const canFreeTrial = planIsStarter && plan.trial && trialAvailable;
-  const anyGateway = gateways.razorpay || gateways.payu;
+  const anyGateway = gateways.razorpay;
 
   const checkExistingPhone = async (value = phone) => {
     const normalizedPhone = String(value || "").replace(/\D/g, "");
@@ -157,7 +155,7 @@ export default function Signup() {
     try {
       if (!anyGateway) throw new Error("Payment gateway is not available yet. Please set VITE_BACKEND_URL.");
 
-      if (method === "razorpay" && gateways.razorpay) {
+      if (gateways.razorpay) {
         const ok = await loadRazorpayScript();
         if (!ok) throw new Error("Razorpay checkout failed to load.");
         const order = await createSignupOrder({ orgName: orgName.trim(), fullName: fullName.trim(), planId: plan.id, cycle });
@@ -183,11 +181,8 @@ export default function Signup() {
         });
         setStep("done");
         setTimeout(() => window.location.assign("/admin"), 1600);
-      } else if (method === "payu" && gateways.payu) {
-        const { action, params } = await getSignupPayuHash({ orgName, fullName, planId: plan.id, cycle });
-        submitPayuForm(action, params); // redirects to PayU; backend provisions on callback
       } else {
-        throw new Error("This payment method is not configured.");
+        throw new Error("Payment gateway is not configured.");
       }
     } catch (e2) {
       console.error("[signup] pay failed:", e2?.code, e2?.message);
@@ -551,11 +546,10 @@ export default function Signup() {
 
                     {/* payment method (only relevant for paying) */}
                     {anyGateway && (
-                      <div className="flex items-center justify-between mb-5">
+                      <div className="flex items-center justify-between mb-5 bg-cream-50/50 rounded-xl p-3 border border-cream-100">
                         <span className="text-sm font-medium text-ink">Pay with</span>
-                        <div className="inline-flex bg-cream-200 rounded-full p-1 text-sm">
-                          {gateways.razorpay && <button onClick={() => setMethod("razorpay")} className={`px-3 py-1.5 rounded-full font-medium ${method === "razorpay" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>Razorpay</button>}
-                          {gateways.payu && <button onClick={() => setMethod("payu")} className={`px-3 py-1.5 rounded-full font-medium ${method === "payu" ? "bg-white shadow-sm text-ink" : "text-ink-muted"}`}>PayU</button>}
+                        <div className="inline-flex bg-white rounded-full p-0.5 text-sm border border-cream-200 shadow-sm">
+                          <span className="px-3 py-1.5 rounded-full font-medium bg-orange-500 text-white shadow-sm">Razorpay</span>
                         </div>
                       </div>
                     )}

@@ -71,12 +71,10 @@ export const verifyRazorpayPayment = (body) => authedPost("/api/billing/razorpay
 export const createAddOnOrder = (body) => authedPost("/api/billing/razorpay/addon/order", body);
 export const verifyAddOnPayment = (body) => authedPost("/api/billing/razorpay/addon/verify", body);
 export const getQuotaStatus = (orgId) => authedGet(`/api/billing/quota-status?orgId=${encodeURIComponent(orgId)}`);
-export const getPayuHash = (body) => authedPost("/api/billing/payu/hash", body);
 
 // ---- paid SIGNUP (no org yet — backend provisions after payment) ----
 export const createSignupOrder = (body) => authedPost("/api/billing/signup/order", body);
 export const verifySignupPayment = (body) => authedPost("/api/billing/signup/verify", body);
-export const getSignupPayuHash = (body) => authedPost("/api/billing/signup/payu/hash", body);
 
 // ---- autopay (Razorpay Subscriptions — Option A) ----
 export const createSubscription = (body) => authedPost("/api/billing/subscription/create", body);
@@ -94,22 +92,6 @@ export function loadRazorpayScript() {
     s.onerror = () => resolve(false);
     document.body.appendChild(s);
   });
-}
-
-// Build + auto-submit a hidden form to PayU (redirect-based flow).
-export function submitPayuForm(action, params) {
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = action;
-  Object.entries(params).forEach(([k, v]) => {
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = k;
-    input.value = v ?? "";
-    form.appendChild(input);
-  });
-  document.body.appendChild(form);
-  form.submit();
 }
 
 
