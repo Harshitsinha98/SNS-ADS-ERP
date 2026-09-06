@@ -98,13 +98,25 @@ export async function metaGraphRequest(path, { method = "GET", token = null, bod
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    // Log the provider's own message and subcode: `code` alone is ambiguous
+    // (100 covers both "nonexisting field" and "missing permissions"), which
+    // makes webhook failures undiagnosable from logs.
     logger.warn(
-      { status: response.status, code: data?.error?.code },
+      {
+        status: response.status,
+        code: data?.error?.code,
+        subcode: data?.error?.error_subcode,
+        providerMessage: data?.error?.message,
+        fbtraceId: data?.error?.fbtrace_id,
+        path: String(path).split("?")[0],
+      },
       "Meta Graph API request failed"
     );
     throw Object.assign(new Error("WhatsApp provider request failed"), {
       status: 502,
       providerCode: data?.error?.code,
+      providerSubcode: data?.error?.error_subcode,
+      providerMessage: data?.error?.message,
       deliveryUnknown: response.status >= 500,
     });
   }
