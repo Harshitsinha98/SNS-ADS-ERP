@@ -406,7 +406,10 @@ export function createAdLeadWebhookRouter(db, { metaGraphRequest, metaAppSecret 
         const connection = await metaConnectionRef(db, pageId).get();
         if (!connection.exists || connection.data().active !== true) continue;
         const token = decryptToken(connection.data().pageAccessTokenCiphertext);
-        const lead = await metaGraphRequest(`${change.value.leadgen_id}?fields=field_data,created_time,ad_id,adgroup_id,form_id`, { token });
+        // `adgroup_id` exists on the webhook payload but not on the Lead node:
+        // requesting it makes Graph reject the whole read with error 100.
+        // metaLeadInput only consumes ad_id/form_id, so it was never needed.
+        const lead = await metaGraphRequest(`${change.value.leadgen_id}?fields=field_data,created_time,ad_id,form_id`, { token });
         await createLeadFromIntake({
           db,
           orgId: connection.data().orgId,
@@ -420,7 +423,13 @@ export function createAdLeadWebhookRouter(db, { metaGraphRequest, metaAppSecret 
       }
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("Meta Lead Ads webhook failed:", error.message);
+      // Surface the provider's own reason: the generic message hid whether the
+      // failure was a bad field, an expired token, or missing lead access.
+      console.error("Meta Lead Ads webhook failed:", error.message, JSON.stringify({
+        providerCode: error.providerCode,
+        providerSubcode: error.providerSubcode,
+        providerMessage: error.providerMessage,
+      }));
       return res.status(error.status || 500).json({ error: "Could not receive Meta lead" });
     }
   });

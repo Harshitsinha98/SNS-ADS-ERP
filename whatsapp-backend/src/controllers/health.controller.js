@@ -22,8 +22,10 @@ export async function healthCheck(req, res) {
   let firestoreOk = false;
 
   try {
-    // Lightweight connectivity check — reads a system metadata doc
-    await db.collection("systemLocks").doc("__healthcheck__").get();
+    // Lightweight connectivity check — reads a system metadata doc.
+    // The id must not match Firestore's reserved __*__ pattern, or every
+    // check fails with INVALID_ARGUMENT and reports a false outage.
+    await db.collection("systemLocks").doc("healthcheck").get();
     firestoreOk = true;
   } catch {
     firestoreOk = false;
