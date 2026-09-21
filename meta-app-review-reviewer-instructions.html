@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Codeskate CRM — Meta App Review Reviewer Instructions</title>
+<style>
+  :root { --ink:#1a1a1a; --soft:#444; --muted:#777; --line:#e2e2e2; --brand:#e8590c; --bg:#fafafa; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); line-height: 1.55; margin: 0; padding: 40px; background: #fff;
+    font-size: 13.5px;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; }
+  header { border-bottom: 3px solid var(--brand); padding-bottom: 16px; margin-bottom: 24px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 12.5px; }
+  h2 {
+    font-size: 15px; margin: 26px 0 10px; padding: 7px 12px;
+    background: var(--bg); border-left: 4px solid var(--brand); border-radius: 4px;
+  }
+  h3 { font-size: 13.5px; margin: 16px 0 6px; color: var(--soft); }
+  p { margin: 8px 0; color: var(--soft); }
+  ol, ul { margin: 8px 0 8px 4px; padding-left: 22px; color: var(--soft); }
+  li { margin: 5px 0; }
+  code, .cred {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    background: #f2f2f2; padding: 1px 6px; border-radius: 4px; font-size: 12.5px; color: var(--ink);
+  }
+  .box { border: 1px solid var(--line); border-radius: 8px; padding: 14px 18px; margin: 12px 0; background: #fff; }
+  .cred-box { background: #fff7f0; border: 1px solid #ffd8b8; border-radius: 8px; padding: 14px 18px; margin: 12px 0; }
+  .cred-box strong { color: var(--brand); }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 12.5px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--bg); font-weight: 600; }
+  .tag { display:inline-block; background:#eef6ff; color:#1c64c4; border-radius:4px; padding:1px 7px; font-size:11.5px; margin:1px 2px; }
+  footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+  .note { background:#f0f9f2; border:1px solid #bfe6cb; border-radius:8px; padding:10px 16px; color:#256b3c; font-size:12.5px; }
+  @media print { body { padding: 22px; } h2 { break-after: avoid; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Codeskate CRM — App Review: Reviewer Instructions</h1>
+    <div class="sub">App ID 1581914519978056 &nbsp;·&nbsp; https://crm.codeskate.com &nbsp;·&nbsp; Multi-tenant lead management SaaS (verified Tech Provider)</div>
+  </header>
+
+  <h2>1. What the app does</h2>
+  <p>Codeskate CRM is a multi-tenant lead management platform. Each business (workspace) connects <strong>its own</strong> Facebook Page and WhatsApp Business account. Leads submitted through the business's Facebook Lead Ads instant forms flow automatically into its CRM workspace and are assigned to a team member, and the business can reply to its own customers over WhatsApp from inside the CRM. Data for each business is isolated to its own workspace; access tokens are stored encrypted and never appear in lead records or logs.</p>
+
+  <h3>Meta permissions used</h3>
+  <p>
+    <span class="tag">leads_retrieval</span>
+    <span class="tag">pages_show_list</span>
+    <span class="tag">pages_read_engagement</span>
+    <span class="tag">pages_manage_metadata</span>
+    <span class="tag">business_management</span>
+    <span class="tag">whatsapp_business_messaging</span>
+    <span class="tag">whatsapp_business_management</span>
+    <span class="tag">public_profile</span>
+  </p>
+
+  <h2>2. Test login (no real phone required)</h2>
+  <div class="cred-box">
+    <p style="margin-top:0"><strong>Site URL:</strong> https://crm.codeskate.com</p>
+    <p><strong>Phone number:</strong> <span class="cred">9999999999</span></p>
+    <p><strong>OTP code:</strong> <span class="cred">123456</span></p>
+    <p style="margin-bottom:0; font-size:12px; color:#a55;">This is a dedicated review account. No SMS is sent — the code above always works. It logs into a workspace where a Facebook Page and a WhatsApp Business account are already connected, so all features can be reviewed without any payment or subscription.</p>
+  </div>
+  <ol>
+    <li>Open <code>https://crm.codeskate.com</code> and choose phone login.</li>
+    <li>Enter the phone number <code>9999999999</code>.</li>
+    <li>When prompted for the OTP, enter <code>123456</code>.</li>
+    <li>You will land in a workspace with a Facebook Page and WhatsApp Business account already connected.</li>
+  </ol>
+
+  <h2>3. Reviewing Facebook Lead Ads</h2>
+  <p><em>Demonstrates leads_retrieval, pages_show_list, pages_read_engagement, pages_manage_metadata, business_management.</em></p>
+  <ol>
+    <li>From the sidebar, open <strong>Ads Lead Integration</strong>. The connected Facebook Page shows a <strong>“Connected”</strong> status. (Connecting a Page uses Facebook Login for Business — <code>pages_show_list</code> to list the admin's Pages, <code>pages_read_engagement</code> to confirm access, <code>business_management</code> for Business-owned Pages, and <code>pages_manage_metadata</code> to subscribe to the Page's leadgen webhook.)</li>
+    <li>Open Meta's <strong>Lead Ads Testing Tool</strong>, select the connected Page and a form, delete any existing test lead, then click <strong>Create Lead</strong>.</li>
+    <li>Return to the CRM <strong>Leads</strong> page. The test lead appears automatically, tagged as a <strong>“Meta Lead Ads”</strong> source, and is auto-assigned to a team member. This demonstrates <code>leads_retrieval</code>: on the leadgen webhook, the app fetches the lead's name, phone, and email and creates the CRM record.</li>
+  </ol>
+
+  <h2>4. Reviewing WhatsApp</h2>
+  <p><em>Demonstrates whatsapp_business_messaging and whatsapp_business_management.</em></p>
+  <ol>
+    <li>Open the <strong>WhatsApp</strong> section to view the connected phone number and the account's message templates. This demonstrates <code>whatsapp_business_management</code> (reading connected phone numbers and reading/managing templates).</li>
+    <li>Open a customer conversation and send a reply within the 24-hour customer service window. This demonstrates <code>whatsapp_business_messaging</code>. Messages are only sent to customers who have already contacted the business.</li>
+  </ol>
+
+  <h2>5. Permission-to-feature map</h2>
+  <table>
+    <tr><th>Permission</th><th>Where it is used in the app</th></tr>
+    <tr><td><code>pages_show_list</code></td><td>Lists the admin's Facebook Pages (<code>/me/accounts</code>) so they can select the Page to connect.</td></tr>
+    <tr><td><code>pages_read_engagement</code></td><td>Confirms access to the selected Page and reads its basic metadata (id, name) to associate leads correctly.</td></tr>
+    <tr><td><code>pages_manage_metadata</code></td><td>Subscribes the app to the Page's <code>leadgen</code> webhook via <code>POST /{page-id}/subscribed_apps</code>.</td></tr>
+    <tr><td><code>leads_retrieval</code></td><td>On a leadgen webhook, fetches the lead's field data (name, phone, email) and creates a CRM record.</td></tr>
+    <tr><td><code>business_management</code></td><td>Lets admins whose Pages are owned by a Business portfolio list and connect those Pages.</td></tr>
+    <tr><td><code>whatsapp_business_messaging</code></td><td>Sends session replies and approved templates via <code>/{phone-number-id}/messages</code>; receives inbound messages via webhooks.</td></tr>
+    <tr><td><code>whatsapp_business_management</code></td><td>Reads connected phone numbers and reads/manages message templates for the connected WhatsApp Business Account.</td></tr>
+    <tr><td><code>public_profile</code></td><td>Identifies the logged-in admin during Facebook Login.</td></tr>
+  </table>
+
+  <h2>6. Data handling summary</h2>
+  <ul>
+    <li>Platform Data is stored in Google Cloud Firestore (asia-south1) with per-workspace tenant separation and role-based access control.</li>
+    <li>Integration access tokens are encrypted (AES-256-GCM) and never appear in lead records or logs.</li>
+    <li>All incoming webhooks are verified with signature validation before processing.</li>
+    <li>Data is used only to deliver a business's own leads and messages into its own workspace. It is never sold and never used for advertising or audience building.</li>
+    <li>Deletion can be requested at <code>https://crm.codeskate.com/data-deletion</code> and is processed within 30 days.</li>
+  </ul>
+
+  <div class="note">
+    Privacy Policy: https://crm.codeskate.com/privacy &nbsp;·&nbsp;
+    Terms: https://crm.codeskate.com/terms &nbsp;·&nbsp;
+    Data Deletion: https://crm.codeskate.com/data-deletion
+  </div>
+
+  <footer>
+    Codeskate CRM · Prepared for Meta App Review · Each business connects only its own Facebook Page and WhatsApp Business account (multi-tenant SaaS).
+  </footer>
+
+</div>
+</body>
+</html>
