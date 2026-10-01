@@ -133,13 +133,13 @@ export default function Workspace() {
       )}
 
       {/* ─── STATS GRID ─── */}
-      <div className="grid grid-cols-2 gap-2.5 mb-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-3 mb-3 app-stagger">
         <StatCard label="Pipeline" value={myLeads.length} tone="ink" />
         <StatCard label="New to call" value={newToCall.length} tone="info" />
         <StatCard label="Due today" value={followToday.length} tone="primary" icon={Clock} />
         <StatCard label="Overdue" value={overdue.length} tone="danger" icon={AlertTriangle} />
       </div>
-      <div className="grid grid-cols-3 gap-2.5 mb-4">
+      <div className="grid grid-cols-3 gap-2.5 mb-4 app-stagger">
         <StatCard label="Won" value={won} tone="ok" />
         <StatCard label="Rate" value={`${convRate}%`} tone="info" />
         <StatCard label="Rank" value={`#${rank}`} tone="signal" icon={Trophy} />

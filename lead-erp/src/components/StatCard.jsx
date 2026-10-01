@@ -37,13 +37,13 @@ export default function StatCard({ label, value, tone = "ink", icon: Icon, onCli
   return (
     <div
       onClick={onClick}
-      className={`card p-3.5 flex items-center gap-3 transition-transform duration-100 ${
+      className={`card p-3.5 flex items-center gap-3 ${
         onClick ? "cursor-pointer press-scale" : ""
       }`}
     >
       {/* Icon Circle */}
       {Icon && (
-        <div className={`w-9 h-9 ${t.bg} rounded-xl flex items-center justify-center shrink-0`}>
+        <div className={`w-9 h-9 ${t.bg} rounded-xl flex items-center justify-center shrink-0 ring-1 ring-black/[0.03]`}>
           <Icon size={17} strokeWidth={2.2} className={t.icon} />
         </div>
       )}
@@ -53,7 +53,7 @@ export default function StatCard({ label, value, tone = "ink", icon: Icon, onCli
         <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted truncate">
           {label}
         </p>
-        <p className={`text-xl font-display font-bold num leading-tight ${t.accent}`}>
+        <p className={`text-xl font-display font-bold num leading-tight tracking-tight ${t.accent}`}>
           {value}
         </p>
       </div>

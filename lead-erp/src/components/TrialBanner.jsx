@@ -17,8 +17,8 @@ export default function TrialBanner() {
           Trial ended. {isAdminish ? "Activate a plan." : "Contact admin."}
         </p>
         {isAdminish && (
-          <Link to="/admin/billing" className="text-xs font-bold text-danger-700 whitespace-nowrap press-scale">
-            Upgrade
+          <Link to="/admin/billing" className="inline-flex items-center gap-1 text-xs font-bold text-white bg-danger-600 hover:bg-danger-700 px-2.5 py-1.5 rounded-lg whitespace-nowrap press-scale transition-colors">
+            Upgrade <ArrowRight size={12} />
           </Link>
         )}
       </div>
@@ -29,15 +29,15 @@ export default function TrialBanner() {
     const urgent = trialDaysLeft <= 3;
     return (
       <div className={`rounded-xl px-3 py-2.5 mb-3 flex items-center gap-2.5 border ${
-        urgent ? "bg-warning-50 border-warning-200" : "bg-orange-50 border-orange-100"
+        urgent ? "bg-gradient-to-r from-warning-50 to-white border-warning-200" : "bg-gradient-to-r from-orange-50 to-white border-orange-100"
       }`}>
         <Clock size={16} className={urgent ? "text-warning-600" : "text-orange-500"} />
         <p className="text-xs text-ink-soft flex-1">
           <span className="font-bold text-ink">{trialDaysLeft}d</span> left · {planName}
         </p>
         {isAdminish && (
-          <Link to="/admin/billing" className="text-xs font-bold text-orange-600 whitespace-nowrap press-scale">
-            Upgrade
+          <Link to="/admin/billing" className="inline-flex items-center gap-1 text-xs font-bold text-white bg-gradient-orange shadow-button hover:shadow-button-hover px-2.5 py-1.5 rounded-lg whitespace-nowrap press-scale transition-shadow">
+            Upgrade <ArrowRight size={12} />
           </Link>
         )}
       </div>
