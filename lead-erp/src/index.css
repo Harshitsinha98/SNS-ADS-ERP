@@ -364,3 +364,210 @@
     }
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MARKETING SITE PRIMITIVES
+   ---------------------------------------------------------------------------
+   Two groups live here:
+
+   1. Classes that were already referenced throughout the markup but had no
+      definition anywhere (`texture-grain`, `pattern-dots`, `pattern-grid`).
+      They silently rendered as no-ops. They are defined now so the original
+      design intent actually shows up.
+
+      `texture-grain` is deliberately implemented with `background-image`
+      instead of an `::after` overlay: several call sites are not positioned
+      elements, and introducing `position: relative` there would re-anchor
+      their absolutely-positioned children and shift existing layouts.
+
+   2. New `mkt-*` primitives for the dark marketing surface. Everything is
+      namespaced so it cannot collide with the shared app components
+      (`.btn`, `.card`, `.eyebrow`, `.text-gradient`, …) which are used by
+      20+ screens across admin/employee/platform.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* Fine film grain. Sits in the components layer so an explicit
+     `bg-gradient-*` utility on the same element still wins. */
+  .texture-grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+}
+
+@layer utilities {
+  /* ── Texture overlays (for use on absolutely-positioned child divs) ───── */
+
+  /* Grain as a standalone overlay — full control, no background conflicts. */
+  .mkt-grain {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+    opacity: 0.4;
+    mix-blend-mode: overlay;
+  }
+
+  /* Dot matrix — tuned for light surfaces (its existing call sites). */
+  .pattern-dots {
+    background-image: radial-gradient(rgba(122, 106, 88, 0.28) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* Line grid — tuned for dark surfaces (its existing call sites). */
+  .pattern-grid {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  /* Line grid for light surfaces. */
+  .pattern-grid-ink {
+    background-image:
+      linear-gradient(to right, rgba(42, 33, 26, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(42, 33, 26, 0.06) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  /* Grid that dissolves toward the bottom — keeps hero sections from
+     looking like graph paper. */
+  .mkt-grid-fade {
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(110% 80% at 50% 0%, #000 25%, transparent 75%);
+    -webkit-mask-image: radial-gradient(110% 80% at 50% 0%, #000 25%, transparent 75%);
+  }
+
+  /* ── Dark surface primitives ──────────────────────────────────────────── */
+
+  /* The page canvas: warm near-black with a soft ember bloom up top. */
+  .mkt-canvas {
+    background-color: #0F0C0A;
+    background-image:
+      radial-gradient(120% 90% at 50% -10%, rgba(255, 107, 26, 0.16) 0%, rgba(255, 107, 26, 0) 55%),
+      radial-gradient(80% 60% at 85% 10%, rgba(199, 78, 36, 0.10) 0%, rgba(199, 78, 36, 0) 60%);
+    background-repeat: no-repeat;
+  }
+
+  /* Frosted card with a hairline edge. */
+  .mkt-card {
+    background-color: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: background-color 0.3s ease, border-color 0.3s ease,
+                transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .mkt-card-hover:hover {
+    background-color: rgba(255, 255, 255, 0.065);
+    border-color: rgba(255, 138, 61, 0.32);
+    transform: translateY(-4px);
+    box-shadow: 0 18px 50px -18px rgba(255, 107, 26, 0.3);
+  }
+
+  /* Top-edge highlight — the detail that sells "premium" on dark cards. */
+  .mkt-sheen {
+    position: relative;
+  }
+  .mkt-sheen::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.28) 50%,
+      transparent 100%
+    );
+    pointer-events: none;
+  }
+
+  /* Gradient text that stays legible on a dark canvas. */
+  .mkt-text-gradient {
+    background-image: linear-gradient(100deg, #FFAC70 0%, #FF6B1A 55%, #FF8A3D 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Small caps label for dark sections. */
+  .mkt-eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #FFAC70;
+  }
+
+  /* Pill chip used for section badges. */
+  .mkt-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background-color: rgba(255, 255, 255, 0.05);
+    padding: 0.375rem 0.875rem;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Solid ember CTA for dark backgrounds. */
+  .mkt-btn-ember {
+    background-image: linear-gradient(135deg, #FF8A3D 0%, #F04E00 100%);
+    color: #fff;
+    box-shadow: 0 10px 30px -10px rgba(240, 78, 0, 0.6);
+    transition: box-shadow 0.25s ease, transform 0.25s ease, filter 0.25s ease;
+  }
+  .mkt-btn-ember:hover {
+    box-shadow: 0 16px 44px -12px rgba(240, 78, 0, 0.75);
+    transform: translateY(-2px);
+    filter: brightness(1.06);
+  }
+  .mkt-btn-ember:active {
+    transform: translateY(0) scale(0.99);
+  }
+
+  /* Secondary glass CTA for dark backgrounds. */
+  .mkt-btn-glass {
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #E8E5E2;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background-color 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+  }
+  .mkt-btn-glass:hover {
+    background-color: rgba(255, 255, 255, 0.11);
+    border-color: rgba(255, 255, 255, 0.28);
+    transform: translateY(-2px);
+  }
+  .mkt-btn-glass:active {
+    transform: translateY(0) scale(0.99);
+  }
+
+  /* Ambient colour blooms. Pair with `animate-blob` / `animate-aurora`. */
+  .mkt-bloom {
+    border-radius: 9999px;
+    filter: blur(80px);
+    pointer-events: none;
+  }
+
+  /* Hairline divider that fades at both ends. */
+  .mkt-rule {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.14) 50%,
+      transparent
+    );
+  }
+
+  /* Edge-fade for horizontally scrolling / ticker rows. */
+  .mkt-edge-fade {
+    mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  }
+}
