@@ -198,7 +198,7 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen mkt-canvas text-midnight-100 flex flex-col lg:flex-row">
+    <div className="min-h-screen mkt-canvas text-midnight-100 flex flex-col lg:flex-row overflow-x-hidden">
       {/* LEFT brand panel — Premium showcase */}
       <div className="relative lg:w-[45%] bg-midnight-950 texture-grain overflow-hidden border-r border-white/[0.07] hidden lg:flex flex-col justify-between p-10 xl:p-14">
         {/* Animated background elements */}
