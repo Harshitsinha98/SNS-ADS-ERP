@@ -3,13 +3,13 @@
   "appName": "Codeskate CRM",
   "webDir": "dist",
   "android": {
-    "backgroundColor": "#1a1a2e",
+    "backgroundColor": "#0F0C0A",
     "allowMixedContent": true
   },
   "plugins": {
     "StatusBar": {
       "style": "LIGHT",
-      "backgroundColor": "#1a1a2e"
+      "backgroundColor": "#0F0C0A"
     }
   }
 }
