@@ -174,7 +174,7 @@ export default function Dashboard() {
 
       {/* ═══ TODAY'S PULSE ═══ */}
       <SectionLabel icon={Flame} text="Today's Pulse" />
-      <div className="grid grid-cols-2 gap-2.5 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-3 mb-4 app-stagger">
         <PulseCard label="New Today" value={m.newToday} icon={UserPlus} tone="primary" onClick={() => navigate("/admin/leads")} />
         <PulseCard label="Due Today" value={m.dueToday.length} icon={CalendarClock} tone="info" onClick={() => navigate("/admin/follow-ups")} />
         <PulseCard label="Overdue" value={m.overdue.length} icon={CalendarX2} tone={m.overdue.length > 0 ? "danger" : "ok"} onClick={() => navigate("/admin/follow-ups")} />
@@ -183,7 +183,7 @@ export default function Dashboard() {
 
       {/* ═══ PIPELINE HEALTH ═══ */}
       <SectionLabel icon={Target} text="Pipeline" />
-      <div className="grid grid-cols-2 gap-2.5 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 lg:gap-3 mb-4 app-stagger">
         <PulseCard label="Active" value={m.open} icon={Layers} tone="primary" sub={`of ${m.total}`} onClick={() => navigate("/admin/leads")} />
         <PulseCard label="Conv. Rate" value={`${m.conversionRate}%`} icon={TrendingUp} tone="ok" sub={`${m.won} won`} />
         <PulseCard label="Avg Close" value={m.avgDaysToClose || "—"} icon={Timer} tone="signal" sub="days" />
@@ -429,13 +429,15 @@ export default function Dashboard() {
 
 function SectionLabel({ icon: Icon, text, action }) {
   return (
-    <div className="flex items-center justify-between mb-2 mt-1">
-      <div className="flex items-center gap-1.5">
-        <Icon size={13} className="text-orange-500" />
+    <div className="flex items-center justify-between mb-2.5 mt-2">
+      <div className="flex items-center gap-2">
+        <span className="w-5 h-5 rounded-md bg-orange-100 flex items-center justify-center">
+          <Icon size={12} className="text-orange-600" />
+        </span>
         <h2 className="section-title">{text}</h2>
       </div>
       {action && (
-        <Link to={action.to} className="text-[11px] font-semibold text-orange-600 flex items-center gap-0.5 press-scale">
+        <Link to={action.to} className="text-[11px] font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-0.5 press-scale transition-colors">
           {action.label} <ChevronRight size={11} />
         </Link>
       )}
@@ -444,12 +446,12 @@ function SectionLabel({ icon: Icon, text, action }) {
 }
 
 const TONES = {
-  primary: { bg: "bg-orange-50", fg: "text-orange-600", accent: "text-orange-700" },
-  ok: { bg: "bg-success-50", fg: "text-success-600", accent: "text-success-700" },
-  danger: { bg: "bg-danger-50", fg: "text-danger-600", accent: "text-danger-700" },
-  warn: { bg: "bg-amber-50", fg: "text-amber-600", accent: "text-amber-700" },
-  info: { bg: "bg-blue-50", fg: "text-blue-600", accent: "text-blue-700" },
-  signal: { bg: "bg-purple-50", fg: "text-purple-600", accent: "text-purple-700" },
+  primary: { bg: "bg-orange-50", fg: "text-orange-600", accent: "text-orange-700", wash: "from-orange-50/80", bar: "bg-orange-400" },
+  ok: { bg: "bg-success-50", fg: "text-success-600", accent: "text-success-700", wash: "from-success-50/80", bar: "bg-success-400" },
+  danger: { bg: "bg-danger-50", fg: "text-danger-600", accent: "text-danger-700", wash: "from-danger-50/80", bar: "bg-danger-400" },
+  warn: { bg: "bg-amber-50", fg: "text-amber-600", accent: "text-amber-700", wash: "from-amber-50/80", bar: "bg-amber-400" },
+  info: { bg: "bg-blue-50", fg: "text-blue-600", accent: "text-blue-700", wash: "from-blue-50/80", bar: "bg-blue-400" },
+  signal: { bg: "bg-purple-50", fg: "text-purple-600", accent: "text-purple-700", wash: "from-purple-50/80", bar: "bg-purple-400" },
 };
 
 function PulseCard({ label, value, icon: Icon, tone = "primary", sub, onClick, className = "" }) {
@@ -458,13 +460,14 @@ function PulseCard({ label, value, icon: Icon, tone = "primary", sub, onClick, c
   return (
     <div
       onClick={onClick}
-      className={`card p-3 transition-transform duration-100 ${onClick ? "press-scale cursor-pointer" : ""} ${className}`}
+      className={`card relative p-3 bg-gradient-to-br ${t.wash} to-white ${onClick ? "press-scale cursor-pointer" : ""} ${className}`}
     >
-      <div className={`w-8 h-8 ${t.bg} rounded-lg flex items-center justify-center mb-2`}>
+      <span className={`absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full ${t.bar} opacity-70`} />
+      <div className={`w-8 h-8 ${t.bg} rounded-lg flex items-center justify-center mb-2 ring-1 ring-black/[0.03]`}>
         <Icon size={15} strokeWidth={2.2} className={t.fg} />
       </div>
       <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-muted mb-0.5 truncate">{label}</p>
-      <p className={`text-lg font-display font-bold num leading-tight ${t.accent}`}>{value}</p>
+      <p className={`text-xl font-display font-bold num leading-tight tracking-tight ${t.accent}`}>{value}</p>
       {sub && <p className="text-[10px] text-ink-muted mt-0.5 truncate">{sub}</p>}
     </div>
   );
@@ -487,13 +490,13 @@ function ActionList({ title, items, to }) {
           <Link
             key={it.key}
             to={it.link}
-            className={`flex items-center justify-between rounded-xl border px-3 py-2.5 press-scale ${toneMap[it.tone] || toneMap.info}`}
+            className={`flex items-center justify-between rounded-xl border px-3 py-2.5 press-scale transition-all hover:shadow-card hover:-translate-y-px ${toneMap[it.tone] || toneMap.info}`}
           >
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-ink truncate">{it.primary}</p>
               <p className="text-[10px] text-ink-muted truncate">{it.secondary}</p>
             </div>
-            <span className="text-[10px] font-mono font-semibold whitespace-nowrap ml-2">{it.badge}</span>
+            <span className="text-[10px] font-mono font-semibold whitespace-nowrap ml-2 px-1.5 py-0.5 rounded-md bg-white/70">{it.badge}</span>
           </Link>
         ))}
       </div>

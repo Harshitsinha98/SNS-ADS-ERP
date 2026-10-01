@@ -43,21 +43,21 @@ export default function Layout({ children, title, showBack = false, onBack }) {
             {showBack ? (
               <button
                 onClick={onBack || (() => navigate(-1))}
-                className="w-9 h-9 flex items-center justify-center rounded-full tap-highlight"
+                className="w-9 h-9 flex items-center justify-center rounded-full tap-highlight transition-colors hover:bg-cream-100"
               >
                 <ArrowLeft size={20} className="text-ink" />
               </button>
             ) : (
               <button
                 onClick={() => setDrawerOpen(true)}
-                className="w-9 h-9 flex items-center justify-center rounded-full tap-highlight"
+                className="w-9 h-9 flex items-center justify-center rounded-full tap-highlight transition-colors hover:bg-cream-100"
               >
                 <Menu size={20} className="text-ink" />
               </button>
             )}
 
             {/* Title */}
-            <h1 className="text-base font-display font-bold text-ink truncate max-w-[180px]">
+            <h1 className="text-base font-display font-bold tracking-tight text-ink truncate max-w-[180px]">
               {title}
             </h1>
           </div>
@@ -66,7 +66,7 @@ export default function Layout({ children, title, showBack = false, onBack }) {
           <div className="flex items-center gap-1">
             <button
               onClick={() => setSearchOpen(!searchOpen)}
-              className="w-9 h-9 flex items-center justify-center rounded-full tap-highlight"
+              className="w-9 h-9 flex items-center justify-center rounded-full tap-highlight transition-colors hover:bg-cream-100"
             >
               <Search size={18} className="text-ink-soft" />
             </button>
@@ -96,12 +96,12 @@ export default function Layout({ children, title, showBack = false, onBack }) {
 
             {/* Search Results */}
             {results.length > 0 && (
-              <div className="mt-2 bg-white rounded-xl border border-cream-200 shadow-card overflow-hidden">
+              <div className="mt-2 bg-white rounded-xl border border-cream-200 shadow-card-hover overflow-hidden animate-scale-in">
                 {results.map((l) => (
                   <button
                     key={l.id}
                     onClick={() => goToLead(l)}
-                    className="list-item w-full text-left border-b border-cream-100 last:border-0"
+                    className="list-item w-full text-left border-b border-cream-100 last:border-0 hover:bg-cream-50"
                   >
                     <div className="avatar-sm">
                       {(l.name || "?")[0].toUpperCase()}
@@ -123,7 +123,7 @@ export default function Layout({ children, title, showBack = false, onBack }) {
 
       {/* ─── MAIN CONTENT ─── */}
       <main className="app-content">
-        <div className="px-4 pt-3 pb-2">
+        <div className="px-4 pt-3 pb-2 lg:px-8 lg:max-w-6xl lg:mx-auto app-page-enter">
           <TrialBanner />
           {children}
         </div>
