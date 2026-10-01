@@ -10,8 +10,9 @@ import {
 import MarketingNav from "../../components/marketing/MarketingNav";
 import MarketingFooter from "../../components/marketing/MarketingFooter";
 import AIChatWidget from "../../components/marketing/AIChatWidget";
+import HeroShowcase from "../../components/marketing/HeroShowcase";
 import {
-  Reveal, Stagger, StaggerItem, CountUp, PointerGlow, motion,
+  Reveal, Stagger, StaggerItem, CountUp, PointerGlow, motion, useReducedMotion,
 } from "../../components/marketing/Motion";
 import { TRIAL_DAYS } from "../../data/plans";
 
@@ -200,6 +201,21 @@ const FOMO_COUNTERS = [
   { label: "businesses growing with us", value: "180+" },
 ];
 
+/* Marquee under the hero. Every entry is a capability that exists in the
+   feature set below — nothing aspirational. */
+const HERO_TICKER = [
+  "WhatsApp Business API",
+  "AI Auto-Reply",
+  "Bridge Calling",
+  "AI Voice Bot",
+  "Workflow Automation",
+  "Native Call Tracking",
+  "SLA Escalation",
+  "Live Analytics",
+  "Multi-Org Support",
+  "Knowledge Base Training",
+];
+
 /* The cost-of-slow-response grid. */
 const REALITY_COSTS = [
   { problem: "30+ min reply time", cost: "Up to 40% leads lost", icon: Clock },
@@ -269,13 +285,25 @@ const EASE = [0.22, 1, 0.36, 1];
 
 export default function Landing() {
   const navigate = useNavigate();
+  const reduce = useReducedMotion();
+
+  // Hero entrance props, collapsed to a no-op when reduced motion is on.
+  // These run on mount rather than on scroll, so <Reveal>'s guard doesn't cover them.
+  const intro = (delay, y = 20) =>
+    reduce
+      ? {}
+      : {
+          initial: { opacity: 0, y },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.7, delay, ease: EASE },
+        };
 
   return (
     <div className="min-h-screen mkt-canvas text-midnight-100 overflow-x-hidden">
       <MarketingNav />
 
       {/* ═══════════ HERO ═══════════ */}
-      <section className="relative pt-32 pb-24 sm:pt-44 sm:pb-32 overflow-hidden">
+      <section className="relative pt-32 pb-20 sm:pt-40 sm:pb-24 overflow-hidden">
         {/* Ambient structure */}
         <div className="absolute inset-0 mkt-grid-fade pointer-events-none" />
         <div className="absolute inset-0 mkt-grain pointer-events-none" />
@@ -287,107 +315,154 @@ export default function Landing() {
         />
         <PointerGlow size={620} />
 
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="mkt-chip mb-7"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-            </span>
-            <span className="text-xs font-semibold text-midnight-100">
-              Trusted by 180+ businesses across India — since 2024
-            </span>
-          </motion.div>
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
+          {/* ── Headline ── */}
+          <div className="text-center max-w-4xl mx-auto">
+            <motion.div {...intro(0, 14)} className="mkt-chip mb-7">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+              </span>
+              <span className="text-xs font-semibold text-midnight-100">
+                Trusted by 180+ businesses across India — since 2024
+              </span>
+            </motion.div>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.75, delay: 0.08, ease: EASE }}
-            className="font-display font-bold text-[2.6rem] leading-[1.04] sm:text-6xl lg:text-[4.75rem] tracking-[-0.03em] text-white mb-7"
-          >
-            Reply to every lead in{" "}
-            <span className="mkt-text-gradient">3 seconds</span>.
-            <br />
-            <span className="text-midnight-300">Close more deals.</span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.16, ease: EASE }}
-            className="text-lg sm:text-xl text-midnight-200/80 max-w-2xl mx-auto mb-6 leading-relaxed"
-          >
-            Codeskate CRM captures WhatsApp leads, auto-assigns them to your team, and
-            replies using AI — in <strong className="text-white font-semibold">3 seconds flat</strong>.
-            Your sales pipeline runs <strong className="text-white font-semibold">24/7</strong>, even
-            when your team is offline.
-          </motion.p>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.24 }}
-            className="text-sm text-midnight-300/75 mb-9 flex items-center justify-center gap-2.5 flex-wrap"
-          >
-            <span className="inline-flex -space-x-2">
-              {["V", "A", "R", "P", "S"].map((l) => (
-                <span
-                  key={l}
-                  className="w-7 h-7 rounded-full bg-gradient-orange ring-2 ring-midnight-900 flex items-center justify-center text-[10px] font-bold text-white"
+            <motion.h1
+              {...intro(0.08, 24)}
+              className="font-display font-bold text-[2.85rem] leading-[1.04] sm:text-[4.2rem] sm:leading-[0.99] lg:text-[5.25rem] tracking-[-0.035em] text-white mb-7"
+            >
+              Reply to every lead in{" "}
+              <span className="relative inline-block whitespace-nowrap">
+                <span className="mkt-text-gradient">3 seconds</span>
+                {/* Underline draws itself in just after the headline settles. */}
+                <svg
+                  className="absolute -bottom-1 left-0 w-full h-[0.26em] overflow-visible"
+                  viewBox="0 0 200 14"
+                  fill="none"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
                 >
-                  {l}
-                </span>
-              ))}
-            </span>
-            <span>
-              Businesses using Codeskate reply{" "}
-              <strong className="text-orange-300 font-semibold">100x faster</strong> — see what
-              that does to conversions.
-            </span>
-          </motion.p>
+                  <motion.path
+                    d="M3 10.5C42 3.5 96 1.5 197 6"
+                    stroke="url(#heroUnderline)"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    initial={reduce ? false : { pathLength: 0, opacity: 0 }}
+                    animate={{ pathLength: 1, opacity: 1 }}
+                    transition={{ duration: 0.9, delay: 0.7, ease: EASE }}
+                  />
+                  <defs>
+                    <linearGradient
+                      id="heroUnderline"
+                      x1="0"
+                      y1="0"
+                      x2="200"
+                      y2="0"
+                      gradientUnits="userSpaceOnUse"
+                    >
+                      <stop stopColor="#FFAC70" />
+                      <stop offset="0.55" stopColor="#FF6B1A" />
+                      <stop offset="1" stopColor="#FF8A3D" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </span>
+              .
+              <br />
+              <span className="text-midnight-300">Close more deals.</span>
+            </motion.h1>
 
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.3, ease: EASE }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-7"
-          >
-            <button
-              onClick={() => navigate("/signup")}
-              className="btn mkt-btn-ember text-base px-8 py-4 w-full sm:w-auto font-semibold"
+            <motion.p
+              {...intro(0.16, 18)}
+              className="text-lg sm:text-xl text-midnight-200/80 max-w-2xl mx-auto mb-6 leading-relaxed"
             >
-              <Rocket size={18} />
-              Get Started — {TRIAL_DAYS} Days Free
-              <ArrowRight size={18} />
-            </button>
-            <button
-              onClick={() => navigate("/pricing")}
-              className="btn mkt-btn-glass text-base px-7 py-3.5 w-full sm:w-auto font-semibold"
-            >
-              View Pricing
-            </button>
-          </motion.div>
+              Codeskate CRM captures WhatsApp leads, auto-assigns them to your team, and
+              replies using AI — in <strong className="text-white font-semibold">3 seconds flat</strong>.
+              Your sales pipeline runs <strong className="text-white font-semibold">24/7</strong>, even
+              when your team is offline.
+            </motion.p>
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-            className="text-sm text-midnight-300/70 flex items-center justify-center gap-5 flex-wrap"
-          >
-            <span className="flex items-center gap-1.5">
-              <Check size={14} className="text-emerald-400" strokeWidth={3} /> No credit card
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Check size={14} className="text-emerald-400" strokeWidth={3} /> 2 min setup
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Check size={14} className="text-emerald-400" strokeWidth={3} /> Cancel anytime
-            </span>
-          </motion.p>
+            <motion.p
+              {...intro(0.24, 0)}
+              className="text-sm text-midnight-300/75 mb-9 flex items-center justify-center gap-2.5 flex-wrap"
+            >
+              <span className="inline-flex -space-x-2">
+                {["V", "A", "R", "P", "S"].map((l) => (
+                  <span
+                    key={l}
+                    className="w-7 h-7 rounded-full bg-gradient-orange ring-2 ring-midnight-900 flex items-center justify-center text-[10px] font-bold text-white"
+                  >
+                    {l}
+                  </span>
+                ))}
+              </span>
+              <span>
+                Businesses using Codeskate reply{" "}
+                <strong className="text-orange-300 font-semibold">100x faster</strong> — see what
+                that does to conversions.
+              </span>
+            </motion.p>
+
+            <motion.div
+              {...intro(0.3, 16)}
+              className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-7"
+            >
+              <button
+                onClick={() => navigate("/signup")}
+                className="btn mkt-btn-ember text-base px-8 py-4 w-full sm:w-auto font-semibold"
+              >
+                <Rocket size={18} />
+                Get Started — {TRIAL_DAYS} Days Free
+                <ArrowRight size={18} />
+              </button>
+              <button
+                onClick={() => navigate("/pricing")}
+                className="btn mkt-btn-glass text-base px-7 py-3.5 w-full sm:w-auto font-semibold"
+              >
+                View Pricing
+              </button>
+            </motion.div>
+
+            <motion.p
+              {...intro(0.38, 0)}
+              className="text-sm text-midnight-300/70 flex items-center justify-center gap-5 flex-wrap"
+            >
+              <span className="flex items-center gap-1.5">
+                <Check size={14} className="text-emerald-400" strokeWidth={3} /> No credit card
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Check size={14} className="text-emerald-400" strokeWidth={3} /> 2 min setup
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Check size={14} className="text-emerald-400" strokeWidth={3} /> Cancel anytime
+              </span>
+            </motion.p>
+          </div>
+
+          {/* ── Product panel: the promise, playing out live ── */}
+          <div className="mt-16 sm:mt-20">
+            <HeroShowcase />
+          </div>
+
+          {/* ── Capability marquee ── */}
+          <div className="mt-20 sm:mt-24">
+            <p className="text-center text-[11px] font-bold uppercase tracking-[0.16em] text-midnight-400 mb-6">
+              One platform, every channel
+            </p>
+            <div className="mkt-edge-fade overflow-hidden">
+              <div className={`flex w-max gap-3 ${reduce ? "flex-wrap justify-center" : "animate-ticker"}`}>
+                {(reduce ? HERO_TICKER : [...HERO_TICKER, ...HERO_TICKER]).map((t, i) => (
+                  <span
+                    key={`${t}-${i}`}
+                    className="shrink-0 rounded-full border border-white/[0.09] bg-white/[0.03] px-4 py-2 text-xs font-medium text-midnight-200/80"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

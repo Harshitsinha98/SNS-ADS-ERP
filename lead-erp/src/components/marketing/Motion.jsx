@@ -72,8 +72,8 @@ export function StaggerItem({ children, className = "" }) {
   );
 }
 
-/** Re-export motion for ad-hoc use in pages. */
-export { motion };
+/** Re-export motion (and the reduced-motion hook) for ad-hoc use in pages. */
+export { motion, useReducedMotion };
 
 /* ───────────────────────────────────────────────────────────────────────────
    Additional helpers for the dark marketing surface.
