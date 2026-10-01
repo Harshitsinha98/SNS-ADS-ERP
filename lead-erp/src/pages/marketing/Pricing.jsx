@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Check, X, ArrowRight, Sparkles, ChevronDown, PhoneForwarded, Bot, Wallet } from "lucide-react";
 import MarketingNav from "../../components/marketing/MarketingNav";
 import MarketingFooter from "../../components/marketing/MarketingFooter";
-import { Reveal } from "../../components/marketing/Motion";
+import { Reveal, Stagger, StaggerItem, PointerGlow, motion } from "../../components/marketing/Motion";
 import { TRIAL_DAYS, mergePlansWithConfig } from "../../data/plans";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
 
@@ -27,6 +27,17 @@ const VOICE_PACKS = [
     desc: "AI calls, qualifies in Hindi & English, and warm-transfers hot leads to an available agent.",
     plan: "Available on Scale & up",
   },
+];
+
+const INCLUDED_EVERYWHERE = [
+  "Unlimited team invites",
+  "WhatsApp integration",
+  "Mobile app access",
+  "Bank-level security",
+  "Real-time sync",
+  "Data export",
+  "Email support",
+  "Free updates",
 ];
 
 const SALES_WHATSAPP_NUMBER = (import.meta.env.VITE_SALES_WHATSAPP_NUMBER || "919653043939").replace(/\D/g, "");
@@ -61,43 +72,46 @@ function PlanCard({ plan, cycle, onSelect }) {
 
   return (
     <div
-      className={`relative rounded-3xl p-7 flex flex-col transition-all duration-300 ${
+      className={`relative h-full rounded-3xl p-7 flex flex-col transition-all duration-300 overflow-hidden ${
         plan.popular
-          ? "bg-ink text-cream-100 shadow-glow-lg scale-[1.02] lg:-translate-y-3 texture-grain"
-          : "bg-white border border-cream-300/60 shadow-card hover:shadow-card-hover hover:-translate-y-1"
+          ? "bg-white/[0.07] border border-orange-400/40 shadow-[0_0_70px_-20px_rgba(255,107,26,0.5)] lg:-translate-y-3"
+          : "mkt-card mkt-card-hover"
       }`}
     >
       {plan.popular && (
-        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-orange text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-glow flex items-center gap-1.5 whitespace-nowrap">
-          <Sparkles size={13} />
-          MOST POPULAR
-        </div>
+        <>
+          <div className="absolute -top-20 left-1/2 -translate-x-1/2 w-64 h-40 bg-orange-500/25 mkt-bloom" />
+          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-gradient-orange text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-glow flex items-center gap-1.5 whitespace-nowrap z-10">
+            <Sparkles size={13} />
+            MOST POPULAR
+          </div>
+        </>
       )}
 
-      <div className="mb-5">
-        <h3 className={`font-display font-bold text-xl mb-1 ${plan.popular ? "text-white" : "text-ink"}`}>
-          {plan.name}
-        </h3>
-        <p className={`text-sm ${plan.popular ? "text-cream-300/80" : "text-ink-muted"}`}>
-          {plan.tagline}
-        </p>
+      <div className="relative mb-5">
+        <h3 className="font-display font-bold text-xl mb-1 text-white">{plan.name}</h3>
+        <p className="text-sm text-midnight-300/75">{plan.tagline}</p>
       </div>
 
-      <div className="mb-6">
+      <div className="relative mb-6">
         <div className="flex items-end gap-1">
-          <span className={`font-display font-bold text-4xl ${plan.popular ? "text-orange-400" : "text-ink"}`}>
+          <span
+            className={`font-display font-bold text-4xl tracking-[-0.02em] ${
+              plan.popular ? "mkt-text-gradient" : "text-white"
+            }`}
+          >
             ₹{price.toLocaleString("en-IN")}
           </span>
-          <span className={`text-sm mb-1.5 ${plan.popular ? "text-cream-300/70" : "text-ink-muted"}`}>
+          <span className="text-sm mb-1.5 text-midnight-400">
             /{cycle === "monthly" ? "mo" : "yr"}
           </span>
         </div>
         {cycle === "yearly" ? (
-          <p className="text-xs text-success-500 font-semibold mt-1">
+          <p className="text-xs text-emerald-400 font-semibold mt-1.5">
             Save ₹{yearlySaving.toLocaleString("en-IN")} a year
           </p>
         ) : (
-          <p className={`text-xs mt-1 ${plan.popular ? "text-cream-300/60" : "text-ink-muted"}`}>
+          <p className="text-xs mt-1.5 text-midnight-400">
             {plan.includedSeats < 0 ? "Unlimited" : plan.includedSeats} seats included
           </p>
         )}
@@ -105,34 +119,44 @@ function PlanCard({ plan, cycle, onSelect }) {
 
       <button
         onClick={() => onSelect(plan)}
-        className={`btn w-full mb-6 ${
-          plan.popular
-            ? "bg-gradient-orange text-white shadow-button hover:shadow-button-hover hover:-translate-y-0.5"
-            : "btn-secondary"
+        className={`btn relative w-full mb-6 font-semibold ${
+          plan.popular ? "mkt-btn-ember" : "mkt-btn-glass"
         }`}
       >
         {plan.trial ? "Start free trial" : "Get started"}
         <ArrowRight size={16} />
       </button>
       {plan.trial ? (
-        <p className="text-center text-xs text-success-600 -mt-4 mb-5 font-medium">7-day free trial included</p>
+        <p className="relative text-center text-xs text-emerald-400 -mt-4 mb-5 font-medium">
+          7-day free trial included
+        </p>
       ) : (
-        <p className="text-center text-xs text-ink-muted -mt-4 mb-5">Paid plan · no trial</p>
+        <p className="relative text-center text-xs text-midnight-400 -mt-4 mb-5">
+          Paid plan · no trial
+        </p>
       )}
 
-      <ul className="space-y-3 mt-auto">
+      <ul className="relative space-y-3 mt-auto">
         {plan.features.map((f, i) => (
           <li key={i} className="flex items-start gap-2.5 text-sm">
             {f.included ? (
-              <span className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${plan.popular ? "bg-orange-500/20" : "bg-success-100"}`}>
-                <Check size={12} className={plan.popular ? "text-orange-400" : "text-success-600"} strokeWidth={3} />
+              <span
+                className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                  plan.popular ? "bg-orange-500/20" : "bg-emerald-500/15"
+                }`}
+              >
+                <Check
+                  size={12}
+                  className={plan.popular ? "text-orange-300" : "text-emerald-400"}
+                  strokeWidth={3}
+                />
               </span>
             ) : (
-              <span className="mt-0.5 w-5 h-5 rounded-full bg-cream-200/50 flex items-center justify-center shrink-0">
-                <X size={12} className="text-ink-muted/50" strokeWidth={3} />
+              <span className="mt-0.5 w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0">
+                <X size={12} className="text-midnight-500" strokeWidth={3} />
               </span>
             )}
-            <span className={f.included ? (plan.popular ? "text-cream-100" : "text-ink-soft") : (plan.popular ? "text-cream-300/40" : "text-ink-muted/60")}>
+            <span className={f.included ? "text-midnight-200/85" : "text-midnight-400/60"}>
               {f.text}
             </span>
           </li>
@@ -145,19 +169,22 @@ function PlanCard({ plan, cycle, onSelect }) {
 function FaqItem({ q, a }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="bg-white rounded-2xl border border-cream-300/60 overflow-hidden shadow-card">
+    <div className="mkt-card mkt-sheen rounded-2xl overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left"
+        className="w-full flex items-center justify-between gap-4 px-6 py-5 text-left transition-colors hover:bg-white/[0.03]"
+        aria-expanded={open}
       >
-        <span className="font-semibold text-ink">{q}</span>
+        <span className="font-semibold text-white">{q}</span>
         <ChevronDown
           size={20}
-          className={`text-orange-500 shrink-0 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+          className={`text-orange-400 shrink-0 transition-transform duration-300 ${
+            open ? "rotate-180" : ""
+          }`}
         />
       </button>
       {open && (
-        <div className="px-6 pb-5 text-ink-soft text-sm leading-relaxed animate-fade-in">
+        <div className="px-6 pb-5 text-midnight-200/75 text-sm leading-relaxed animate-fade-in">
           {a}
         </div>
       )}
@@ -183,180 +210,231 @@ export default function Pricing() {
   };
 
   return (
-    <div className="min-h-screen bg-cream-100 overflow-x-hidden">
+    <div className="min-h-screen mkt-canvas text-midnight-100 overflow-x-hidden">
       <MarketingNav />
 
       {/* ===== HERO ===== */}
-      <section className="relative pt-32 pb-16 sm:pt-40 texture-grain">
-        <div className="absolute top-24 -right-16 w-80 h-80 bg-orange-300/25 rounded-full blur-3xl animate-blob pointer-events-none" />
-        <div className="absolute inset-0 pattern-dots opacity-50 pointer-events-none" />
+      <section className="relative pt-32 pb-16 sm:pt-40 overflow-hidden">
+        <div className="absolute inset-0 mkt-grid-fade pointer-events-none" />
+        <div className="absolute inset-0 mkt-grain pointer-events-none" />
+        <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-[40rem] h-80 bg-orange-500/18 mkt-bloom animate-aurora" />
+        <div className="absolute top-24 -right-16 w-80 h-80 bg-ember-500/12 mkt-bloom animate-blob" />
+        <PointerGlow size={560} />
+
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-center">
-          <div className="inline-flex items-center gap-2 bg-white/70 backdrop-blur border border-orange-200 rounded-full px-4 py-1.5 mb-6 shadow-sm">
-            <Sparkles size={14} className="text-orange-500" />
-            <span className="text-xs font-semibold text-ember-700">
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="mkt-chip mb-7"
+          >
+            <Sparkles size={14} className="text-orange-400" />
+            <span className="text-xs font-semibold text-midnight-100">
               {TRIAL_DAYS} days free · No credit card
             </span>
-          </div>
-          <h1 className="font-display font-bold text-4xl sm:text-6xl text-ink mb-5 leading-tight">
-            Simple, transparent <span className="text-gradient">pricing</span>
-          </h1>
-          <p className="text-lg text-ink-soft mb-10">
-            Pick the plan that fits your team. Every plan starts with a {TRIAL_DAYS}-day
-            free trial — upgrade, downgrade, or cancel anytime.
-          </p>
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+            className="font-display font-bold text-[2.6rem] sm:text-6xl tracking-[-0.03em] text-white mb-6 leading-[1.06]"
+          >
+            Simple, transparent <span className="mkt-text-gradient">pricing</span>
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            className="text-lg text-midnight-200/80 mb-10 leading-relaxed"
+          >
+            Pick the plan that fits your team. Every plan starts with a {TRIAL_DAYS}-day free
+            trial — upgrade, downgrade, or cancel anytime.
+          </motion.p>
 
           {/* Billing toggle */}
-          <div className="inline-flex items-center bg-white rounded-full p-1.5 border border-cream-300/70 shadow-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.24, ease: [0.22, 1, 0.36, 1] }}
+            className="inline-flex items-center rounded-full p-1.5 border border-white/[0.1] bg-white/[0.04] backdrop-blur"
+          >
             <button
               onClick={() => setCycle("monthly")}
-              className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all ${
-                cycle === "monthly" ? "bg-gradient-orange text-white shadow-sm" : "text-ink-soft hover:text-orange-600"
+              className={`mkt-touch px-6 py-2.5 rounded-full text-sm font-semibold transition-all inline-flex items-center justify-center ${
+                cycle === "monthly"
+                  ? "bg-gradient-orange text-white shadow-glow"
+                  : "text-midnight-200/75 hover:text-white"
               }`}
             >
               Monthly
             </button>
             <button
               onClick={() => setCycle("yearly")}
-              className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center gap-2 ${
-                cycle === "yearly" ? "bg-gradient-orange text-white shadow-sm" : "text-ink-soft hover:text-orange-600"
+              className={`mkt-touch px-6 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                cycle === "yearly"
+                  ? "bg-gradient-orange text-white shadow-glow"
+                  : "text-midnight-200/75 hover:text-white"
               }`}
             >
               Yearly
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cycle === "yearly" ? "bg-white/25 text-white" : "bg-success-100 text-success-700"}`}>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  cycle === "yearly"
+                    ? "bg-white/25 text-white"
+                    : "bg-emerald-500/15 text-emerald-300"
+                }`}
+              >
                 SAVE 17%
               </span>
             </button>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ===== PLANS ===== */}
       <section className="pb-20 sm:pb-28">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-3 gap-6 lg:gap-8 items-center">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
           {PLANS.map((plan) => (
             <PlanCard key={plan.id} plan={plan} cycle={cycle} onSelect={selectPlan} />
           ))}
         </div>
 
-        <p className="text-center text-sm text-ink-muted mt-10 px-4">
+        <p className="text-center text-sm text-midnight-300/75 mt-12 px-4">
           All prices in INR and exclusive of applicable taxes. Need a custom plan?{" "}
-          <a href={salesWhatsAppUrl} target="_blank" rel="noreferrer" className="text-orange-600 font-semibold hover:underline">Talk to sales →</a>
+          <a
+            href={salesWhatsAppUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-orange-300 font-semibold hover:underline"
+          >
+            Talk to sales →
+          </a>
         </p>
       </section>
 
       {/* ===== CODESKATE VOICE — pay-as-you-go wallets ===== */}
-      <section className="pb-20 sm:pb-24">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <Reveal className="text-center max-w-2xl mx-auto mb-10">
-            <div className="inline-flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-full px-4 py-1.5 mb-4">
-              <Wallet size={14} className="text-orange-600" />
-              <span className="text-xs font-bold text-orange-700 uppercase tracking-wider">Codeskate Voice</span>
+      <section className="relative pb-20 sm:pb-24 overflow-hidden">
+        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-violet-600/10 mkt-bloom" />
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6">
+          <Reveal className="text-center max-w-2xl mx-auto mb-12">
+            <div className="mkt-chip mb-5">
+              <Wallet size={14} className="text-orange-400" />
+              <span className="text-[11px] font-bold text-orange-300 uppercase tracking-[0.14em]">
+                Codeskate Voice
+              </span>
             </div>
-            <h2 className="font-display font-bold text-2xl sm:text-4xl text-ink mb-3">
-              Add calling, <span className="text-gradient">pay only for what you use</span>
+            <h2 className="font-display font-bold text-2xl sm:text-4xl tracking-[-0.025em] text-white mb-4">
+              Add calling, <span className="mkt-text-gradient">pay only for what you use</span>
             </h2>
-            <p className="text-ink-soft">
+            <p className="text-midnight-200/75 leading-relaxed">
               Voice is a prepaid wallet on top of any eligible plan — no fixed monthly commitment.
               Top up anytime; minutes never expire while your plan is active.
             </p>
           </Reveal>
 
-          <div className="grid sm:grid-cols-2 gap-6 max-w-3xl mx-auto">
-            {VOICE_PACKS.map((p) => {
-              const Icon = p.icon;
-              return (
-                <Reveal key={p.name}>
-                  <div className="h-full bg-white rounded-2xl border border-cream-300/60 p-7 shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="w-11 h-11 rounded-xl bg-gradient-orange/10 flex items-center justify-center">
-                        <Icon size={20} className="text-orange-600" />
-                      </div>
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-cream-200 text-ink-soft">{p.plan}</span>
+          <Stagger className="grid sm:grid-cols-2 gap-5 max-w-3xl mx-auto">
+            {VOICE_PACKS.map((p) => (
+              <StaggerItem key={p.name}>
+                <div className="group h-full mkt-card mkt-card-hover mkt-sheen rounded-2xl p-7">
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="w-11 h-11 rounded-xl bg-orange-500/12 flex items-center justify-center transition-transform duration-300 group-hover:scale-110">
+                      <p.icon size={20} className="text-orange-300" />
                     </div>
-                    <h3 className="font-display font-bold text-lg text-ink">{p.name}</h3>
-                    <div className="flex items-end gap-2 mt-2 mb-1">
-                      <span className="font-display font-bold text-3xl text-ink">{p.price}</span>
-                      <span className="text-sm text-ink-muted mb-1">/ {p.unit}</span>
-                    </div>
-                    <p className="text-xs font-semibold text-orange-600 mb-3">{p.rate}</p>
-                    <p className="text-sm text-ink-soft leading-relaxed">{p.desc}</p>
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-white/[0.06] border border-white/[0.1] text-midnight-200">
+                      {p.plan}
+                    </span>
                   </div>
-                </Reveal>
-              );
-            })}
-          </div>
-          <p className="text-center text-xs text-ink-muted mt-6">
-            Native call tracking (Android) is included free on every plan. Bridge &amp; AI Voice Bot are billed from your voice wallet.
+                  <h3 className="font-display font-bold text-lg text-white">{p.name}</h3>
+                  <div className="flex items-end gap-2 mt-2 mb-1">
+                    <span className="font-display font-bold text-3xl text-white tracking-[-0.02em]">
+                      {p.price}
+                    </span>
+                    <span className="text-sm text-midnight-400 mb-1">/ {p.unit}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-orange-300 mb-3">{p.rate}</p>
+                  <p className="text-sm text-midnight-200/75 leading-relaxed">{p.desc}</p>
+                </div>
+              </StaggerItem>
+            ))}
+          </Stagger>
+
+          <p className="text-center text-xs text-midnight-400 mt-7">
+            Native call tracking (Android) is included free on every plan. Bridge &amp; AI Voice
+            Bot are billed from your voice wallet.
           </p>
         </div>
       </section>
 
       {/* ===== FEATURE COMPARISON STRIP ===== */}
-      <section className="py-16 bg-gradient-warm texture-grain">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="font-display font-bold text-2xl sm:text-3xl text-ink mb-10">
-            Every plan includes
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-            {[
-              "Unlimited team invites",
-              "WhatsApp integration",
-              "Mobile app access",
-              "Bank-level security",
-              "Real-time sync",
-              "Data export",
-              "Email support",
-              "Free updates",
-            ].map((f) => (
-              <div key={f} className="flex items-center gap-2 text-sm text-ink-soft">
-                <span className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center shrink-0">
-                  <Check size={12} className="text-success-600" strokeWidth={3} />
-                </span>
-                <span className="text-left">{f}</span>
-              </div>
+      <section className="relative py-16 sm:py-20 border-y border-white/[0.07] bg-midnight-950/50">
+        <div className="absolute inset-0 pattern-grid opacity-40 pointer-events-none" />
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <Reveal>
+            <h2 className="font-display font-bold text-2xl sm:text-3xl tracking-[-0.02em] text-white mb-10">
+              Every plan includes
+            </h2>
+          </Reveal>
+          <Stagger className="grid grid-cols-2 sm:grid-cols-4 gap-5" stagger={0.05}>
+            {INCLUDED_EVERYWHERE.map((f) => (
+              <StaggerItem key={f}>
+                <div className="flex items-center gap-2.5 text-sm text-midnight-200/85">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                    <Check size={12} className="text-emerald-400" strokeWidth={3} />
+                  </span>
+                  <span className="text-left">{f}</span>
+                </div>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
       </section>
 
       {/* ===== FAQ ===== */}
       <section id="faq" className="py-20 sm:py-28 scroll-mt-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-14">
-            <p className="eyebrow mb-3">Got questions?</p>
-            <h2 className="font-display font-bold text-3xl sm:text-4xl text-ink">
+          <Reveal className="text-center mb-14">
+            <p className="mkt-eyebrow mb-4">Got questions?</p>
+            <h2 className="font-display font-bold text-3xl sm:text-5xl tracking-[-0.025em] text-white">
               Frequently asked questions
             </h2>
-          </div>
-          <div className="space-y-4">
+          </Reveal>
+          <Stagger className="space-y-4" stagger={0.07}>
             {FAQS.map((f) => (
-              <FaqItem key={f.q} q={f.q} a={f.a} />
+              <StaggerItem key={f.q}>
+                <FaqItem q={f.q} a={f.a} />
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         </div>
       </section>
 
       {/* ===== CTA ===== */}
       <section className="pb-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="relative bg-gradient-ember rounded-3xl p-10 sm:p-14 text-center overflow-hidden texture-grain shadow-glow-lg">
-            <div className="absolute -top-16 -right-16 w-56 h-56 bg-orange-300/30 rounded-full blur-3xl" />
-            <div className="relative">
-              <h2 className="font-display font-bold text-3xl sm:text-4xl text-white mb-4">
-                Start closing more deals today
-              </h2>
-              <p className="text-cream-100/90 mb-8 max-w-lg mx-auto">
-                Try Codeskate CRM free for {TRIAL_DAYS} days. No credit card, no commitment.
-              </p>
-              <button
-                onClick={() => navigate("/signup")}
-                className="btn bg-white text-ember-700 hover:bg-cream-100 text-base px-8 py-3.5 font-bold shadow-lg"
-              >
-                Create your workspace
-                <ArrowRight size={18} />
-              </button>
+          <Reveal>
+            <div className="relative rounded-[2rem] border border-orange-400/25 bg-gradient-to-br from-orange-500/[0.18] via-ember-600/[0.12] to-midnight-950/60 p-10 sm:p-14 text-center overflow-hidden">
+              <div className="absolute inset-0 mkt-grain pointer-events-none" />
+              <div className="absolute -top-20 -right-16 w-72 h-72 bg-orange-400/25 mkt-bloom animate-blob" />
+              <PointerGlow size={460} color="rgba(255,172,112,0.16)" />
+              <div className="relative">
+                <h2 className="font-display font-bold text-3xl sm:text-5xl tracking-[-0.025em] text-white mb-5">
+                  Start closing more deals today
+                </h2>
+                <p className="text-midnight-200/80 mb-9 max-w-lg mx-auto leading-relaxed">
+                  Try Codeskate CRM free for {TRIAL_DAYS} days. No credit card, no commitment.
+                </p>
+                <button
+                  onClick={() => navigate("/signup")}
+                  className="btn bg-white text-midnight-900 hover:bg-midnight-50 text-base px-8 py-3.5 font-bold transition-colors"
+                >
+                  Create your workspace
+                  <ArrowRight size={18} />
+                </button>
+              </div>
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 

@@ -43,14 +43,15 @@ export default function MarketingNav() {
     <header
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-cream-50/85 backdrop-blur-xl border-b border-cream-300/60 shadow-sm"
+          ? "bg-midnight-950/80 backdrop-blur-xl border-b border-white/[0.08] shadow-[0_8px_32px_-16px_rgba(0,0,0,0.8)]"
           : "bg-transparent"
       }`}
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           <button onClick={() => go("/")} className="shrink-0">
-            <Logo />
+            {/* onDark keeps the wordmark legible against the dark canvas. */}
+            <Logo onDark />
           </button>
 
           {/* Desktop nav */}
@@ -59,7 +60,7 @@ export default function MarketingNav() {
               <button
                 key={l.label}
                 onClick={() => go(l.to)}
-                className="px-4 py-2 text-sm font-medium text-ink-soft hover:text-orange-600 rounded-lg hover:bg-orange-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-midnight-200/80 hover:text-white rounded-lg hover:bg-white/[0.06] transition-colors"
               >
                 {l.label}
               </button>
@@ -69,13 +70,13 @@ export default function MarketingNav() {
           <div className="hidden md:flex items-center gap-2">
             <button
               onClick={() => navigate("/login")}
-              className="px-4 py-2 text-sm font-semibold text-ink hover:text-orange-600 transition-colors"
+              className="px-4 py-2 text-sm font-semibold text-midnight-100 hover:text-orange-300 transition-colors"
             >
               Sign in
             </button>
             <button
               onClick={() => navigate("/signup")}
-              className="btn btn-primary text-sm"
+              className="btn mkt-btn-ember text-sm font-semibold"
             >
               Start free trial
               <ArrowRight size={16} />
@@ -85,7 +86,9 @@ export default function MarketingNav() {
           {/* Mobile toggle */}
           <button
             onClick={() => setOpen((v) => !v)}
-            className="md:hidden p-2 text-ink hover:bg-orange-50 rounded-lg"
+            className="md:hidden p-2 text-white hover:bg-white/[0.08] rounded-lg transition-colors"
+            aria-label={open ? "Close menu" : "Open menu"}
+            aria-expanded={open}
           >
             {open ? <X size={22} /> : <Menu size={22} />}
           </button>
@@ -94,26 +97,26 @@ export default function MarketingNav() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden bg-cream-50/95 backdrop-blur-xl border-b border-cream-300/60 px-4 py-4 space-y-1 animate-fade-in">
+        <div className="md:hidden bg-midnight-950/95 backdrop-blur-xl border-b border-white/[0.08] px-4 py-4 space-y-1 animate-fade-in">
           {NAV_LINKS.map((l) => (
             <button
               key={l.label}
               onClick={() => go(l.to)}
-              className="block w-full text-left px-4 py-3 text-sm font-medium text-ink-soft hover:text-orange-600 hover:bg-orange-50 rounded-lg"
+              className="mkt-touch flex items-center w-full text-left px-4 py-3 text-sm font-medium text-midnight-200/80 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
             >
               {l.label}
             </button>
           ))}
-          <div className="pt-3 flex flex-col gap-2 border-t border-cream-300/60 mt-2">
+          <div className="pt-3 flex flex-col gap-2 border-t border-white/[0.08] mt-2">
             <button
               onClick={() => navigate("/login")}
-              className="btn btn-secondary w-full"
+              className="btn mkt-btn-glass w-full font-semibold"
             >
               Sign in
             </button>
             <button
               onClick={() => navigate("/signup")}
-              className="btn btn-primary w-full"
+              className="btn mkt-btn-ember w-full font-semibold"
             >
               Start free trial
               <ArrowRight size={16} />

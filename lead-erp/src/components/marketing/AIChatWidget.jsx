@@ -90,7 +90,7 @@ export default function AIChatWidget() {
     <>
       {/* Chat Window */}
       {open && (
-        <div className="fixed bottom-24 right-5 z-50 w-[360px] max-w-[calc(100vw-2.5rem)] bg-white rounded-3xl shadow-2xl border border-cream-300/60 overflow-hidden animate-fade-in flex flex-col" style={{ maxHeight: "520px" }}>
+        <div className="fixed bottom-24 right-5 z-50 w-[360px] max-w-[calc(100vw-2.5rem)] bg-midnight-900/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/[0.1] overflow-hidden animate-fade-in flex flex-col" style={{ maxHeight: "520px" }}>
           {/* Header */}
           <div className="bg-gradient-orange px-5 py-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
@@ -115,7 +115,7 @@ export default function AIChatWidget() {
                 <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                   msg.role === "user"
                     ? "bg-orange-500 text-white rounded-tr-md"
-                    : "bg-cream-100 text-ink rounded-tl-md"
+                    : "bg-white/[0.06] text-midnight-100 rounded-tl-md"
                 }`}>
                   {msg.text}
                 </div>
@@ -123,21 +123,21 @@ export default function AIChatWidget() {
             ))}
             {typing && (
               <div className="flex justify-start">
-                <div className="bg-cream-100 rounded-2xl rounded-tl-md px-4 py-3 flex items-center gap-1.5">
-                  <span className="w-2 h-2 bg-ink-muted/40 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 bg-ink-muted/40 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-2 h-2 bg-ink-muted/40 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                <div className="bg-white/[0.06] rounded-2xl rounded-tl-md px-4 py-3 flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-midnight-300/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-2 h-2 bg-midnight-300/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-2 h-2 bg-midnight-300/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             )}
           {/* Lead capture form (appears after 3+ messages) */}
           {messages.length >= 4 && !leadCaptured && (
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3.5 space-y-2">
-              <p className="text-xs font-semibold text-orange-800">Want a personalized demo or pricing?</p>
+            <div className="bg-orange-500/10 border border-orange-400/25 rounded-2xl p-3.5 space-y-2">
+              <p className="text-xs font-semibold text-orange-200">Want a personalized demo or pricing?</p>
               <input value={leadName} onChange={(e) => setLeadName(e.target.value)}
-                placeholder="Your name" className="w-full border border-orange-200 rounded-lg px-2.5 py-1.5 text-xs" />
+                placeholder="Your name" className="w-full bg-white/[0.06] border border-orange-400/25 text-white placeholder:text-midnight-500 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-orange-400/50" />
               <input value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)}
-                placeholder="Phone / WhatsApp number" className="w-full border border-orange-200 rounded-lg px-2.5 py-1.5 text-xs" />
+                placeholder="Phone / WhatsApp number" className="w-full bg-white/[0.06] border border-orange-400/25 text-white placeholder:text-midnight-500 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-orange-400/50" />
               <div className="flex gap-2">
                 <button onClick={handleLeadCapture} disabled={!leadName.trim() || !leadPhone.trim()}
                   className="flex-1 bg-orange-500 text-white text-xs font-medium py-1.5 rounded-lg hover:bg-orange-600 disabled:opacity-40">
@@ -152,10 +152,10 @@ export default function AIChatWidget() {
             </div>
           )}
           {leadCaptured && (
-            <div className="bg-green-50 border border-green-200 rounded-2xl p-3 text-xs text-green-700 text-center">
+            <div className="bg-emerald-500/10 border border-emerald-400/25 rounded-2xl p-3 text-xs text-emerald-300 text-center">
               ✅ Thanks {leadName}! We'll reach out shortly. Or chat now on WhatsApp:
               <a href={`https://wa.me/919653043939?text=${encodeURIComponent(`Hi, I'm ${leadName}. Interested in CodeSkate CRM.`)}`}
-                target="_blank" rel="noreferrer" className="block mt-1 font-semibold underline text-green-800">
+                target="_blank" rel="noreferrer" className="block mt-1 font-semibold underline text-emerald-200">
                 Chat on WhatsApp →
               </a>
             </div>
@@ -170,7 +170,7 @@ export default function AIChatWidget() {
                 <button
                   key={q}
                   onClick={() => sendMessage(q)}
-                  className="text-[11px] px-3 py-1.5 rounded-full border border-orange-200 bg-orange-50 text-orange-700 font-medium hover:bg-orange-100 transition-colors"
+                  className="text-[11px] px-3 py-1.5 rounded-full border border-orange-400/25 bg-orange-500/10 text-orange-200 font-medium hover:bg-orange-500/20 transition-colors"
                 >
                   {q}
                 </button>
@@ -179,19 +179,19 @@ export default function AIChatWidget() {
           )}
 
           {/* Input */}
-          <form onSubmit={handleSubmit} className="border-t border-cream-200 px-4 py-3 flex items-center gap-2">
+          <form onSubmit={handleSubmit} className="border-t border-white/[0.08] px-4 py-3 flex items-center gap-2">
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask in any language..."
-              className="flex-1 text-sm bg-cream-50 border border-cream-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-orange-300 focus:ring-2 focus:ring-orange-100 transition-all"
+              className="flex-1 text-sm bg-white/[0.05] border border-white/[0.1] text-white placeholder:text-midnight-500 rounded-xl px-3.5 py-2.5 outline-none focus:border-orange-400/50 focus:ring-2 focus:ring-orange-500/20 transition-all"
               disabled={typing}
             />
             <button
               type="submit"
               disabled={!input.trim() || typing}
-              className="w-10 h-10 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-cream-200 flex items-center justify-center transition-colors shadow-sm"
+              className="w-10 h-10 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:bg-white/[0.08] flex items-center justify-center transition-colors shadow-sm"
             >
               {typing ? <Loader2 size={16} className="text-white animate-spin" /> : <Send size={16} className="text-white" />}
             </button>

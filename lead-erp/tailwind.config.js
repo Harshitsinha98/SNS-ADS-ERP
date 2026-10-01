@@ -88,6 +88,21 @@ export default {
           soft: '#4A3D31',
           muted: '#7A6A58',
         },
+        // Midnight — warm near-black canvas for the marketing site.
+        // Additive only: existing light surfaces are untouched.
+        midnight: {
+          50: '#F7F6F5',
+          100: '#E8E5E2',
+          200: '#C9C3BD',
+          300: '#A49C94',
+          400: '#6F665E',
+          500: '#4A4239',
+          600: '#332C25',
+          700: '#231D18',
+          800: '#171310',
+          900: '#0F0C0A',
+          950: '#080606',
+        },
       },
       fontFamily: {
         display: ['"Space Grotesk"', '"Inter"', 'system-ui', 'sans-serif'],
@@ -125,6 +140,10 @@ export default {
         'gradient-ember': 'linear-gradient(135deg, #FF6B1A 0%, #C74E24 100%)',
         'gradient-warm': 'linear-gradient(135deg, #FDF8F0 0%, #FBF0E1 50%, #FFE8D4 100%)',
         'gradient-sunset': 'linear-gradient(120deg, #FF6B1A 0%, #FF8A3D 40%, #FFAC70 100%)',
+        // Dark marketing surfaces
+        'gradient-midnight': 'linear-gradient(180deg, #0F0C0A 0%, #171310 50%, #0F0C0A 100%)',
+        'gradient-ink-fade': 'linear-gradient(180deg, rgba(8,6,6,0) 0%, rgba(8,6,6,0.9) 100%)',
+        'gradient-ember-glow': 'radial-gradient(120% 120% at 50% 0%, rgba(255,107,26,0.22) 0%, rgba(255,107,26,0) 60%)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
@@ -136,6 +155,13 @@ export default {
         'pulse-soft': 'pulseSoft 2s ease-in-out infinite',
         'shimmer': 'shimmer 2s linear infinite',
         'sheet-up': 'sheetUp 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
+        // Previously referenced in markup but never defined — now real.
+        'blob': 'blob 20s ease-in-out infinite',
+        'slide-up-delay': 'slideUp 0.6s ease-out 0.15s both',
+        'aurora': 'aurora 24s ease-in-out infinite',
+        'float': 'float 7s ease-in-out infinite',
+        'gradient-x': 'gradientX 8s ease infinite',
+        'ticker': 'ticker 32s linear infinite',
       },
       keyframes: {
         fadeIn: {
@@ -174,6 +200,27 @@ export default {
         sheetUp: {
           '0%': { transform: 'translateY(100%)' },
           '100%': { transform: 'translateY(0)' },
+        },
+        blob: {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '33%': { transform: 'translate(24px, -36px) scale(1.08)' },
+          '66%': { transform: 'translate(-20px, 20px) scale(0.94)' },
+        },
+        aurora: {
+          '0%, 100%': { transform: 'translate3d(0, 0, 0) rotate(0deg)', opacity: '0.55' },
+          '50%': { transform: 'translate3d(6%, -4%, 0) rotate(8deg)', opacity: '0.85' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        gradientX: {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+        ticker: {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
         },
       },
       fontSize: {
