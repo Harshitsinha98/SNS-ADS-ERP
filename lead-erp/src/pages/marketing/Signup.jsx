@@ -198,12 +198,12 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-cream-100 flex flex-col lg:flex-row">
+    <div className="min-h-screen mkt-canvas text-midnight-100 flex flex-col lg:flex-row">
       {/* LEFT brand panel — Premium showcase */}
-      <div className="relative lg:w-[45%] bg-ink texture-grain overflow-hidden hidden lg:flex flex-col justify-between p-10 xl:p-14">
+      <div className="relative lg:w-[45%] bg-midnight-950 texture-grain overflow-hidden border-r border-white/[0.07] hidden lg:flex flex-col justify-between p-10 xl:p-14">
         {/* Animated background elements */}
         <div className="absolute -top-20 -right-20 w-96 h-96 bg-orange-600/20 rounded-full blur-3xl animate-blob" />
-        <div className="absolute bottom-20 -left-20 w-80 h-80 bg-purple-500/15 rounded-full blur-3xl animate-blob" style={{ animationDelay: "3s" }} />
+        <div className="absolute bottom-20 -left-20 w-80 h-80 bg-violet-600/15 rounded-full blur-3xl animate-blob" style={{ animationDelay: "3s" }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[30rem] h-[30rem] bg-ember-500/10 rounded-full blur-3xl animate-blob" style={{ animationDelay: "6s" }} />
         <div className="absolute inset-0 pattern-grid opacity-15" />
 
@@ -220,7 +220,7 @@ export default function Signup() {
             <h2 className="font-display font-bold text-3xl xl:text-[2.5rem] text-white leading-tight mb-4">
               Your AI-powered sales engine starts here
             </h2>
-            <p className="text-cream-300/80 text-sm leading-relaxed max-w-sm">
+            <p className="text-midnight-200/80 text-sm leading-relaxed max-w-sm">
               Set up in 2 minutes. First lead captured in 10. First AI reply sent in under a minute. No technical skills required.
             </p>
           </div>
@@ -236,7 +236,7 @@ export default function Signup() {
               <div key={f.label} className="bg-white/5 border border-white/10 rounded-xl p-3.5 backdrop-blur-sm hover:bg-white/10 transition-colors">
                 <f.icon size={16} className="text-orange-400 mb-1.5" />
                 <p className="text-xs font-semibold text-white">{f.label}</p>
-                <p className="text-[10px] text-cream-400/70">{f.sub}</p>
+                <p className="text-[10px] text-midnight-300/70">{f.sub}</p>
               </div>
             ))}
           </div>
@@ -245,17 +245,17 @@ export default function Signup() {
           <div className="flex items-center gap-6">
             <div className="text-center">
               <p className="font-display font-bold text-2xl text-orange-400">12.4K+</p>
-              <p className="text-[10px] text-cream-400/70">AI replies today</p>
+              <p className="text-[10px] text-midnight-300/70">AI replies today</p>
             </div>
             <div className="w-px h-10 bg-white/10" />
             <div className="text-center">
               <p className="font-display font-bold text-2xl text-emerald-400">70%</p>
-              <p className="text-[10px] text-cream-400/70">auto-resolved</p>
+              <p className="text-[10px] text-midnight-300/70">auto-resolved</p>
             </div>
             <div className="w-px h-10 bg-white/10" />
             <div className="text-center">
-              <p className="font-display font-bold text-2xl text-purple-400">3s</p>
-              <p className="text-[10px] text-cream-400/70">response time</p>
+              <p className="font-display font-bold text-2xl text-violet-300">3s</p>
+              <p className="text-[10px] text-midnight-300/70">response time</p>
             </div>
           </div>
         </div>
@@ -265,14 +265,14 @@ export default function Signup() {
           <div className="flex gap-0.5 mb-2.5">
             {[...Array(5)].map((_, i) => <Star key={i} size={12} className="text-orange-400" fill="currentColor" />)}
           </div>
-          <p className="text-cream-200 text-sm leading-relaxed mb-3">
+          <p className="text-midnight-100 text-sm leading-relaxed mb-3">
             "We replaced 3 employees with Codeskate AI and our conversion rate went up 3x. Best decision this year."
           </p>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-xs font-bold text-orange-400">V</div>
             <div>
               <p className="text-xs font-semibold text-white">Vikram Saxena</p>
-              <p className="text-[10px] text-cream-400/60">Director, Meridian Properties</p>
+              <p className="text-[10px] text-midnight-400">Director, Meridian Properties</p>
             </div>
           </div>
         </div>
@@ -284,8 +284,8 @@ export default function Signup() {
             { icon: Clock, text: "2-min setup" },
             { icon: Lock, text: "Data encrypted" },
           ].map((b) => (
-            <div key={b.text} className="flex items-center gap-1.5 text-[10px] text-cream-400/60">
-              <b.icon size={11} className="text-cream-500/50" />
+            <div key={b.text} className="flex items-center gap-1.5 text-[10px] text-midnight-400">
+              <b.icon size={11} className="text-midnight-500" />
               <span>{b.text}</span>
             </div>
           ))}
@@ -294,9 +294,9 @@ export default function Signup() {
 
       {/* RIGHT form */}
       <div className="flex-1 flex items-center justify-center p-5 sm:p-8 lg:p-12 relative">
-        <div className="absolute inset-0 bg-gradient-to-br from-cream-100 via-white to-orange-50/30 pointer-events-none" />
-        <div className="absolute top-10 right-10 w-64 h-64 bg-orange-100/40 rounded-full blur-3xl pointer-events-none hidden lg:block" />
-        <div className="absolute bottom-10 left-10 w-48 h-48 bg-purple-100/20 rounded-full blur-3xl pointer-events-none hidden lg:block" />
+        <div className="absolute inset-0 bg-gradient-to-br from-midnight-900 via-midnight-950 to-midnight-900 pointer-events-none" />
+        <div className="absolute top-10 right-10 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none hidden lg:block" />
+        <div className="absolute bottom-10 left-10 w-48 h-48 bg-violet-600/10 rounded-full blur-3xl pointer-events-none hidden lg:block" />
         <div id="recaptcha-container" />
         <div className="relative w-full max-w-[26rem]">
           <div className="lg:hidden flex justify-center mb-8"><Link to="/"><Logo /></Link></div>
@@ -306,47 +306,47 @@ export default function Signup() {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, ease: "easeOut" }}
-              className="bg-white rounded-3xl shadow-soft border border-cream-300/60 p-10 text-center relative overflow-hidden"
+              className="mkt-card mkt-sheen rounded-3xl p-10 text-center relative overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-b from-emerald-50/50 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none" />
               <div className="relative">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                  className="w-20 h-20 bg-success-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-100"
+                  className="w-20 h-20 bg-emerald-500/15 border border-emerald-400/25 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_48px_-12px_rgba(16,185,129,0.6)]"
                 >
-                  <CheckCircle2 className="w-11 h-11 text-success-600" />
+                  <CheckCircle2 className="w-11 h-11 text-emerald-400" />
                 </motion.div>
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-                  <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1 mb-4">
+                  <div className="inline-flex items-center gap-2 bg-emerald-500/12 border border-emerald-400/25 rounded-full px-3 py-1 mb-4">
                     <Sparkles size={12} className="text-emerald-600" />
                     <span className="text-[11px] font-bold text-emerald-700">Workspace Created Successfully</span>
                   </div>
-                  <h1 className="font-display font-bold text-2xl text-ink mb-2">You're all set!</h1>
-                  <p className="text-ink-soft mb-6"><span className="font-semibold text-ink">{orgName}</span> is ready. Taking you to your dashboard now...</p>
+                  <h1 className="font-display font-bold text-2xl text-white mb-2">You're all set!</h1>
+                  <p className="text-midnight-200/80 mb-6"><span className="font-semibold text-white">{orgName}</span> is ready. Taking you to your dashboard now...</p>
                   <div className="flex items-center justify-center gap-3">
                     <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
-                    <span className="text-sm text-ink-muted">Loading your workspace...</span>
+                    <span className="text-sm text-midnight-400">Loading your workspace...</span>
                   </div>
                 </motion.div>
               </div>
             </motion.div>
           ) : (
-            <div className="bg-white rounded-3xl shadow-xl shadow-cream-300/30 border border-cream-200/80 overflow-hidden">
+            <div className="mkt-card mkt-sheen rounded-3xl overflow-hidden">
               {/* Progress bar with glow */}
               <div className="relative">
                 <div className="flex">
                   <div className="h-1 flex-1 bg-gradient-orange" />
-                  <div className={`h-1 flex-1 transition-colors duration-500 ${step === "otp" || step === "checkout" ? "bg-gradient-orange" : "bg-cream-100"}`} />
-                  <div className={`h-1 flex-1 transition-colors duration-500 ${step === "checkout" ? "bg-gradient-orange" : "bg-cream-100"}`} />
+                  <div className={`h-1 flex-1 transition-colors duration-500 ${step === "otp" || step === "checkout" ? "bg-gradient-orange" : "bg-white/[0.08]"}`} />
+                  <div className={`h-1 flex-1 transition-colors duration-500 ${step === "checkout" ? "bg-gradient-orange" : "bg-white/[0.08]"}`} />
                 </div>
               </div>
 
               {/* Step indicators with connected line */}
               <div className="relative flex items-center justify-between px-9 pt-6 pb-0">
                 {/* Connecting line behind the dots */}
-                <div className="absolute top-[2.1rem] left-[4.5rem] right-[4.5rem] h-[2px] bg-cream-200 hidden sm:block" />
+                <div className="absolute top-[2.1rem] left-[4.5rem] right-[4.5rem] h-[2px] bg-white/[0.1] hidden sm:block" />
                 <div className={`absolute top-[2.1rem] left-[4.5rem] h-[2px] bg-orange-400 hidden sm:block transition-all duration-500 ${step === "details" ? "w-0" : step === "otp" ? "w-[calc(50%-1rem)]" : "w-[calc(100%-5rem)]"}`} />
 
                 {["Your details", "Verification", "Activate"].map((label, i) => {
@@ -354,10 +354,10 @@ export default function Signup() {
                   const isDone = (i === 0 && step !== "details") || (i === 1 && step === "checkout");
                   return (
                     <div key={label} className="flex flex-col items-center gap-1.5 relative z-10">
-                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 ${isDone ? "bg-emerald-500 text-white shadow-md shadow-emerald-200" : isActive ? "bg-orange-500 text-white shadow-md shadow-orange-200" : "bg-cream-100 text-ink-muted border border-cream-200"}`}>
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 ${isDone ? "bg-emerald-500 text-white shadow-[0_0_20px_-4px_rgba(16,185,129,0.6)]" : isActive ? "bg-orange-500 text-white shadow-[0_0_20px_-4px_rgba(255,107,26,0.6)]" : "bg-white/[0.06] text-midnight-400 border border-white/[0.1]"}`}>
                         {isDone ? <Check size={13} strokeWidth={3} /> : i + 1}
                       </span>
-                      <span className={`text-[10px] font-medium ${isActive ? "text-ink" : isDone ? "text-emerald-600" : "text-ink-muted"}`}>{label}</span>
+                      <span className={`text-[10px] font-medium ${isActive ? "text-white" : isDone ? "text-emerald-600" : "text-midnight-400"}`}>{label}</span>
                     </div>
                   );
                 })}
@@ -368,7 +368,7 @@ export default function Signup() {
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-danger-50 text-danger-600 text-sm px-4 py-3 rounded-xl mb-4 border border-danger-100"
+                    className="bg-rose-500/12 text-rose-300 text-sm px-4 py-3 rounded-xl mb-4 border border-rose-400/25"
                   >{err}</motion.div>
                 )}
 
@@ -383,24 +383,24 @@ export default function Signup() {
 
                 {step === "details" && (
                   <>
-                    <h1 className="font-display font-bold text-[1.6rem] text-ink mb-1.5">Get started for free</h1>
-                    <p className="text-[13px] text-ink-muted mb-7">Set up your workspace in under 2 minutes. No credit card needed.</p>
+                    <h1 className="font-display font-bold text-[1.6rem] text-white mb-1.5">Get started for free</h1>
+                    <p className="text-[13px] text-midnight-400 mb-7">Set up your workspace in under 2 minutes. No credit card needed.</p>
                     <form onSubmit={submitDetails} className="space-y-5">
                       <Field icon={User} label="Your name" value={fullName} onChange={setFullName} placeholder="e.g. Rohan Mehta" disabled={loading} />
                       <Field icon={Building2} label="Organization name" value={orgName} onChange={setOrgName} placeholder="e.g. Meridian Properties" disabled={loading} />
                       <div>
-                        <label className="block text-sm font-medium text-ink mb-1.5">Mobile number</label>
+                        <label className="block text-sm font-medium text-white mb-1.5">Mobile number</label>
                         <div className="relative group">
-                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted/70 group-focus-within:text-orange-500 transition-colors" size={18} />
-                          <span className="absolute left-11 top-1/2 -translate-y-1/2 text-ink-soft font-medium text-sm">+91</span>
-                          <input type="tel" className="input pl-[4.5rem] bg-cream-50/30 border-cream-200 focus:border-orange-300 focus:bg-white focus:shadow-sm focus:shadow-orange-100/50 transition-all" placeholder="98XXXXXXXX" value={phone}
+                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-midnight-400 group-focus-within:text-orange-500 transition-colors" size={18} />
+                          <span className="absolute left-11 top-1/2 -translate-y-1/2 text-midnight-200/80 font-medium text-sm">+91</span>
+                          <input type="tel" className="input pl-[4.5rem] bg-white/[0.04] border-white/[0.1] text-white placeholder:text-midnight-500 focus:border-orange-400/50 focus:bg-white/[0.07] focus:ring-orange-500/20 transition-all" placeholder="98XXXXXXXX" value={phone}
                             onChange={(e) => handlePhoneChange(e.target.value)}
                             onBlur={() => checkExistingPhone()}
                             maxLength={10} disabled={loading || checkingAccount} />
                         </div>
-                        {checkingAccount && <p className="mt-1.5 text-xs text-ink-muted flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Checking availability...</p>}
+                        {checkingAccount && <p className="mt-1.5 text-xs text-midnight-400 flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Checking availability...</p>}
                         {existingAccount && (
-                          <p className="mt-1.5 text-xs text-orange-700">
+                          <p className="mt-1.5 text-xs text-orange-200">
                             This number is already registered. <button type="button" onClick={() => navigate("/login")} className="font-semibold underline">Log in instead</button>.
                           </p>
                         )}
@@ -408,22 +408,22 @@ export default function Signup() {
 
                       {/* Divider between details and plan selection */}
                       <div className="relative py-2">
-                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-cream-200" /></div>
-                        <div className="relative flex justify-center"><span className="px-3 bg-white text-[10px] font-semibold text-ink-muted uppercase tracking-wider">Select plan</span></div>
+                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/[0.1]" /></div>
+                        <div className="relative flex justify-center"><span className="px-3 bg-midnight-900 text-[10px] font-semibold text-midnight-400 uppercase tracking-wider">Select plan</span></div>
                       </div>
 
                       <div>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                           {plans.map((p) => (
                             <button key={p.id} type="button" onClick={() => setPlanId(p.id)}
-                              className={`relative rounded-xl border px-2 py-3.5 text-center transition-all duration-200 ${planId === p.id ? "border-orange-400 bg-orange-50/70 shadow-md shadow-orange-100/50 ring-1 ring-orange-200" : "border-cream-200 hover:border-orange-200 hover:bg-cream-50"}`}>
+                              className={`relative rounded-xl border px-2 py-3.5 text-center transition-all duration-200 ${planId === p.id ? "border-orange-400/60 bg-orange-500/12 ring-1 ring-orange-400/30" : "border-white/[0.1] hover:border-orange-400/40 hover:bg-white/[0.05]"}`}>
                               {p.popular && <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm">POPULAR</span>}
-                              {planId === p.id && <span className="absolute top-2 right-2 w-3 h-3 rounded-full bg-orange-500 border-2 border-white shadow-sm" />}
-                              <span className={`block text-sm font-bold ${planId === p.id ? "text-orange-700" : "text-ink"}`}>{p.name}</span>
-                              <span className="block text-[11px] text-ink-muted mt-0.5">₹{p.monthlyPrice.toLocaleString("en-IN")}/mo</span>
-                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-ink-muted/60"}`}>{p.trial ? `${trialDays}-day free trial` : "Paid plan"}</span>
+                              {planId === p.id && <span className="absolute top-2 right-2 w-3 h-3 rounded-full bg-orange-500 border-2 border-midnight-900 shadow-sm" />}
+                              <span className={`block text-sm font-bold ${planId === p.id ? "text-orange-200" : "text-white"}`}>{p.name}</span>
+                              <span className="block text-[11px] text-midnight-400 mt-0.5">₹{p.monthlyPrice.toLocaleString("en-IN")}/mo</span>
+                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-midnight-500"}`}>{p.trial ? `${trialDays}-day free trial` : "Paid plan"}</span>
                               {/* Key feature highlight */}
-                              <span className="block text-[9px] text-ink-muted/80 mt-1.5 leading-tight">
+                              <span className="block text-[9px] text-midnight-400 mt-1.5 leading-tight">
                                 {p.id === "starter" ? "3 users · 1K leads" : p.id === "growth" ? "10 users · AI + Human Takeover" : p.id === "enterprise" ? "25 users · Bridge calling" : "Unlimited + AI Voice Bot"}
                               </span>
                             </button>
@@ -431,29 +431,29 @@ export default function Signup() {
                         </div>
                       </div>
 
-                      <button type="submit" disabled={loading || checkingAccount || existingAccount || !fullName.trim() || !orgName.trim() || phone.length !== 10} className="btn btn-primary w-full py-3.5 text-base mt-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                      <button type="submit" disabled={loading || checkingAccount || existingAccount || !fullName.trim() || !orgName.trim() || phone.length !== 10} className="btn mkt-btn-ember w-full py-3.5 text-base mt-2 disabled:opacity-50 disabled:cursor-not-allowed">
                         {loading || checkingAccount ? <><Loader2 size={18} className="animate-spin" /> Please wait...</> : existingAccount ? <>Account exists — log in instead</> : <>Continue <ArrowRight size={18} /></>}
                       </button>
-                      <p className="text-center text-[11px] text-ink-muted flex items-center justify-center gap-1.5">
-                        <Shield size={11} className="text-ink-muted/60" /> No credit card required to start your trial
+                      <p className="text-center text-[11px] text-midnight-400 flex items-center justify-center gap-1.5">
+                        <Shield size={11} className="text-midnight-500" /> No credit card required to start your trial
                       </p>
                     </form>
-                    <p className="text-center text-sm text-ink-muted mt-6">
-                      Already have an account? <Link to="/login" className="text-orange-600 font-semibold hover:underline">Sign in</Link>
+                    <p className="text-center text-sm text-midnight-400 mt-6">
+                      Already have an account? <Link to="/login" className="text-orange-300 font-semibold hover:underline">Sign in</Link>
                     </p>
                   </>
                 )}
 
                 {step === "registered" && (
                   <>
-                    <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4"><ShieldCheck className="text-orange-600" size={24} /></div>
-                    <p className="eyebrow mb-2">Account found</p>
-                    <h1 className="font-display font-bold text-2xl text-ink mb-2">You are already registered</h1>
-                    <p className="text-sm text-ink-soft mb-6">This mobile number already has a Codeskate CRM account. Please sign in to continue—no new OTP or purchase is needed here.</p>
-                    <button onClick={() => navigate("/login")} className="btn btn-primary w-full py-3.5 text-base">
+                    <div className="w-12 h-12 bg-orange-500/15 border border-orange-400/20 rounded-xl flex items-center justify-center mb-4"><ShieldCheck className="text-orange-300" size={24} /></div>
+                    <p className="mkt-eyebrow mb-2">Account found</p>
+                    <h1 className="font-display font-bold text-2xl text-white mb-2">You are already registered</h1>
+                    <p className="text-sm text-midnight-200/80 mb-6">This mobile number already has a Codeskate CRM account. Please sign in to continue—no new OTP or purchase is needed here.</p>
+                    <button onClick={() => navigate("/login")} className="btn mkt-btn-ember w-full py-3.5 text-base">
                       Go to login <ArrowRight size={18} />
                     </button>
-                    <button onClick={() => { setExistingAccount(false); setStep("details"); }} className="w-full mt-3 text-sm font-medium text-ink-muted hover:text-orange-600">
+                    <button onClick={() => { setExistingAccount(false); setStep("details"); }} className="w-full mt-3 text-sm font-medium text-midnight-400 hover:text-orange-300">
                       Use a different number
                     </button>
                   </>
@@ -461,12 +461,12 @@ export default function Signup() {
 
                 {step === "otp" && (
                   <>
-                    <button onClick={() => { setStep("details"); setOtp(""); setErr(""); }} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-orange-600 mb-6 transition-colors"><ArrowLeft size={16} /> Back</button>
-                    <div className="w-14 h-14 bg-gradient-to-br from-orange-100 to-orange-50 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
-                      <ShieldCheck className="text-orange-600" size={26} />
+                    <button onClick={() => { setStep("details"); setOtp(""); setErr(""); }} className="flex items-center gap-1.5 text-sm text-midnight-400 hover:text-orange-300 mb-6 transition-colors"><ArrowLeft size={16} /> Back</button>
+                    <div className="w-14 h-14 bg-gradient-to-br from-orange-500/20 to-orange-500/5 border border-orange-400/20 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
+                      <ShieldCheck className="text-orange-300" size={26} />
                     </div>
-                    <h1 className="font-display font-bold text-2xl text-ink mb-1">Verify your number</h1>
-                    <p className="text-sm text-ink-soft mb-7">We sent a 6-digit code to <span className="font-semibold text-ink">+91 {phone.slice(0,5)} {phone.slice(5)}</span></p>
+                    <h1 className="font-display font-bold text-2xl text-white mb-1">Verify your number</h1>
+                    <p className="text-sm text-midnight-200/80 mb-7">We sent a 6-digit code to <span className="font-semibold text-white">+91 {phone.slice(0,5)} {phone.slice(5)}</span></p>
                     <form onSubmit={submitOtp} className="space-y-5">
                       <div>
                         <div className="flex justify-center gap-2" onClick={() => document.getElementById("otp-hidden-input")?.focus()}>
@@ -477,7 +477,7 @@ export default function Signup() {
                               animate={{ opacity: 1, scale: 1 }}
                               transition={{ delay: i * 0.05, duration: 0.2 }}
                               className={`w-11 h-14 rounded-xl border-2 flex items-center justify-center text-xl font-bold font-mono cursor-text transition-all ${
-                                otp[i] ? "border-orange-400 bg-orange-50 text-orange-700 shadow-sm shadow-orange-100" : "border-cream-200 bg-cream-50/50 text-ink-muted"
+                                otp[i] ? "border-orange-400/60 bg-orange-500/15 text-orange-200" : "border-white/[0.1] bg-white/[0.03] text-midnight-500"
                               }`}
                             >
                               {otp[i] || ""}
@@ -494,12 +494,12 @@ export default function Signup() {
                           disabled={loading}
                           id="otp-hidden-input"
                         />
-                        <p className="text-xs text-ink-muted mt-3 text-center">Didn't receive it? Check your messages or wait 30 seconds.</p>
+                        <p className="text-xs text-midnight-400 mt-3 text-center">Didn't receive it? Check your messages or wait 30 seconds.</p>
                       </div>
                       <motion.button
                         type="submit"
                         disabled={loading || otp.length < 6}
-                        className="btn btn-primary w-full py-3.5 text-base disabled:opacity-50"
+                        className="btn mkt-btn-ember w-full py-3.5 text-base disabled:opacity-50"
                         whileTap={{ scale: 0.97 }}
                       >
                         {loading ? <><Loader2 size={18} className="animate-spin" /> Verifying...</> : <>Verify & continue <ArrowRight size={18} /></>}
@@ -510,45 +510,45 @@ export default function Signup() {
 
                 {step === "checkout" && (
                   <>
-                    <button onClick={() => { setStep("otp"); setErr(""); }} className="flex items-center gap-1.5 text-sm text-ink-muted hover:text-orange-600 mb-6 transition-colors"><ArrowLeft size={16} /> Back</button>
-                    <h1 className="font-display font-bold text-2xl text-ink mb-1">Almost there!</h1>
-                    <p className="text-sm text-ink-soft mb-6">Confirm your plan and you'll be inside your new workspace in seconds.</p>
+                    <button onClick={() => { setStep("otp"); setErr(""); }} className="flex items-center gap-1.5 text-sm text-midnight-400 hover:text-orange-300 mb-6 transition-colors"><ArrowLeft size={16} /> Back</button>
+                    <h1 className="font-display font-bold text-2xl text-white mb-1">Almost there!</h1>
+                    <p className="text-sm text-midnight-200/80 mb-6">Confirm your plan and you'll be inside your new workspace in seconds.</p>
 
                     {/* Plan summary card */}
-                    <div className={`rounded-2xl border p-5 mb-6 transition-all ${plan.popular ? "border-orange-200 bg-gradient-to-br from-orange-50/60 to-cream-50 shadow-sm shadow-orange-100/50" : "border-cream-200 bg-cream-50/50"}`}>
+                    <div className={`rounded-2xl border p-5 mb-6 transition-all ${plan.popular ? "border-orange-400/30 bg-gradient-to-br from-orange-500/12 to-transparent" : "border-white/[0.1] bg-white/[0.03]"}`}>
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-display font-bold text-lg text-ink">{plan.name}</h3>
+                            <h3 className="font-display font-bold text-lg text-white">{plan.name}</h3>
                             {plan.popular && <span className="text-[9px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full">POPULAR</span>}
                           </div>
-                          <p className="text-xs text-ink-muted mt-0.5">{plan.tagline}</p>
+                          <p className="text-xs text-midnight-400 mt-0.5">{plan.tagline}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-display font-bold text-2xl text-ink">₹{price.toLocaleString("en-IN")}</p>
-                          <p className="text-[11px] text-ink-muted">per {cycle === "monthly" ? "month" : "year"}</p>
+                          <p className="font-display font-bold text-2xl text-white">₹{price.toLocaleString("en-IN")}</p>
+                          <p className="text-[11px] text-midnight-400">per {cycle === "monthly" ? "month" : "year"}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-ink-soft border-t border-cream-200/80 pt-3">
+                      <div className="flex items-center gap-4 text-sm text-midnight-200/80 border-t border-white/[0.08] pt-3">
                         <span className="flex items-center gap-1.5"><Users size={13} className="text-orange-500" /> {plan.includedSeats < 0 ? "Unlimited" : plan.includedSeats} seats</span>
                         <span className="flex items-center gap-1.5"><Inbox size={13} className="text-orange-500" /> {plan.leadsLimit < 0 || plan.leadsLimit >= 1000000 ? "Unlimited" : plan.leadsLimit.toLocaleString("en-IN")} leads</span>
                       </div>
                     </div>
 
                     {/* billing cycle toggle */}
-                    <div className="flex items-center justify-between mb-5 bg-cream-50/50 rounded-xl p-3 border border-cream-100">
-                      <span className="text-sm font-medium text-ink">Billing cycle</span>
-                      <div className="inline-flex bg-white rounded-full p-0.5 text-sm border border-cream-200 shadow-sm">
-                        <button onClick={() => setCycle("monthly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "monthly" ? "bg-orange-500 text-white shadow-sm" : "text-ink-muted hover:text-ink"}`}>Monthly</button>
-                        <button onClick={() => setCycle("yearly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "yearly" ? "bg-orange-500 text-white shadow-sm" : "text-ink-muted hover:text-ink"}`}>Yearly <span className="text-[9px] font-bold ml-0.5">-20%</span></button>
+                    <div className="flex items-center justify-between mb-5 bg-white/[0.03] rounded-xl p-3 border border-white/[0.07]">
+                      <span className="text-sm font-medium text-white">Billing cycle</span>
+                      <div className="inline-flex bg-white/[0.06] rounded-full p-0.5 text-sm border border-white/[0.1]">
+                        <button onClick={() => setCycle("monthly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "monthly" ? "bg-orange-500 text-white shadow-sm" : "text-midnight-400 hover:text-white"}`}>Monthly</button>
+                        <button onClick={() => setCycle("yearly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "yearly" ? "bg-orange-500 text-white shadow-sm" : "text-midnight-400 hover:text-white"}`}>Yearly <span className="text-[9px] font-bold ml-0.5">-20%</span></button>
                       </div>
                     </div>
 
                     {/* payment method (only relevant for paying) */}
                     {anyGateway && (
-                      <div className="flex items-center justify-between mb-5 bg-cream-50/50 rounded-xl p-3 border border-cream-100">
-                        <span className="text-sm font-medium text-ink">Pay with</span>
-                        <div className="inline-flex bg-white rounded-full p-0.5 text-sm border border-cream-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-5 bg-white/[0.03] rounded-xl p-3 border border-white/[0.07]">
+                        <span className="text-sm font-medium text-white">Pay with</span>
+                        <div className="inline-flex bg-white/[0.06] rounded-full p-0.5 text-sm border border-white/[0.1]">
                           <span className="px-3 py-1.5 rounded-full font-medium bg-orange-500 text-white shadow-sm">Razorpay</span>
                         </div>
                       </div>
@@ -557,26 +557,26 @@ export default function Signup() {
                     {/* ACTIONS */}
                     <div className="space-y-3">
                       {canFreeTrial && (
-                        <button onClick={startFreeTrial} disabled={payBusy} className="btn btn-secondary w-full py-3.5 text-base border-success-300 text-success-700 hover:bg-success-50">
+                        <button onClick={startFreeTrial} disabled={payBusy} className="btn mkt-btn-glass w-full py-3.5 text-base !border-emerald-400/30 !text-emerald-300 hover:!bg-emerald-500/10">
                           {payBusy ? <><Loader2 size={18} className="animate-spin" /> Setting up…</> : <><Gift size={18} /> Start {trialDays}-day free trial</>}
                         </button>
                       )}
 
-                      <button onClick={payAndCreate} disabled={payBusy || (!anyGateway)} className="btn btn-primary w-full py-3.5 text-base">
+                      <button onClick={payAndCreate} disabled={payBusy || (!anyGateway)} className="btn mkt-btn-ember w-full py-3.5 text-base">
                         {payBusy ? <><Loader2 size={18} className="animate-spin" /> Processing…</>
                           : <><CreditCard size={18} /> Pay ₹{price.toLocaleString("en-IN")} & activate</>}
                       </button>
 
                       {planIsStarter && !canFreeTrial && (
-                        <p className="text-xs text-warning-700 text-center">This number has already used its free trial — pay to activate.</p>
+                        <p className="text-xs text-amber-300 text-center">This number has already used its free trial — pay to activate.</p>
                       )}
                       {!planIsStarter && (
-                        <p className="text-xs text-ink-muted text-center flex items-center justify-center gap-1.5">
+                        <p className="text-xs text-midnight-400 text-center flex items-center justify-center gap-1.5">
                           <Lock size={12} /> {plan.name} is a paid plan — your workspace is created only after payment.
                         </p>
                       )}
                       {!anyGateway && (
-                        <p className="text-xs text-danger-600 text-center">Payment gateway is unreachable (set VITE_BACKEND_URL).</p>
+                        <p className="text-xs text-rose-300 text-center">Payment gateway is unreachable (set VITE_BACKEND_URL).</p>
                       )}
                     </div>
                   </>
@@ -588,7 +588,7 @@ export default function Signup() {
             </div>
           )}
 
-          <p className="text-center text-xs text-ink-muted mt-5">By continuing you agree to our <Link to="/terms" className="underline hover:text-orange-600">Terms</Link> & <Link to="/privacy" className="underline hover:text-orange-600">Privacy Policy</Link></p>
+          <p className="text-center text-xs text-midnight-400 mt-5">By continuing you agree to our <Link to="/terms" className="underline hover:text-orange-300">Terms</Link> & <Link to="/privacy" className="underline hover:text-orange-300">Privacy Policy</Link></p>
 
           {/* Mobile trust badges (hidden on desktop — shown on left panel) */}
           <div className="lg:hidden flex items-center justify-center gap-4 mt-4">
@@ -597,8 +597,8 @@ export default function Signup() {
               { icon: Clock, text: "2-min setup" },
               { icon: Lock, text: "Encrypted" },
             ].map((b) => (
-              <div key={b.text} className="flex items-center gap-1 text-[10px] text-ink-muted">
-                <b.icon size={10} className="text-ink-muted/60" />
+              <div key={b.text} className="flex items-center gap-1 text-[10px] text-midnight-400">
+                <b.icon size={10} className="text-midnight-500" />
                 <span>{b.text}</span>
               </div>
             ))}
@@ -612,10 +612,10 @@ export default function Signup() {
 function Field({ icon: Icon, label, value, onChange, placeholder, disabled }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-ink mb-1.5">{label}</label>
+      <label className="block text-sm font-medium text-white mb-1.5">{label}</label>
       <div className="relative group">
-        <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-muted/70 group-focus-within:text-orange-500 transition-colors" size={18} />
-        <input className="input pl-11 bg-cream-50/30 border-cream-200 focus:border-orange-300 focus:bg-white focus:shadow-sm focus:shadow-orange-100/50 transition-all" placeholder={placeholder} value={value}
+        <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-midnight-400 group-focus-within:text-orange-500 transition-colors" size={18} />
+        <input className="input pl-11 bg-white/[0.04] border-white/[0.1] text-white placeholder:text-midnight-500 focus:border-orange-400/50 focus:bg-white/[0.07] focus:ring-orange-500/20 transition-all" placeholder={placeholder} value={value}
           onChange={(e) => onChange(e.target.value)} disabled={disabled} />
       </div>
     </div>
