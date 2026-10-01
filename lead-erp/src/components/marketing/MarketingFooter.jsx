@@ -34,7 +34,7 @@ export default function MarketingFooter() {
                 Codeskate <span className="mkt-text-gradient">CRM</span>
               </span>
             </div>
-            <p className="text-sm text-midnight-300/75 leading-relaxed max-w-xs">
+            <p className="text-sm text-midnight-300/80 leading-relaxed max-w-xs">
               The all-in-one lead management platform that helps growing teams close more deals.
             </p>
           </div>
@@ -46,7 +46,7 @@ export default function MarketingFooter() {
                 <li key={l.label}>
                   <Link
                     to={l.to}
-                    className="text-midnight-300/75 hover:text-orange-300 transition-colors"
+                    className="text-midnight-300/80 hover:text-orange-300 transition-colors"
                   >
                     {l.label}
                   </Link>
@@ -60,7 +60,7 @@ export default function MarketingFooter() {
             <ul className="space-y-2.5 text-sm">
               {COMPANY_LINKS.map((l) => (
                 <li key={l}>
-                  <span className="text-midnight-300/75">{l}</span>
+                  <span className="text-midnight-300/80">{l}</span>
                 </li>
               ))}
             </ul>
@@ -73,14 +73,14 @@ export default function MarketingFooter() {
                 <li key={l.label}>
                   <Link
                     to={l.to}
-                    className="text-midnight-300/75 hover:text-orange-300 transition-colors"
+                    className="text-midnight-300/80 hover:text-orange-300 transition-colors"
                   >
                     {l.label}
                   </Link>
                 </li>
               ))}
               <li>
-                <span className="text-midnight-300/75">Security</span>
+                <span className="text-midnight-300/80">Security</span>
               </li>
             </ul>
           </div>
@@ -89,7 +89,7 @@ export default function MarketingFooter() {
         <div className="mkt-rule mb-8" />
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-midnight-400">
+          <p className="text-xs text-midnight-300/80">
             © {new Date().getFullYear()} Codeskate CRM. All rights reserved.
           </p>
           <div className="flex items-center gap-2.5">

@@ -32,7 +32,7 @@ export default function LegalPageLayout({ eyebrow, title, intro, updatedAt, chil
                 <p className="mt-3 max-w-2xl text-sm sm:text-base leading-7 text-midnight-200/80">
                   {intro}
                 </p>
-                <p className="mt-5 text-xs text-midnight-400">Last updated: {updatedAt}</p>
+                <p className="mt-5 text-xs text-midnight-300/80">Last updated: {updatedAt}</p>
               </div>
             </div>
           </header>

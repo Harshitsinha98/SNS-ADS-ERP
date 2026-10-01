@@ -138,7 +138,7 @@ export default function Login() {
             /* ─── PORTAL SELECTOR ─── */
             <div className="p-6">
               <h1 className="font-display font-bold text-xl text-white mb-1 text-center">Sign in to CodeSkate</h1>
-              <p className="text-sm text-midnight-400 mb-6 text-center">How do you want to sign in?</p>
+              <p className="text-sm text-midnight-300/80 mb-6 text-center">How do you want to sign in?</p>
 
               <div className="space-y-2.5">
                 <button onClick={() => setPortal("admin")}
@@ -148,9 +148,9 @@ export default function Login() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-semibold text-white text-[15px]">Admin / Owner</p>
-                    <p className="text-xs text-midnight-400">Manage team, billing & settings</p>
+                    <p className="text-xs text-midnight-300/80">Manage team, billing & settings</p>
                   </div>
-                  <ArrowRight size={17} className="text-midnight-500 group-hover:text-orange-300 transition-colors" />
+                  <ArrowRight size={17} className="text-midnight-300/80 group-hover:text-orange-300 transition-colors" />
                 </button>
 
                 <button onClick={() => setPortal("employee")}
@@ -160,13 +160,13 @@ export default function Login() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-display font-semibold text-white text-[15px]">Employee</p>
-                    <p className="text-xs text-midnight-400">Work on your assigned leads</p>
+                    <p className="text-xs text-midnight-300/80">Work on your assigned leads</p>
                   </div>
-                  <ArrowRight size={17} className="text-midnight-500 group-hover:text-orange-300 transition-colors" />
+                  <ArrowRight size={17} className="text-midnight-300/80 group-hover:text-orange-300 transition-colors" />
                 </button>
               </div>
 
-              <p className="text-center text-sm text-midnight-400 mt-6">
+              <p className="text-center text-sm text-midnight-300/80 mt-6">
                 New here?{" "}
                 <Link to="/signup" className="text-orange-300 font-semibold hover:underline">Start free trial</Link>
               </p>
@@ -178,7 +178,7 @@ export default function Login() {
                 onClick={step === "otp"
                   ? () => { setStep("phone"); setOtp(""); setErr(""); setInfo(""); }
                   : resetToPortal}
-                className="mkt-touch inline-flex items-center gap-1.5 text-sm text-midnight-400 hover:text-orange-300 mb-4"
+                className="mkt-touch inline-flex items-center gap-1.5 text-sm text-midnight-300/80 hover:text-orange-300 mb-4"
               >
                 <ArrowLeft size={16} /> {step === "otp" ? "Change number" : "Back"}
               </button>
@@ -215,14 +215,14 @@ export default function Login() {
               {step === "phone" ? (
                 <form onSubmit={sendOtp} className="space-y-4">
                   <div className="relative">
-                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-midnight-400 z-10">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 text-midnight-300/80 z-10">
                       <Phone size={16} />
                       <span className="text-sm font-semibold">+91</span>
                       <div className="w-px h-4 bg-white/20" />
                     </div>
                     <input
                       type="tel"
-                      className="input pl-[5.25rem] bg-white/[0.04] border-white/[0.1] text-white placeholder:text-midnight-500 focus:border-orange-400/50 focus:bg-white/[0.07] focus:ring-orange-500/20"
+                      className="input pl-[5.25rem] bg-white/[0.04] border-white/[0.1] text-white placeholder:text-midnight-400 focus:border-orange-400/50 focus:bg-white/[0.07] focus:ring-orange-500/20"
                       placeholder="98765 43210"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
@@ -243,7 +243,7 @@ export default function Login() {
                 <>
                   <form onSubmit={confirmOtp} className="space-y-4">
                     <input
-                      className="input text-center text-2xl tracking-[0.4em] font-mono bg-white/[0.04] border-white/[0.1] text-white placeholder:text-midnight-500 focus:border-orange-400/50 focus:bg-white/[0.07] focus:ring-orange-500/20"
+                      className="input text-center text-2xl tracking-[0.4em] font-mono bg-white/[0.04] border-white/[0.1] text-white placeholder:text-midnight-400 focus:border-orange-400/50 focus:bg-white/[0.07] focus:ring-orange-500/20"
                       placeholder="● ● ● ● ● ●"
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
@@ -262,7 +262,7 @@ export default function Login() {
                   </form>
 
                   <div className="mt-5 pt-4 border-t border-white/[0.08]">
-                    <p className="text-xs text-midnight-400 mb-2.5">Didn't get the code?</p>
+                    <p className="text-xs text-midnight-300/80 mb-2.5">Didn't get the code?</p>
                     <div className="flex gap-2 flex-wrap">
                       <button type="button" onClick={() => resend("whatsapp")} disabled={!!resending || loading}
                         className="mkt-touch flex items-center gap-1.5 text-xs font-semibold px-3 py-2.5 rounded-lg border border-white/[0.1] bg-white/[0.03] text-midnight-200 hover:bg-white/[0.07] disabled:opacity-40 transition-colors">
@@ -289,7 +289,7 @@ export default function Login() {
           )}
         </div>
 
-        <p className="text-center text-xs text-midnight-400 mt-5">
+        <p className="text-center text-xs text-midnight-300/80 mt-5">
           Secured with one-time password verification
         </p>
       </div>

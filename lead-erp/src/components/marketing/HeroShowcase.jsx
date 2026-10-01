@@ -92,15 +92,18 @@ export default function HeroShowcase() {
         >
           <div className="absolute inset-0 mkt-grain pointer-events-none" />
 
-          {/* ── Window chrome ── */}
-          <div className="relative flex items-center gap-3 px-4 py-3 border-b border-white/[0.08] bg-white/[0.03]">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-400/60" />
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400/60" />
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/60" />
-            </div>
-            <p className="flex-1 text-center text-[11px] font-medium text-midnight-300/80 truncate">
-              Codeskate CRM · Team Inbox
+          {/* ── Panel header ──
+              Deliberately NOT dressed up as an OS window. The macOS traffic
+              lights that were here read as "this is a screenshot", which this
+              isn't — the real Team Inbox is light-themed and laid out
+              differently. What's depicted (lead queue, conversation, AI reply
+              latency) is real; the chrome was not. */}
+          <div className="relative flex items-center gap-2.5 px-4 py-3 border-b border-white/[0.08] bg-white/[0.03]">
+            <span className="w-5 h-5 rounded-md bg-gradient-orange flex items-center justify-center shrink-0">
+              <MessageSquare size={11} className="text-white" />
+            </span>
+            <p className="flex-1 text-[11px] font-semibold text-midnight-200/80 truncate">
+              Team Inbox
             </p>
             <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-300">
               <span className="relative flex h-1.5 w-1.5">
@@ -115,7 +118,7 @@ export default function HeroShowcase() {
           <div className="relative grid sm:grid-cols-[0.8fr_1.2fr]">
             {/* Lead list */}
             <div className="hidden sm:block border-r border-white/[0.08] p-3 space-y-1.5">
-              <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-midnight-400">
+              <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-midnight-300/80">
                 Leads
               </p>
               {LEAD_ROWS.map((row, i) => {
@@ -132,9 +135,9 @@ export default function HeroShowcase() {
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tone.dot}`} />
                     <div className="min-w-0 flex-1">
                       <p className="text-[11px] font-semibold text-white truncate">{row.name}</p>
-                      <p className="text-[9px] text-midnight-400 truncate">{row.source}</p>
+                      <p className="text-[10px] text-midnight-300/80 truncate">{row.source}</p>
                     </div>
-                    <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${tone.chip}`}>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${tone.chip}`}>
                       {tone.label}
                     </span>
                   </motion.div>
@@ -150,7 +153,7 @@ export default function HeroShowcase() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold text-white truncate">Neha Gupta</p>
-                  <p className="text-[9px] text-midnight-400 flex items-center gap-1">
+                  <p className="text-[10px] text-midnight-300/80 flex items-center gap-1">
                     <MessageSquare size={8} /> WhatsApp · Whitefield enquiry
                   </p>
                 </div>
@@ -168,7 +171,7 @@ export default function HeroShowcase() {
                     <p className="text-[12px] leading-relaxed text-midnight-100">
                       Do you have 3BHK options under ₹80L in Whitefield?
                     </p>
-                    <p className="text-[9px] text-midnight-400 mt-1 text-right">12:01 PM</p>
+                    <p className="text-[10px] text-midnight-300/80 mt-1 text-right">12:01 PM</p>
                   </div>
                 </motion.div>
 
@@ -195,8 +198,8 @@ export default function HeroShowcase() {
                   <div className="max-w-[92%] rounded-2xl rounded-tl-md bg-white/[0.06] border border-white/10 px-3.5 py-2.5 backdrop-blur">
                     <div className="flex items-center gap-1.5 mb-1">
                       <Brain size={9} className="text-violet-300" />
-                      <span className="text-[9px] font-bold text-violet-300">AI Auto-Reply</span>
-                      <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">
+                      <span className="text-[10px] font-bold text-violet-300">AI Auto-Reply</span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">
                         3 SEC
                       </span>
                     </div>
@@ -204,7 +207,7 @@ export default function HeroShowcase() {
                       Yes — 3 units in Whitefield from ₹72L, with covered parking and clubhouse
                       access. Shall I block a site visit this weekend?
                     </p>
-                    <p className="text-[9px] text-midnight-400 mt-1 flex items-center gap-1">
+                    <p className="text-[10px] text-midnight-300/80 mt-1 flex items-center gap-1">
                       <Check size={8} className="text-emerald-400" /> Sent from your business number
                     </p>
                   </div>

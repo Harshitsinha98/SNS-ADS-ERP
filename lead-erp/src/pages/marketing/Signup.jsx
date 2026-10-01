@@ -236,7 +236,7 @@ export default function Signup() {
               <div key={f.label} className="bg-white/5 border border-white/10 rounded-xl p-3.5 backdrop-blur-sm hover:bg-white/10 transition-colors">
                 <f.icon size={16} className="text-orange-400 mb-1.5" />
                 <p className="text-xs font-semibold text-white">{f.label}</p>
-                <p className="text-[10px] text-midnight-300/70">{f.sub}</p>
+                <p className="text-[10px] text-midnight-300/80">{f.sub}</p>
               </div>
             ))}
           </div>
@@ -245,17 +245,17 @@ export default function Signup() {
           <div className="flex items-center gap-6">
             <div className="text-center">
               <p className="font-display font-bold text-2xl text-orange-400">12.4K+</p>
-              <p className="text-[10px] text-midnight-300/70">AI replies today</p>
+              <p className="text-[10px] text-midnight-300/80">AI replies today</p>
             </div>
             <div className="w-px h-10 bg-white/10" />
             <div className="text-center">
               <p className="font-display font-bold text-2xl text-emerald-400">70%</p>
-              <p className="text-[10px] text-midnight-300/70">auto-resolved</p>
+              <p className="text-[10px] text-midnight-300/80">auto-resolved</p>
             </div>
             <div className="w-px h-10 bg-white/10" />
             <div className="text-center">
               <p className="font-display font-bold text-2xl text-violet-300">3s</p>
-              <p className="text-[10px] text-midnight-300/70">response time</p>
+              <p className="text-[10px] text-midnight-300/80">response time</p>
             </div>
           </div>
         </div>
@@ -272,7 +272,7 @@ export default function Signup() {
             <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-xs font-bold text-orange-400">V</div>
             <div>
               <p className="text-xs font-semibold text-white">Vikram Saxena</p>
-              <p className="text-[10px] text-midnight-400">Director, Meridian Properties</p>
+              <p className="text-[10px] text-midnight-300/80">Director, Meridian Properties</p>
             </div>
           </div>
         </div>
@@ -284,8 +284,8 @@ export default function Signup() {
             { icon: Clock, text: "2-min setup" },
             { icon: Lock, text: "Data encrypted" },
           ].map((b) => (
-            <div key={b.text} className="flex items-center gap-1.5 text-[10px] text-midnight-400">
-              <b.icon size={11} className="text-midnight-500" />
+            <div key={b.text} className="flex items-center gap-1.5 text-[10px] text-midnight-300/80">
+              <b.icon size={11} className="text-midnight-300/80" />
               <span>{b.text}</span>
             </div>
           ))}
@@ -327,7 +327,7 @@ export default function Signup() {
                   <p className="text-midnight-200/80 mb-6"><span className="font-semibold text-white">{orgName}</span> is ready. Taking you to your dashboard now...</p>
                   <div className="flex items-center justify-center gap-3">
                     <Loader2 className="w-5 h-5 animate-spin text-orange-500" />
-                    <span className="text-sm text-midnight-400">Loading your workspace...</span>
+                    <span className="text-sm text-midnight-300/80">Loading your workspace...</span>
                   </div>
                 </motion.div>
               </div>
@@ -354,10 +354,10 @@ export default function Signup() {
                   const isDone = (i === 0 && step !== "details") || (i === 1 && step === "checkout");
                   return (
                     <div key={label} className="flex flex-col items-center gap-1.5 relative z-10">
-                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 ${isDone ? "bg-emerald-500 text-white shadow-[0_0_20px_-4px_rgba(16,185,129,0.6)]" : isActive ? "bg-orange-500 text-white shadow-[0_0_20px_-4px_rgba(255,107,26,0.6)]" : "bg-white/[0.06] text-midnight-400 border border-white/[0.1]"}`}>
+                      <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all duration-300 ${isDone ? "bg-emerald-500 text-white shadow-[0_0_20px_-4px_rgba(16,185,129,0.6)]" : isActive ? "bg-orange-500 text-white shadow-[0_0_20px_-4px_rgba(255,107,26,0.6)]" : "bg-white/[0.06] text-midnight-300/80 border border-white/[0.1]"}`}>
                         {isDone ? <Check size={13} strokeWidth={3} /> : i + 1}
                       </span>
-                      <span className={`text-[10px] font-medium ${isActive ? "text-white" : isDone ? "text-emerald-600" : "text-midnight-400"}`}>{label}</span>
+                      <span className={`text-[10px] font-medium ${isActive ? "text-white" : isDone ? "text-emerald-600" : "text-midnight-300/80"}`}>{label}</span>
                     </div>
                   );
                 })}
@@ -384,21 +384,21 @@ export default function Signup() {
                 {step === "details" && (
                   <>
                     <h1 className="font-display font-bold text-[1.6rem] text-white mb-1.5">Get started for free</h1>
-                    <p className="text-[13px] text-midnight-400 mb-7">Set up your workspace in under 2 minutes. No credit card needed.</p>
+                    <p className="text-[13px] text-midnight-300/80 mb-7">Set up your workspace in under 2 minutes. No credit card needed.</p>
                     <form onSubmit={submitDetails} className="space-y-5">
                       <Field icon={User} label="Your name" value={fullName} onChange={setFullName} placeholder="e.g. Rohan Mehta" disabled={loading} />
                       <Field icon={Building2} label="Organization name" value={orgName} onChange={setOrgName} placeholder="e.g. Meridian Properties" disabled={loading} />
                       <div>
                         <label className="block text-sm font-medium text-white mb-1.5">Mobile number</label>
                         <div className="relative group">
-                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-midnight-400 group-focus-within:text-orange-500 transition-colors" size={18} />
+                          <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-midnight-300/80 group-focus-within:text-orange-500 transition-colors" size={18} />
                           <span className="absolute left-11 top-1/2 -translate-y-1/2 text-midnight-200/80 font-medium text-sm">+91</span>
-                          <input type="tel" className="input pl-[4.5rem] bg-white/[0.04] border-white/[0.1] text-white placeholder:text-midnight-500 focus:border-orange-400/50 focus:bg-white/[0.07] focus:ring-orange-500/20 transition-all" placeholder="98XXXXXXXX" value={phone}
+                          <input type="tel" className="input pl-[4.5rem] bg-white/[0.04] border-white/[0.1] text-white placeholder:text-midnight-400 focus:border-orange-400/50 focus:bg-white/[0.07] focus:ring-orange-500/20 transition-all" placeholder="98XXXXXXXX" value={phone}
                             onChange={(e) => handlePhoneChange(e.target.value)}
                             onBlur={() => checkExistingPhone()}
                             maxLength={10} disabled={loading || checkingAccount} />
                         </div>
-                        {checkingAccount && <p className="mt-1.5 text-xs text-midnight-400 flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Checking availability...</p>}
+                        {checkingAccount && <p className="mt-1.5 text-xs text-midnight-300/80 flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Checking availability...</p>}
                         {existingAccount && (
                           <p className="mt-1.5 text-xs text-orange-200">
                             This number is already registered. <button type="button" onClick={() => navigate("/login")} className="font-semibold underline">Log in instead</button>.
@@ -409,7 +409,7 @@ export default function Signup() {
                       {/* Divider between details and plan selection */}
                       <div className="relative py-2">
                         <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/[0.1]" /></div>
-                        <div className="relative flex justify-center"><span className="px-3 bg-midnight-900 text-[10px] font-semibold text-midnight-400 uppercase tracking-wider">Select plan</span></div>
+                        <div className="relative flex justify-center"><span className="px-3 bg-midnight-900 text-[10px] font-semibold text-midnight-300/80 uppercase tracking-wider">Select plan</span></div>
                       </div>
 
                       <div>
@@ -420,10 +420,10 @@ export default function Signup() {
                               {p.popular && <span className="absolute -top-2 left-1/2 -translate-x-1/2 text-[8px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm">POPULAR</span>}
                               {planId === p.id && <span className="absolute top-2 right-2 w-3 h-3 rounded-full bg-orange-500 border-2 border-midnight-900 shadow-sm" />}
                               <span className={`block text-sm font-bold ${planId === p.id ? "text-orange-200" : "text-white"}`}>{p.name}</span>
-                              <span className="block text-[11px] text-midnight-400 mt-0.5">₹{p.monthlyPrice.toLocaleString("en-IN")}/mo</span>
-                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-midnight-500"}`}>{p.trial ? `${trialDays}-day free trial` : "Paid plan"}</span>
+                              <span className="block text-[11px] text-midnight-300/80 mt-0.5">₹{p.monthlyPrice.toLocaleString("en-IN")}/mo</span>
+                              <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-midnight-300/80"}`}>{p.trial ? `${trialDays}-day free trial` : "Paid plan"}</span>
                               {/* Key feature highlight */}
-                              <span className="block text-[9px] text-midnight-400 mt-1.5 leading-tight">
+                              <span className="block text-[9px] text-midnight-300/80 mt-1.5 leading-tight">
                                 {p.id === "starter" ? "3 users · 1K leads" : p.id === "growth" ? "10 users · AI + Human Takeover" : p.id === "enterprise" ? "25 users · Bridge calling" : "Unlimited + AI Voice Bot"}
                               </span>
                             </button>
@@ -434,11 +434,11 @@ export default function Signup() {
                       <button type="submit" disabled={loading || checkingAccount || existingAccount || !fullName.trim() || !orgName.trim() || phone.length !== 10} className="btn mkt-btn-ember w-full py-3.5 text-base mt-2 disabled:opacity-50 disabled:cursor-not-allowed">
                         {loading || checkingAccount ? <><Loader2 size={18} className="animate-spin" /> Please wait...</> : existingAccount ? <>Account exists — log in instead</> : <>Continue <ArrowRight size={18} /></>}
                       </button>
-                      <p className="text-center text-[11px] text-midnight-400 flex items-center justify-center gap-1.5">
-                        <Shield size={11} className="text-midnight-500" /> No credit card required to start your trial
+                      <p className="text-center text-[11px] text-midnight-300/80 flex items-center justify-center gap-1.5">
+                        <Shield size={11} className="text-midnight-300/80" /> No credit card required to start your trial
                       </p>
                     </form>
-                    <p className="text-center text-sm text-midnight-400 mt-6">
+                    <p className="text-center text-sm text-midnight-300/80 mt-6">
                       Already have an account? <Link to="/login" className="text-orange-300 font-semibold hover:underline">Sign in</Link>
                     </p>
                   </>
@@ -453,7 +453,7 @@ export default function Signup() {
                     <button onClick={() => navigate("/login")} className="btn mkt-btn-ember w-full py-3.5 text-base">
                       Go to login <ArrowRight size={18} />
                     </button>
-                    <button onClick={() => { setExistingAccount(false); setStep("details"); }} className="w-full mt-3 text-sm font-medium text-midnight-400 hover:text-orange-300">
+                    <button onClick={() => { setExistingAccount(false); setStep("details"); }} className="w-full mt-3 text-sm font-medium text-midnight-300/80 hover:text-orange-300">
                       Use a different number
                     </button>
                   </>
@@ -461,7 +461,7 @@ export default function Signup() {
 
                 {step === "otp" && (
                   <>
-                    <button onClick={() => { setStep("details"); setOtp(""); setErr(""); }} className="flex items-center gap-1.5 text-sm text-midnight-400 hover:text-orange-300 mb-6 transition-colors"><ArrowLeft size={16} /> Back</button>
+                    <button onClick={() => { setStep("details"); setOtp(""); setErr(""); }} className="flex items-center gap-1.5 text-sm text-midnight-300/80 hover:text-orange-300 mb-6 transition-colors"><ArrowLeft size={16} /> Back</button>
                     <div className="w-14 h-14 bg-gradient-to-br from-orange-500/20 to-orange-500/5 border border-orange-400/20 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
                       <ShieldCheck className="text-orange-300" size={26} />
                     </div>
@@ -477,7 +477,7 @@ export default function Signup() {
                               animate={{ opacity: 1, scale: 1 }}
                               transition={{ delay: i * 0.05, duration: 0.2 }}
                               className={`w-11 h-14 rounded-xl border-2 flex items-center justify-center text-xl font-bold font-mono cursor-text transition-all ${
-                                otp[i] ? "border-orange-400/60 bg-orange-500/15 text-orange-200" : "border-white/[0.1] bg-white/[0.03] text-midnight-500"
+                                otp[i] ? "border-orange-400/60 bg-orange-500/15 text-orange-200" : "border-white/[0.1] bg-white/[0.03] text-midnight-300/80"
                               }`}
                             >
                               {otp[i] || ""}
@@ -494,7 +494,7 @@ export default function Signup() {
                           disabled={loading}
                           id="otp-hidden-input"
                         />
-                        <p className="text-xs text-midnight-400 mt-3 text-center">Didn't receive it? Check your messages or wait 30 seconds.</p>
+                        <p className="text-xs text-midnight-300/80 mt-3 text-center">Didn't receive it? Check your messages or wait 30 seconds.</p>
                       </div>
                       <motion.button
                         type="submit"
@@ -510,7 +510,7 @@ export default function Signup() {
 
                 {step === "checkout" && (
                   <>
-                    <button onClick={() => { setStep("otp"); setErr(""); }} className="flex items-center gap-1.5 text-sm text-midnight-400 hover:text-orange-300 mb-6 transition-colors"><ArrowLeft size={16} /> Back</button>
+                    <button onClick={() => { setStep("otp"); setErr(""); }} className="flex items-center gap-1.5 text-sm text-midnight-300/80 hover:text-orange-300 mb-6 transition-colors"><ArrowLeft size={16} /> Back</button>
                     <h1 className="font-display font-bold text-2xl text-white mb-1">Almost there!</h1>
                     <p className="text-sm text-midnight-200/80 mb-6">Confirm your plan and you'll be inside your new workspace in seconds.</p>
 
@@ -522,11 +522,11 @@ export default function Signup() {
                             <h3 className="font-display font-bold text-lg text-white">{plan.name}</h3>
                             {plan.popular && <span className="text-[9px] font-bold bg-orange-500 text-white px-2 py-0.5 rounded-full">POPULAR</span>}
                           </div>
-                          <p className="text-xs text-midnight-400 mt-0.5">{plan.tagline}</p>
+                          <p className="text-xs text-midnight-300/80 mt-0.5">{plan.tagline}</p>
                         </div>
                         <div className="text-right">
                           <p className="font-display font-bold text-2xl text-white">₹{price.toLocaleString("en-IN")}</p>
-                          <p className="text-[11px] text-midnight-400">per {cycle === "monthly" ? "month" : "year"}</p>
+                          <p className="text-[11px] text-midnight-300/80">per {cycle === "monthly" ? "month" : "year"}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-midnight-200/80 border-t border-white/[0.08] pt-3">
@@ -539,8 +539,8 @@ export default function Signup() {
                     <div className="flex items-center justify-between mb-5 bg-white/[0.03] rounded-xl p-3 border border-white/[0.07]">
                       <span className="text-sm font-medium text-white">Billing cycle</span>
                       <div className="inline-flex bg-white/[0.06] rounded-full p-0.5 text-sm border border-white/[0.1]">
-                        <button onClick={() => setCycle("monthly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "monthly" ? "bg-orange-500 text-white shadow-sm" : "text-midnight-400 hover:text-white"}`}>Monthly</button>
-                        <button onClick={() => setCycle("yearly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "yearly" ? "bg-orange-500 text-white shadow-sm" : "text-midnight-400 hover:text-white"}`}>Yearly <span className="text-[9px] font-bold ml-0.5">-20%</span></button>
+                        <button onClick={() => setCycle("monthly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "monthly" ? "bg-orange-500 text-white shadow-sm" : "text-midnight-300/80 hover:text-white"}`}>Monthly</button>
+                        <button onClick={() => setCycle("yearly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "yearly" ? "bg-orange-500 text-white shadow-sm" : "text-midnight-300/80 hover:text-white"}`}>Yearly <span className="text-[9px] font-bold ml-0.5">-20%</span></button>
                       </div>
                     </div>
 
@@ -571,7 +571,7 @@ export default function Signup() {
                         <p className="text-xs text-amber-300 text-center">This number has already used its free trial — pay to activate.</p>
                       )}
                       {!planIsStarter && (
-                        <p className="text-xs text-midnight-400 text-center flex items-center justify-center gap-1.5">
+                        <p className="text-xs text-midnight-300/80 text-center flex items-center justify-center gap-1.5">
                           <Lock size={12} /> {plan.name} is a paid plan — your workspace is created only after payment.
                         </p>
                       )}
@@ -588,7 +588,7 @@ export default function Signup() {
             </div>
           )}
 
-          <p className="text-center text-xs text-midnight-400 mt-5">By continuing you agree to our <Link to="/terms" className="underline hover:text-orange-300">Terms</Link> & <Link to="/privacy" className="underline hover:text-orange-300">Privacy Policy</Link></p>
+          <p className="text-center text-xs text-midnight-300/80 mt-5">By continuing you agree to our <Link to="/terms" className="underline hover:text-orange-300">Terms</Link> & <Link to="/privacy" className="underline hover:text-orange-300">Privacy Policy</Link></p>
 
           {/* Mobile trust badges (hidden on desktop — shown on left panel) */}
           <div className="lg:hidden flex items-center justify-center gap-4 mt-4">
@@ -597,8 +597,8 @@ export default function Signup() {
               { icon: Clock, text: "2-min setup" },
               { icon: Lock, text: "Encrypted" },
             ].map((b) => (
-              <div key={b.text} className="flex items-center gap-1 text-[10px] text-midnight-400">
-                <b.icon size={10} className="text-midnight-500" />
+              <div key={b.text} className="flex items-center gap-1 text-[10px] text-midnight-300/80">
+                <b.icon size={10} className="text-midnight-300/80" />
                 <span>{b.text}</span>
               </div>
             ))}
@@ -614,8 +614,8 @@ function Field({ icon: Icon, label, value, onChange, placeholder, disabled }) {
     <div>
       <label className="block text-sm font-medium text-white mb-1.5">{label}</label>
       <div className="relative group">
-        <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-midnight-400 group-focus-within:text-orange-500 transition-colors" size={18} />
-        <input className="input pl-11 bg-white/[0.04] border-white/[0.1] text-white placeholder:text-midnight-500 focus:border-orange-400/50 focus:bg-white/[0.07] focus:ring-orange-500/20 transition-all" placeholder={placeholder} value={value}
+        <Icon className="absolute left-3.5 top-1/2 -translate-y-1/2 text-midnight-300/80 group-focus-within:text-orange-500 transition-colors" size={18} />
+        <input className="input pl-11 bg-white/[0.04] border-white/[0.1] text-white placeholder:text-midnight-400 focus:border-orange-400/50 focus:bg-white/[0.07] focus:ring-orange-500/20 transition-all" placeholder={placeholder} value={value}
           onChange={(e) => onChange(e.target.value)} disabled={disabled} />
       </div>
     </div>
