@@ -46,12 +46,12 @@ export default function BottomNav() {
               key={tab.to}
               to={tab.to}
               end={tab.end}
-              className="flex flex-col items-center justify-center gap-0.5 flex-1 py-1 press-scale"
+              className="relative flex flex-col items-center justify-center gap-0.5 flex-1 py-1 press-scale"
             >
               <div
                 className={`flex items-center justify-center w-10 h-7 rounded-full transition-all duration-200 ${
                   isActive
-                    ? "bg-orange-100 scale-110"
+                    ? "bg-gradient-to-b from-orange-100 to-orange-50 ring-1 ring-orange-200/70 shadow-[0_4px_12px_-4px_rgba(240,78,0,0.35)] app-pop-in"
                     : "bg-transparent"
                 }`}
               >
@@ -64,8 +64,8 @@ export default function BottomNav() {
                 />
               </div>
               <span
-                className={`text-[10px] font-medium transition-colors duration-200 ${
-                  isActive ? "text-orange-600" : "text-ink-muted"
+                className={`text-[10px] transition-colors duration-200 ${
+                  isActive ? "text-orange-600 font-semibold" : "text-ink-muted font-medium"
                 }`}
               >
                 {tab.label}

@@ -643,3 +643,183 @@
     }
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   APP SHELL POLISH  (admin + employee panels)
+   ---------------------------------------------------------------------------
+   Visual-only refinements to the shared app primitives. Rules for this block:
+
+   - No change to any box dimension (padding, height, width, gap). Every
+     screen that uses these classes keeps its exact layout.
+   - Hover effects are gated behind (hover: hover) so touch devices don't get
+     "sticky" hover states after a tap. Press states (:active) already exist.
+   - Entrance animations use `animation-fill-mode: backwards`, so once they
+     finish they leave NO residual transform/opacity behind. That matters:
+     a lingering transform would create a containing block and break every
+     `position: fixed` modal nested inside a page.
+   - The global prefers-reduced-motion rule (utilities layer) still disables
+     all of these.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer components {
+  /* ── Cards ── */
+  .card {
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  }
+  /* Only interactive cards lift — static info cards stay still. */
+  @media (hover: hover) {
+    .card:is(a, button, [role="button"], .cursor-pointer):hover {
+      @apply shadow-card-hover border-orange-200/70;
+      transform: translateY(-1px);
+    }
+  }
+
+  /* ── Buttons: desktop previously had no hover feedback at all ── */
+  .btn:focus-visible {
+    @apply ring-2 ring-orange-500/60 ring-offset-2 ring-offset-white;
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+  }
+  @media (hover: hover) {
+    .btn-primary:not(:disabled):hover {
+      @apply shadow-button-hover;
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+    .btn-secondary:not(:disabled):hover {
+      @apply bg-cream-50 border-orange-200;
+    }
+    /* Translucent ink, not a light fill — btn-ghost is also used on a dark
+       background (platform login), where a cream hover would flash. */
+    .btn-ghost:not(:disabled):hover {
+      background-color: rgba(42, 33, 26, 0.05);
+    }
+  }
+
+  /* ── Inputs ── */
+  @media (hover: hover) {
+    .input:not(:focus):not(:disabled):hover {
+      @apply border-cream-400;
+    }
+  }
+  .input:disabled {
+    @apply bg-cream-50 cursor-not-allowed;
+  }
+
+  /* ── Badges: a hairline inset ring gives them definition on white ── */
+  .badge-primary { box-shadow: inset 0 0 0 1px rgba(240, 78, 0, 0.12); }
+  .badge-success { box-shadow: inset 0 0 0 1px rgba(5, 150, 105, 0.14); }
+  .badge-warning { box-shadow: inset 0 0 0 1px rgba(234, 88, 12, 0.14); }
+  .badge-danger  { box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.14); }
+
+  /* ── Top bar + bottom nav: lighter glass, hairline edge ── */
+  .app-topbar {
+    @apply bg-white/80 backdrop-blur-xl border-b border-cream-200/70;
+  }
+  .app-bottomnav {
+    @apply bg-white/85 backdrop-blur-xl;
+  }
+
+  /* ── Wide screens: the shell is mobile-first, and at desktop widths the
+     top bar spread its controls to the far edges while five bottom tabs
+     scattered across ~1280px. Align the top bar with the content column
+     and gather the tabs into a centred dock. Nothing changes below lg. ── */
+  @media (min-width: 1024px) {
+    .app-topbar-inner {
+      @apply max-w-6xl mx-auto px-8;
+    }
+    .app-bottomnav-inner {
+      @apply max-w-xl mx-auto;
+    }
+  }
+
+  /* ── Second-level avatars: warm gradient instead of flat beige ── */
+  .avatar-sm {
+    @apply bg-gradient-to-br from-orange-100 to-cream-200 text-orange-700;
+  }
+
+  /* ── Section titles: a touch more presence ── */
+  .section-title {
+    @apply text-ink-soft;
+  }
+}
+
+@layer utilities {
+  /* Page entrance. Applied by <Layout> to its content wrapper; each route
+     renders its own <Layout>, so this naturally replays on every navigation
+     without keying or remounting anything that wasn't already remounting.
+
+     Opacity only — deliberately no transform. See the note at the top of
+     this block about containing blocks and fixed-position modals. */
+  /* Modals and sheets that a page renders as a direct child are excluded:
+     they mount long after page load, and inheriting the stagger delay would
+     make them open sluggishly. */
+  .app-page-enter > :not(.fixed, .sheet, .sheet-backdrop) {
+    animation: appFadeIn 0.32s ease-out backwards;
+  }
+  .app-page-enter > :nth-child(2):not(.fixed, .sheet, .sheet-backdrop) { animation-delay: 0.03s; }
+  .app-page-enter > :nth-child(3):not(.fixed, .sheet, .sheet-backdrop) { animation-delay: 0.06s; }
+  .app-page-enter > :nth-child(4):not(.fixed, .sheet, .sheet-backdrop) { animation-delay: 0.09s; }
+  .app-page-enter > :nth-child(5):not(.fixed, .sheet, .sheet-backdrop) { animation-delay: 0.12s; }
+  .app-page-enter > :nth-child(6):not(.fixed, .sheet, .sheet-backdrop) { animation-delay: 0.15s; }
+  .app-page-enter > :nth-child(n + 7):not(.fixed, .sheet, .sheet-backdrop) { animation-delay: 0.18s; }
+
+  /* Rise-in stagger for card grids. Transform IS used here, which is safe
+     only because it is applied to grids of cards that contain no fixed
+     descendants — and `backwards` fill drops the transform once done. */
+  .app-stagger > * {
+    animation: appRiseIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .app-stagger > *:nth-child(2) { animation-delay: 0.05s; }
+  .app-stagger > *:nth-child(3) { animation-delay: 0.1s; }
+  .app-stagger > *:nth-child(4) { animation-delay: 0.15s; }
+  .app-stagger > *:nth-child(n + 5) { animation-delay: 0.2s; }
+
+  /* Active tab indicator pops in on each navigation. */
+  .app-pop-in {
+    animation: appPopIn 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  }
+
+  @keyframes appFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes appRiseIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes appPopIn {
+    from { opacity: 0; transform: scale(0.6); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+}
+
+/* Belt-and-braces: the global reduced-motion rule already uses !important
+   and so wins regardless of order. This keeps the opt-out next to the
+   animations it governs, so it survives if that global rule is ever edited. */
+@media (prefers-reduced-motion: reduce) {
+  .app-page-enter > *,
+  .app-stagger > *,
+  .app-pop-in {
+    animation: none !important;
+  }
+}
+
+/* ── Support chat vs bottom nav ──
+   SupportChat is mounted once in App for every route, fixed at bottom-5 /
+   z-50. Inside the app shell the bottom nav is fixed at bottom-0 / z-40, so
+   the button sat on top of the rightmost tab and swallowed its taps.
+
+   When a bottom nav is on the page, lift the button and panel clear of it.
+   `:has()` keeps this a pure CSS change — no new props, no route checks.
+   Browsers without :has() simply keep the previous position. */
+@layer utilities {
+  body:has(.app-bottomnav) .support-fab,
+  body:has(.app-bottomnav) .support-panel {
+    bottom: calc(var(--nav-height) + var(--safe-bottom) + 0.75rem);
+  }
+  body:has(.app-bottomnav) .support-panel {
+    max-height: calc(100dvh - var(--nav-height) - var(--safe-bottom) - var(--topbar-height) - var(--safe-top) - 1.5rem);
+  }
+}

@@ -95,7 +95,7 @@ export default function SupportChat() {
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-50 w-13 h-13 bg-gradient-to-br from-orange-500 to-amber-500 text-white rounded-full shadow-xl flex items-center justify-center hover:scale-105 transition-transform"
+          className="support-fab fixed bottom-5 right-5 z-50 w-13 h-13 bg-gradient-to-br from-orange-500 to-amber-500 text-white rounded-full shadow-xl flex items-center justify-center hover:scale-105 transition-transform"
           title="Need help?"
         >
           <MessageCircle size={22} />
@@ -104,7 +104,7 @@ export default function SupportChat() {
 
       {/* Chat drawer */}
       {open && (
-        <div className="fixed bottom-5 right-5 z-50 w-[360px] max-w-[calc(100vw-2rem)] h-[520px] max-h-[calc(100vh-3rem)] bg-white rounded-2xl shadow-2xl border border-cream-200 flex flex-col overflow-hidden">
+        <div className="support-panel fixed bottom-5 right-5 z-50 w-[360px] max-w-[calc(100vw-2rem)] h-[520px] max-h-[calc(100vh-3rem)] bg-white rounded-2xl shadow-2xl border border-cream-200 flex flex-col overflow-hidden">
           {/* Header */}
           <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-3 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
