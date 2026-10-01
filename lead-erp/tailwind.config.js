@@ -79,10 +79,24 @@ export default {
           800: '#9A3412', 900: '#7C2D12',
         },
         danger: {
+          // DEFAULT + soft restore `text-danger`, `bg-danger-soft` etc. — see
+          // the legacy token note below.
+          DEFAULT: '#DC2626', soft: '#FEE2E2',
           50: '#FEF2F2', 100: '#FEE2E2', 200: '#FECACA', 300: '#FCA5A5',
           400: '#F87171', 500: '#EF4444', 600: '#DC2626', 700: '#B91C1C',
           800: '#991B1B', 900: '#7F1D1D',
         },
+        /* Legacy semantic tokens.
+           ~90 class references across admin/employee screens (border-paper-line
+           alone appears 45 times) point at an older design system that was never
+           carried into this config, so Tailwind emitted nothing for them: status
+           text lost its colour, `bg-paper` surfaces and hover states were
+           transparent, and the conversion bar on Team was invisible. Defining
+           the tokens restores the intended look without editing any screen. */
+        paper: { DEFAULT: '#FDF8F0', line: '#ECE3D7' },
+        ok: { DEFAULT: '#059669', soft: '#D1FAE5' },
+        info: { DEFAULT: '#2563EB', soft: '#DBEAFE' },
+        signal: { DEFAULT: '#9333EA', soft: '#F3E8FF' },
         ink: {
           DEFAULT: '#2A211A',
           soft: '#4A3D31',
@@ -115,6 +129,8 @@ export default {
         'safe-left': 'env(safe-area-inset-left)',
         'safe-right': 'env(safe-area-inset-right)',
         'nav': '4.5rem', // bottom nav height
+        // Used by the support chat button (w-13 h-13); not in the default scale.
+        '13': '3.25rem',
       },
       borderRadius: {
         '2xl': '1rem',
@@ -162,6 +178,8 @@ export default {
         'float': 'float 7s ease-in-out infinite',
         'gradient-x': 'gradientX 8s ease infinite',
         'ticker': 'ticker 32s linear infinite',
+        // Referenced by the Conversations toast but never defined.
+        'slide-in-right': 'slideInRight 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
       },
       keyframes: {
         fadeIn: {
@@ -221,6 +239,10 @@ export default {
         ticker: {
           '0%': { transform: 'translateX(0)' },
           '100%': { transform: 'translateX(-50%)' },
+        },
+        slideInRight: {
+          '0%': { transform: 'translateX(24px)', opacity: '0' },
+          '100%': { transform: 'translateX(0)', opacity: '1' },
         },
       },
       fontSize: {
