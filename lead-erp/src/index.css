@@ -596,11 +596,14 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @layer utilities {
-  /* Stop rubber-band overscroll from revealing the light <body> behind the
-     dark marketing canvas (visible in the WebView and on iOS Safari). */
-  .mkt-canvas {
-    overscroll-behavior-y: contain;
-  }
+  /* NOTE: do not put `overscroll-behavior` on .mkt-canvas.
+     The page wrappers carry `overflow-x-hidden`, and per the CSS Overflow
+     spec a `visible` axis computes to `auto` when the other axis isn't
+     `visible` — so those wrappers are scroll containers. They grow with
+     their content, so they never actually have anything to scroll, and
+     `overscroll-behavior: contain` then blocks scroll from chaining up to
+     the document. The result is a page that cannot be scrolled at all.
+     Pull-to-refresh is already contained on `html` in the base layer. */
 
   @media (max-width: 767px) {
     .mkt-card,
