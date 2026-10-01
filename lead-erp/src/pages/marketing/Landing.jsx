@@ -385,7 +385,7 @@ export default function Landing() {
 
             <motion.p
               {...intro(0.24, 0)}
-              className="text-sm text-midnight-300/75 mb-9 flex items-center justify-center gap-2.5 flex-wrap"
+              className="text-sm text-midnight-300/80 mb-9 flex items-center justify-center gap-2.5 flex-wrap"
             >
               <span className="inline-flex -space-x-2">
                 {["V", "A", "R", "P", "S"].map((l) => (
@@ -426,7 +426,7 @@ export default function Landing() {
 
             <motion.p
               {...intro(0.38, 0)}
-              className="text-sm text-midnight-300/70 flex items-center justify-center gap-5 flex-wrap"
+              className="text-sm text-midnight-300/80 flex items-center justify-center gap-5 flex-wrap"
             >
               <span className="flex items-center gap-1.5">
                 <Check size={14} className="text-emerald-400" strokeWidth={3} /> No credit card
@@ -447,7 +447,7 @@ export default function Landing() {
 
           {/* ── Capability marquee ── */}
           <div className="mt-20 sm:mt-24">
-            <p className="text-center text-[11px] font-bold uppercase tracking-[0.16em] text-midnight-400 mb-6">
+            <p className="text-center text-[11px] font-bold uppercase tracking-[0.16em] text-midnight-300/80 mb-6">
               One platform, every channel
             </p>
             <div className="mkt-edge-fade overflow-hidden">
@@ -477,7 +477,7 @@ export default function Landing() {
                 <p className="font-display font-bold text-4xl sm:text-5xl tracking-[-0.02em] mb-1.5">
                   <CountUp value={c.value} className="mkt-text-gradient" />
                 </p>
-                <p className="text-sm text-midnight-300/70">{c.label}</p>
+                <p className="text-sm text-midnight-300/80">{c.label}</p>
               </StaggerItem>
             ))}
           </Stagger>
@@ -523,7 +523,7 @@ export default function Landing() {
             ))}
           </Stagger>
 
-          <p className="text-center text-xs text-midnight-400 mt-7">
+          <p className="text-center text-xs text-midnight-300/80 mt-7">
             Based on industry benchmarks and aggregated Codeskate customer data (2024–2026).
           </p>
 
@@ -536,37 +536,6 @@ export default function Landing() {
               Fix These Problems Today
               <ArrowRight size={18} />
             </button>
-          </Reveal>
-        </div>
-      </section>
-
-
-      {/* ═══════════ TRUST QUOTE ═══════════ */}
-      <section className="pb-20 sm:pb-28">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <Reveal>
-            <figure className="mkt-card mkt-sheen rounded-3xl p-7 sm:p-10">
-              <div className="flex flex-col sm:flex-row items-center gap-7">
-                <div className="flex gap-0.5 shrink-0">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} size={18} className="text-orange-400" fill="currentColor" />
-                  ))}
-                </div>
-                <div className="text-center sm:text-left">
-                  <blockquote className="text-midnight-100/90 text-lg leading-relaxed">
-                    “We used to have 3 employees just for WhatsApp replies. Codeskate AI handles
-                    it now — saving us ₹40,000 every month and our response time went from 30
-                    minutes to 3 seconds.”
-                  </blockquote>
-                  <figcaption className="mt-4 text-sm font-semibold text-white">
-                    Vikram Saxena{" "}
-                    <span className="font-normal text-midnight-300/70">
-                      · Director, Meridian Properties
-                    </span>
-                  </figcaption>
-                </div>
-              </div>
-            </figure>
           </Reveal>
         </div>
       </section>
@@ -607,7 +576,7 @@ export default function Landing() {
                   <p className="font-display font-bold text-2xl text-white tracking-[-0.02em]">
                     {s.value}
                   </p>
-                  <p className="text-xs text-midnight-300/70 mt-1">{s.label}</p>
+                  <p className="text-xs text-midnight-300/80 mt-1">{s.label}</p>
                 </div>
               </StaggerItem>
             ))}
@@ -632,73 +601,6 @@ export default function Landing() {
               </StaggerItem>
             ))}
           </Stagger>
-
-          {/* Live demo */}
-          <Reveal delay={0.1}>
-            <div className="mt-12 relative rounded-3xl border border-white/10 bg-midnight-950/60 p-6 sm:p-9 overflow-hidden">
-              <div className="absolute inset-0 pattern-grid opacity-50 pointer-events-none" />
-              <div className="absolute -top-20 right-10 w-72 h-72 bg-violet-600/15 mkt-bloom" />
-              <div className="relative">
-                <div className="flex items-center gap-2 mb-6">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-400" />
-                  </span>
-                  <p className="text-[11px] font-bold text-violet-300 uppercase tracking-[0.14em]">
-                    Live AI Demo
-                  </p>
-                </div>
-
-                <div className="space-y-3 max-w-lg">
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, ease: EASE }}
-                    className="flex justify-end"
-                  >
-                    <div className="bg-emerald-500/12 border border-emerald-400/25 rounded-2xl rounded-tr-md px-4 py-3 max-w-xs">
-                      <p className="text-sm text-midnight-100">
-                        Hi, what's the price for a 2BHK in Sector 150?
-                      </p>
-                      <p className="text-[10px] text-midnight-400 mt-1 text-right">
-                        Customer — 12:01 PM
-                      </p>
-                    </div>
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5, delay: 0.25, ease: EASE }}
-                    className="flex justify-start"
-                  >
-                    <div className="bg-white/[0.06] border border-white/12 rounded-2xl rounded-tl-md px-4 py-3 max-w-sm backdrop-blur">
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <Brain size={10} className="text-violet-300" />
-                        <span className="text-[10px] font-bold text-violet-300">
-                          AI Reply — 3 sec
-                        </span>
-                      </div>
-                      <p className="text-sm text-midnight-100">
-                        Hello! Our 2BHK apartments in Sector 150 start at ₹45 Lakhs. EMI options
-                        available from ₹25,000/month. Would you like to schedule a site visit?
-                      </p>
-                      <p className="text-[10px] text-midnight-400 mt-1">
-                        AI Customer Care — 12:01 PM
-                      </p>
-                    </div>
-                  </motion.div>
-                </div>
-
-                <p className="text-xs text-midnight-300/70 mt-5 flex items-center gap-1.5">
-                  <BadgeCheck size={13} className="text-emerald-400" />
-                  Indistinguishable from a human agent — trained on your actual business knowledge
-                </p>
-              </div>
-            </div>
-          </Reveal>
         </div>
       </section>
 
@@ -811,7 +713,7 @@ export default function Landing() {
           </div>
 
           <Reveal className="text-center mt-10">
-            <p className="text-sm text-midnight-300/70 mb-5 flex items-center justify-center gap-2">
+            <p className="text-sm text-midnight-300/80 mb-5 flex items-center justify-center gap-2">
               <Sparkles size={14} className="text-orange-400" />
               Available on Growth plan and above — included with AI Customer Care
             </p>
@@ -1017,7 +919,7 @@ export default function Landing() {
                 <div className="p-4 sm:p-5 text-sm font-bold text-center text-orange-300 border-x border-white/[0.08] bg-orange-500/[0.07]">
                   Codeskate CRM
                 </div>
-                <div className="p-4 sm:p-5 text-sm font-semibold text-center text-midnight-400">
+                <div className="p-4 sm:p-5 text-sm font-semibold text-center text-midnight-300/80">
                   Others
                 </div>
               </div>
@@ -1083,17 +985,17 @@ export default function Landing() {
 
                   <div className="mb-5">
                     <h3 className="font-display font-bold text-xl text-white">{plan.name}</h3>
-                    <p className="text-sm text-midnight-300/75 mt-1">{plan.desc}</p>
+                    <p className="text-sm text-midnight-300/80 mt-1">{plan.desc}</p>
                   </div>
 
                   <div className="mb-6">
                     <span className="font-display font-bold text-4xl text-white tracking-[-0.02em]">
                       ₹{plan.price}
                     </span>
-                    <span className="text-midnight-400 text-sm">{plan.period}</span>
-                    <div className="flex gap-2.5 mt-2.5 text-xs text-midnight-300/70">
+                    <span className="text-midnight-300/80 text-sm">{plan.period}</span>
+                    <div className="flex gap-2.5 mt-2.5 text-xs text-midnight-300/80">
                       <span>{plan.seats}</span>
-                      <span className="text-midnight-500">•</span>
+                      <span className="text-midnight-300/80">•</span>
                       <span>{plan.leads}</span>
                     </div>
                   </div>
@@ -1121,7 +1023,7 @@ export default function Landing() {
                     {plan.comingSoon?.map((f) => (
                       <div key={f} className="flex items-start gap-2.5 text-sm">
                         <Clock size={15} className="text-amber-400 shrink-0 mt-0.5" />
-                        <span className="text-midnight-300/75">
+                        <span className="text-midnight-300/80">
                           {f}{" "}
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 ml-1">
                             COMING SOON
@@ -1141,7 +1043,7 @@ export default function Landing() {
             ))}
           </Stagger>
 
-          <p className="text-center text-sm text-midnight-300/70 mt-10 leading-relaxed">
+          <p className="text-center text-sm text-midnight-300/80 mt-10 leading-relaxed">
             Starter plan includes a {TRIAL_DAYS}-day free trial. No credit card required.
             <br />
             Save <strong className="text-white font-semibold">20%</strong> with yearly billing ·
@@ -1184,7 +1086,7 @@ export default function Landing() {
                     </div>
                     <div>
                       <p className="font-semibold text-white text-sm">{t.name}</p>
-                      <p className="text-xs text-midnight-300/70">{t.role}</p>
+                      <p className="text-xs text-midnight-300/80">{t.role}</p>
                     </div>
                   </figcaption>
                 </figure>
@@ -1287,7 +1189,7 @@ export default function Landing() {
                   </button>
                 </div>
 
-                <p className="text-sm text-midnight-300/70 mt-7">
+                <p className="text-sm text-midnight-300/80 mt-7">
                   {TRIAL_DAYS}-day free trial. No credit card. 2 minute setup. Cancel anytime.
                 </p>
               </div>

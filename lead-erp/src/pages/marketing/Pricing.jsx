@@ -90,7 +90,7 @@ function PlanCard({ plan, cycle, onSelect }) {
 
       <div className="relative mb-5">
         <h3 className="font-display font-bold text-xl mb-1 text-white">{plan.name}</h3>
-        <p className="text-sm text-midnight-300/75">{plan.tagline}</p>
+        <p className="text-sm text-midnight-300/80">{plan.tagline}</p>
       </div>
 
       <div className="relative mb-6">
@@ -102,7 +102,7 @@ function PlanCard({ plan, cycle, onSelect }) {
           >
             ₹{price.toLocaleString("en-IN")}
           </span>
-          <span className="text-sm mb-1.5 text-midnight-400">
+          <span className="text-sm mb-1.5 text-midnight-300/80">
             /{cycle === "monthly" ? "mo" : "yr"}
           </span>
         </div>
@@ -111,7 +111,7 @@ function PlanCard({ plan, cycle, onSelect }) {
             Save ₹{yearlySaving.toLocaleString("en-IN")} a year
           </p>
         ) : (
-          <p className="text-xs mt-1.5 text-midnight-400">
+          <p className="text-xs mt-1.5 text-midnight-300/80">
             {plan.includedSeats < 0 ? "Unlimited" : plan.includedSeats} seats included
           </p>
         )}
@@ -131,7 +131,7 @@ function PlanCard({ plan, cycle, onSelect }) {
           7-day free trial included
         </p>
       ) : (
-        <p className="relative text-center text-xs text-midnight-400 -mt-4 mb-5">
+        <p className="relative text-center text-xs text-midnight-300/80 -mt-4 mb-5">
           Paid plan · no trial
         </p>
       )}
@@ -153,10 +153,10 @@ function PlanCard({ plan, cycle, onSelect }) {
               </span>
             ) : (
               <span className="mt-0.5 w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center shrink-0">
-                <X size={12} className="text-midnight-500" strokeWidth={3} />
+                <X size={12} className="text-midnight-300/80" strokeWidth={3} />
               </span>
             )}
-            <span className={f.included ? "text-midnight-200/85" : "text-midnight-400/60"}>
+            <span className={f.included ? "text-midnight-200/85" : "text-midnight-300/80/60"}>
               {f.text}
             </span>
           </li>
@@ -301,7 +301,7 @@ export default function Pricing() {
           ))}
         </div>
 
-        <p className="text-center text-sm text-midnight-300/75 mt-12 px-4">
+        <p className="text-center text-sm text-midnight-300/80 mt-12 px-4">
           All prices in INR and exclusive of applicable taxes. Need a custom plan?{" "}
           <a
             href={salesWhatsAppUrl}
@@ -351,7 +351,7 @@ export default function Pricing() {
                     <span className="font-display font-bold text-3xl text-white tracking-[-0.02em]">
                       {p.price}
                     </span>
-                    <span className="text-sm text-midnight-400 mb-1">/ {p.unit}</span>
+                    <span className="text-sm text-midnight-300/80 mb-1">/ {p.unit}</span>
                   </div>
                   <p className="text-xs font-semibold text-orange-300 mb-3">{p.rate}</p>
                   <p className="text-sm text-midnight-200/75 leading-relaxed">{p.desc}</p>
@@ -360,7 +360,7 @@ export default function Pricing() {
             ))}
           </Stagger>
 
-          <p className="text-center text-xs text-midnight-400 mt-7">
+          <p className="text-center text-xs text-midnight-300/80 mt-7">
             Native call tracking (Android) is included free on every plan. Bridge &amp; AI Voice
             Bot are billed from your voice wallet.
           </p>

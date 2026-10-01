@@ -135,9 +135,9 @@ export default function AIChatWidget() {
             <div className="bg-orange-500/10 border border-orange-400/25 rounded-2xl p-3.5 space-y-2">
               <p className="text-xs font-semibold text-orange-200">Want a personalized demo or pricing?</p>
               <input value={leadName} onChange={(e) => setLeadName(e.target.value)}
-                placeholder="Your name" className="w-full bg-white/[0.06] border border-orange-400/25 text-white placeholder:text-midnight-500 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-orange-400/50" />
+                placeholder="Your name" className="w-full bg-white/[0.06] border border-orange-400/25 text-white placeholder:text-midnight-400 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-orange-400/50" />
               <input value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)}
-                placeholder="Phone / WhatsApp number" className="w-full bg-white/[0.06] border border-orange-400/25 text-white placeholder:text-midnight-500 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-orange-400/50" />
+                placeholder="Phone / WhatsApp number" className="w-full bg-white/[0.06] border border-orange-400/25 text-white placeholder:text-midnight-400 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-orange-400/50" />
               <div className="flex gap-2">
                 <button onClick={handleLeadCapture} disabled={!leadName.trim() || !leadPhone.trim()}
                   className="flex-1 bg-orange-500 text-white text-xs font-medium py-1.5 rounded-lg hover:bg-orange-600 disabled:opacity-40">
@@ -185,7 +185,7 @@ export default function AIChatWidget() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask in any language..."
-              className="flex-1 text-sm bg-white/[0.05] border border-white/[0.1] text-white placeholder:text-midnight-500 rounded-xl px-3.5 py-2.5 outline-none focus:border-orange-400/50 focus:ring-2 focus:ring-orange-500/20 transition-all"
+              className="flex-1 text-sm bg-white/[0.05] border border-white/[0.1] text-white placeholder:text-midnight-400 rounded-xl px-3.5 py-2.5 outline-none focus:border-orange-400/50 focus:ring-2 focus:ring-orange-500/20 transition-all"
               disabled={typing}
             />
             <button
