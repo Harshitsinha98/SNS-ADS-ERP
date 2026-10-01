@@ -262,7 +262,7 @@ export default function Pricing() {
           >
             <button
               onClick={() => setCycle("monthly")}
-              className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all ${
+              className={`mkt-touch px-6 py-2.5 rounded-full text-sm font-semibold transition-all inline-flex items-center justify-center ${
                 cycle === "monthly"
                   ? "bg-gradient-orange text-white shadow-glow"
                   : "text-midnight-200/75 hover:text-white"
@@ -272,7 +272,7 @@ export default function Pricing() {
             </button>
             <button
               onClick={() => setCycle("yearly")}
-              className={`px-6 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center gap-2 ${
+              className={`mkt-touch px-6 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
                 cycle === "yearly"
                   ? "bg-gradient-orange text-white shadow-glow"
                   : "text-midnight-200/75 hover:text-white"

@@ -571,3 +571,72 @@
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE & IN-APP HARDENING
+   ---------------------------------------------------------------------------
+   The marketing surface is reachable from inside the Capacitor Android
+   WebView — the login screen links to /signup, and /pricing is routed
+   normally — so only `/` is behind the native guard. The dark surface
+   therefore has to stay cheap to composite on mid-range phones.
+
+   Three decorative effects dominate GPU cost on mobile:
+
+     1. `backdrop-filter` — there are dozens of .mkt-card instances per page,
+        and each one forces its own backdrop snapshot + blur pass.
+     2. Large `filter: blur()` radii on the ambient blooms.
+     3. Continuously animating transforms on those same blurred layers.
+
+   All three are dialled back below `md`. The cards sit on a solid dark
+   canvas, so dropping the backdrop blur is visually near-identical — the
+   translucent white fill still reads as glass.
+
+   This block is intentionally last in the file: it shares the utilities
+   layer with the declarations it overrides, so source order decides.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@layer utilities {
+  /* Stop rubber-band overscroll from revealing the light <body> behind the
+     dark marketing canvas (visible in the WebView and on iOS Safari). */
+  .mkt-canvas {
+    overscroll-behavior-y: contain;
+  }
+
+  @media (max-width: 767px) {
+    .mkt-card,
+    .mkt-chip,
+    .mkt-btn-glass {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+
+    /* Smaller blur radius: same bloom, a fraction of the fill cost. */
+    .mkt-bloom {
+      filter: blur(44px);
+    }
+
+    /* Blend modes force an extra compositing pass — plain alpha instead. */
+    .mkt-grain {
+      mix-blend-mode: normal;
+      opacity: 0.2;
+    }
+
+    /* Keep the ambient blooms, drop their motion. These animate transforms
+       on very large blurred layers, which is the single most expensive
+       thing on the page for a mobile GPU. Small-element animations
+       (ping, bounce, ticker) are cheap and stay. */
+    .animate-blob,
+    .animate-aurora,
+    .animate-float {
+      animation: none;
+    }
+  }
+
+  /* Touch-target floor for controls that aren't built on .btn
+     (which already carries min-h-touch). */
+  @media (hover: none) and (pointer: coarse) {
+    .mkt-touch {
+      min-height: 44px;
+    }
+  }
+}

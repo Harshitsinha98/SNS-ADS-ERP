@@ -102,7 +102,7 @@ export default function MarketingNav() {
             <button
               key={l.label}
               onClick={() => go(l.to)}
-              className="block w-full text-left px-4 py-3 text-sm font-medium text-midnight-200/80 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
+              className="mkt-touch flex items-center w-full text-left px-4 py-3 text-sm font-medium text-midnight-200/80 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
             >
               {l.label}
             </button>
