@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowRight, MessageSquare, Users, Zap, BarChart3, Bell, ShieldCheck,
@@ -14,7 +15,8 @@ import HeroShowcase from "../../components/marketing/HeroShowcase";
 import {
   Reveal, Stagger, StaggerItem, CountUp, PointerGlow, motion, useReducedMotion,
 } from "../../components/marketing/Motion";
-import { TRIAL_DAYS } from "../../data/plans";
+import { mergePlansWithConfig, ADD_ONS } from "../../data/plans";
+import { fetchPlatformConfig } from "../../utils/platformConfig";
 
 
 /* ── Codeskate Voice — the three calling modes ───────────────────── */
@@ -37,36 +39,29 @@ const VOICE_MODES = [
   },
   {
     icon: Bot,
-    tag: "Scale & up",
+    tag: "Coming soon",
     tagColor: "violet",
     title: "AI Voice Bot",
-    desc: "AI calls your leads in Hindi & English, asks qualifying questions, then warm-transfers hot leads to an available agent — or updates the lead itself.",
-    points: ["Natural Hindi + English", "Auto-qualify leads", "Warm transfer to agent"],
+    desc: "In development: AI that calls your leads in Hindi and English, asks qualifying questions and hands hot leads to an available agent.",
+    points: ["Planned for Scale & up", "Hindi + English", "Hand-off to an agent"],
   },
 ];
 
 
-const URGENCY_STATS = [
-  { value: "3 sec", label: "AI reply time", icon: Timer },
-  { value: "70%", label: "queries auto-resolved", icon: Bot },
-  { value: "24/7", label: "availability", icon: Clock },
-  { value: "₹0.04", label: "per AI reply", icon: Zap },
-];
-
-const COMPETITORS_MISSING = [
-  "AI WhatsApp Auto-Reply",
-  "AI Voice Bot (Hindi & English)",
-  "Bridge Calling with Number Masking",
-  "Call Recording on the lead timeline",
-  "Workflow Automation Engine",
-  "Native Call Tracking",
+/* AI stats strip. Every value is a fact about the product, not a result:
+   - 24/7: auto-reply runs server-side on each inbound webhook
+   - 3 min: ESCALATION_THRESHOLD_MS in whatsapp-backend escalationService.js
+   - AI replies / extra-reply price: derived from data/plans.js at render time */
+const URGENCY_STATS_STATIC = [
+  { value: "24/7", label: "AI auto-reply coverage", icon: Clock },
+  { value: "3 min", label: "before an unanswered chat escalates", icon: Timer },
 ];
 
 const AI_FEATURES = [
-  { icon: Brain, title: "AI Auto-Reply", desc: "Every WhatsApp message gets an intelligent reply within 3 seconds — 24/7, without any human intervention.", badge: "LIVE" },
-  { icon: BookOpen, title: "Knowledge Base Training", desc: "Upload your pricing, FAQs, and policies — AI delivers exactly the information you want. Never inaccurate.", badge: "SMART" },
+  { icon: Brain, title: "AI Auto-Reply", desc: "Replies to WhatsApp messages automatically, around the clock, using the answers in your knowledge base.", badge: "LIVE" },
+  { icon: BookOpen, title: "Knowledge Base Training", desc: "Upload your pricing, FAQs and policies. The AI answers from what you give it, and you can update it any time.", badge: "SMART" },
   { icon: Target, title: "Intent Classification", desc: "AI understands the intent behind every message — pricing, booking, complaint, support — and responds accordingly.", badge: "AI" },
-  { icon: Headphones, title: "Smart Escalation", desc: "Complex query? AI automatically hands over to a human agent with full context. Customers never have to repeat themselves.", badge: "HYBRID" },
+  { icon: Headphones, title: "Smart Escalation", desc: "When a query needs a person, the AI hands over to an agent, who sees the full conversation so far.", badge: "HYBRID" },
 ];
 
 const POWER_FEATURES = [
@@ -77,129 +72,10 @@ const POWER_FEATURES = [
   { icon: Bell, title: "SLA Escalation", desc: "Idle lead? Automatic manager alert. No lead goes cold on your watch." },
   { icon: BarChart3, title: "Live Analytics", desc: "Pipeline, conversions, revenue — everything visible in a single command center." },
   { icon: PhoneCall, title: "Auto-Dialer (Coming Soon)", desc: "System dials, your agent talks. No more manual dialing or wasted time.", badge: "SOON" },
-  { icon: Lock, title: "Enterprise Security", desc: "Bank-level encryption, role-based access, complete data isolation per tenant." },
+  { icon: Lock, title: "Enterprise Security", desc: "Role-based access, OTP sign-in, and each organisation's data isolated by database rules." },
   { icon: Building2, title: "Multi-Org Support", desc: "Multiple branches? Each one gets isolated data, managed from a single login." },
 ];
 
-
-const TESTIMONIALS = [
-  {
-    quote: "We used to have 3 employees just for WhatsApp replies. Now AI handles it all — saving us ₹40,000 every month. I regret not starting sooner.",
-    name: "Vikram Saxena",
-    role: "Director, Meridian Properties",
-    metric: "₹40K/mo saved",
-  },
-  {
-    quote: "Customers get instant replies even at 11 PM. Previously, leads would go cold by morning. Now our conversions are up 3x.",
-    name: "Ananya Reddy",
-    role: "Sales Head, BrightHomes",
-    metric: "3x conversions",
-  },
-  {
-    quote: "Auto-assignment plus follow-up automation doubled my team's productivity. No lead sits idle anymore.",
-    name: "Rohan Mehta",
-    role: "Founder, EduLeap Academy",
-    metric: "2x productivity",
-  },
-  {
-    quote: "We were using 5 different tools — CRM, WhatsApp platform, calling, automation, analytics. Now it's all in one place. Simple.",
-    name: "Priya Nair",
-    role: "Ops Manager, UrbanFit",
-    metric: "5 tools replaced",
-  },
-];
-
-const PRICING_PLANS = [
-  {
-    name: "Starter",
-    price: "599",
-    period: "/mo",
-    desc: "For solo agents and small teams",
-    seats: "3 users",
-    leads: "1,000 leads",
-    cta: "Start free trial",
-    features: [
-      "WhatsApp lead capture + templates",
-      "Round-robin auto-assignment",
-      "AI auto-reply (100/mo)",
-      "5 knowledge base articles",
-      "Native call tracking (Android)",
-      "Follow-up reminders",
-      "Activity log",
-      "Mobile app access",
-    ],
-    missing: ["Bridge calling (masked + recorded)", "AI Voice Bot", "Full AI (2,000/mo)"],
-    comingSoon: [],
-  },
-  {
-    name: "Growth",
-    price: "1,499",
-    period: "/mo",
-    desc: "For teams ready to automate with AI",
-    seats: "10 users",
-    leads: "10,000 leads",
-    popular: true,
-    cta: "Get started",
-    features: [
-      "Everything in Starter, plus:",
-      "AI Auto-Reply (2,000/mo)",
-      "Human Takeover + Smart Notifications",
-      "Bridge calling — masked + recorded",
-      "5 workflow automation rules",
-      "Goals & performance tracking",
-      "Meta & Google Ad lead capture",
-      "Priority email support",
-    ],
-    missing: ["AI Voice Bot", "Unlimited AI Auto-Reply"],
-    comingSoon: [],
-  },
-  {
-    name: "Scale",
-    price: "3,499",
-    period: "/mo",
-    desc: "For high-volume sales operations",
-    seats: "25 users",
-    leads: "50,000 leads",
-    cta: "Get started",
-    features: [
-      "Everything in Growth, plus:",
-      "AI Voice Bot — auto-call & qualify",
-      "AI Auto-Reply (10,000/mo)",
-      "25 workflow automation rules",
-      "Full API access & webhooks",
-      "Unlimited website lead forms",
-      "Priority chat support",
-    ],
-    missing: [],
-    comingSoon: ["Auto-dialer"],
-  },
-  {
-    name: "Enterprise",
-    price: "7,999",
-    period: "/mo",
-    desc: "Unlimited everything for large teams",
-    seats: "Unlimited users",
-    leads: "Unlimited leads",
-    cta: "Contact sales",
-    features: [
-      "Everything in Scale, plus:",
-      "Unlimited AI Auto-Reply",
-      "AI Voice Bot + Bridge calling",
-      "Unlimited workflow rules",
-      "500 products + unlimited images",
-      "Dedicated account manager",
-      "White-glove onboarding + custom integrations",
-    ],
-    missing: [],
-    comingSoon: [],
-  },
-];
-
-const FOMO_COUNTERS = [
-  { label: "leads managed this month", value: "2,34,000+" },
-  { label: "AI replies sent today", value: "12,400+" },
-  { label: "businesses growing with us", value: "180+" },
-];
 
 /* Marquee under the hero. Every entry is a capability that exists in the
    feature set below — nothing aspirational. */
@@ -207,7 +83,6 @@ const HERO_TICKER = [
   "WhatsApp Business API",
   "AI Auto-Reply",
   "Bridge Calling",
-  "AI Voice Bot",
   "Workflow Automation",
   "Native Call Tracking",
   "SLA Escalation",
@@ -218,12 +93,12 @@ const HERO_TICKER = [
 
 /* The cost-of-slow-response grid. */
 const REALITY_COSTS = [
-  { problem: "30+ min reply time", cost: "Up to 40% leads lost", icon: Clock },
-  { problem: "No after-hours reply", cost: "Up to 35% enquiries missed", icon: Clock },
-  { problem: "3 employees for replies", cost: "₹45,000/month in payroll", icon: Users },
-  { problem: "Manual lead assignment", cost: "~20 min avg delay", icon: Target },
-  { problem: "No follow-up system", cost: "Up to 60% leads go cold", icon: Bell },
-  { problem: "Multiple disconnected tools", cost: "₹10,000+/month in subscriptions", icon: Layers },
+  { problem: "Enquiries that arrive after hours", fix: "AI auto-reply answers from your knowledge base, any time of day.", icon: Clock },
+  { problem: "Leads waiting to be assigned", fix: "Round-robin or workload-based assignment the moment a lead arrives.", icon: Target },
+  { problem: "Follow-ups that get forgotten", fix: "Reminders, overdue alerts and an escalation if a chat sits unanswered.", icon: Bell },
+  { problem: "Calls nobody logged", fix: "Native call tracking on Android records each call on the lead timeline.", icon: Phone },
+  { problem: "Agents' personal numbers exposed", fix: "Bridge calling connects through a virtual number and records the call.", icon: ShieldCheck },
+  { problem: "Leads spread across tools", fix: "WhatsApp, website forms and Meta & Google ad leads land in one inbox.", icon: Layers },
 ];
 
 const TAKEOVER_FLOW = [
@@ -257,7 +132,7 @@ const BRIDGE_FLOW = [
 ];
 
 const SETUP_STEPS = [
-  { n: "01", title: "Sign up", desc: "Create your workspace in 30 seconds with just a phone number. No paperwork, no sales call." },
+  { n: "01", title: "Sign up", desc: "Create your workspace with just a phone number. No paperwork, no sales call." },
   { n: "02", title: "Connect WhatsApp", desc: "One-click WhatsApp Business integration. Enable AI and fill your knowledge base." },
   { n: "03", title: "Close deals", desc: "Leads flow in automatically, AI replies instantly, your team follows up. You just watch the growth." },
 ];
@@ -286,6 +161,33 @@ const EASE = [0.22, 1, 0.36, 1];
 export default function Landing() {
   const navigate = useNavigate();
   const reduce = useReducedMotion();
+
+  // Prices, limits and trial length come from data/plans.js merged with the
+  // platform owner's overrides — the same path /pricing uses — so the landing
+  // page can never drift from what customers are actually charged.
+  const [config, setConfig] = useState(null);
+  useEffect(() => {
+    fetchPlatformConfig().then(setConfig).catch(() => {});
+  }, []);
+  const { plans, trialDays: TRIAL_DAYS } = mergePlansWithConfig(config);
+  const fmtInr = (n) => Number(n).toLocaleString("en-IN");
+  const startingPrice = Math.min(...plans.map((p) => p.monthlyPrice));
+  const perDay = Math.round(startingPrice / 30);
+  const yearlySavingPct = Math.round(
+    Math.min(...plans.map((p) => (1 - p.yearlyPrice / (p.monthlyPrice * 12)) * 100))
+  );
+  const growthPlan = plans.find((p) => p.id === "growth") || plans[1];
+  const aiAddOn = ADD_ONS.find((a) => a.id === "ai_messages");
+  const URGENCY_STATS = [
+    ...URGENCY_STATS_STATIC,
+    { value: `₹${fmtInr(startingPrice)}`, label: "per month, Starter plan", icon: Wallet },
+    ...(aiAddOn ? [{ value: `₹${fmtInr(aiAddOn.price)}`, label: `add-on: ${aiAddOn.unit} more AI replies`, icon: Zap }] : []),
+  ];
+  const PRODUCT_FACTS = [
+    { value: `₹${fmtInr(startingPrice)}`, label: "per month, Starter plan" },
+    { value: `${TRIAL_DAYS} days`, label: "free trial on Starter, no card" },
+    { value: fmtInr(growthPlan.leadsLimit), label: "leads / month on Growth" },
+  ];
 
   // Hero entrance props, collapsed to a no-op when reduced motion is on.
   // These run on mount rather than on scroll, so <Reveal>'s guard doesn't cover them.
@@ -319,12 +221,9 @@ export default function Landing() {
           {/* ── Headline ── */}
           <div className="text-center max-w-4xl mx-auto">
             <motion.div {...intro(0, 14)} className="mkt-chip mb-7">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-              </span>
+              <Sparkles size={13} className="text-orange-400" />
               <span className="text-xs font-semibold text-midnight-100">
-                Trusted by 180+ businesses across India — since 2024
+                Built for WhatsApp-first sales teams in India
               </span>
             </motion.div>
 
@@ -332,9 +231,9 @@ export default function Landing() {
               {...intro(0.08, 24)}
               className="font-display font-bold text-[2.85rem] leading-[1.04] sm:text-[4.2rem] sm:leading-[0.99] lg:text-[5.25rem] tracking-[-0.035em] text-white mb-7"
             >
-              Reply to every lead in{" "}
+              Reply to every lead,{" "}
               <span className="relative inline-block whitespace-nowrap">
-                <span className="mkt-text-gradient">3 seconds</span>
+                <span className="mkt-text-gradient">automatically</span>
                 {/* Underline draws itself in just after the headline settles. */}
                 <svg
                   className="absolute -bottom-1 left-0 w-full h-[0.26em] overflow-visible"
@@ -377,31 +276,9 @@ export default function Landing() {
               {...intro(0.16, 18)}
               className="text-lg sm:text-xl text-midnight-200/80 max-w-2xl mx-auto mb-6 leading-relaxed"
             >
-              Codeskate CRM captures WhatsApp leads, auto-assigns them to your team, and
-              replies using AI — in <strong className="text-white font-semibold">3 seconds flat</strong>.
-              Your sales pipeline runs <strong className="text-white font-semibold">24/7</strong>, even
-              when your team is offline.
-            </motion.p>
-
-            <motion.p
-              {...intro(0.24, 0)}
-              className="text-sm text-midnight-300/80 mb-9 flex items-center justify-center gap-2.5 flex-wrap"
-            >
-              <span className="inline-flex -space-x-2">
-                {["V", "A", "R", "P", "S"].map((l) => (
-                  <span
-                    key={l}
-                    className="w-7 h-7 rounded-full bg-gradient-orange ring-2 ring-midnight-900 flex items-center justify-center text-[10px] font-bold text-white"
-                  >
-                    {l}
-                  </span>
-                ))}
-              </span>
-              <span>
-                Businesses using Codeskate reply{" "}
-                <strong className="text-orange-300 font-semibold">100x faster</strong> — see what
-                that does to conversions.
-              </span>
+              Codeskate CRM captures WhatsApp leads, auto-assigns them to your team, and replies
+              using AI that answers from your own knowledge base. It keeps working{" "}
+              <strong className="text-white font-semibold">24/7</strong>, even when your team is offline.
             </motion.p>
 
             <motion.div
@@ -429,13 +306,13 @@ export default function Landing() {
               className="text-sm text-midnight-300/80 flex items-center justify-center gap-5 flex-wrap"
             >
               <span className="flex items-center gap-1.5">
-                <Check size={14} className="text-emerald-400" strokeWidth={3} /> No credit card
+                <Check size={14} className="text-emerald-400" strokeWidth={3} /> No credit card for the trial
               </span>
               <span className="flex items-center gap-1.5">
-                <Check size={14} className="text-emerald-400" strokeWidth={3} /> 2 min setup
+                <Check size={14} className="text-emerald-400" strokeWidth={3} /> Sign up with your phone number
               </span>
               <span className="flex items-center gap-1.5">
-                <Check size={14} className="text-emerald-400" strokeWidth={3} /> Cancel anytime
+                <Check size={14} className="text-emerald-400" strokeWidth={3} /> Plans from ₹{fmtInr(startingPrice)}/month
               </span>
             </motion.p>
           </div>
@@ -467,12 +344,12 @@ export default function Landing() {
       </section>
 
 
-      {/* ═══════════ LIVE COUNTERS ═══════════ */}
+      {/* ═══════════ PRODUCT FACTS (from the price list, not usage) ═══════════ */}
       <section className="relative border-y border-white/[0.07] bg-white/[0.02]">
         <div className="absolute inset-0 pattern-grid opacity-40 pointer-events-none" />
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-12">
           <Stagger className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-6">
-            {FOMO_COUNTERS.map((c) => (
+            {PRODUCT_FACTS.map((c) => (
               <StaggerItem key={c.label} className="text-center">
                 <p className="font-display font-bold text-4xl sm:text-5xl tracking-[-0.02em] mb-1.5">
                   <CountUp value={c.value} className="mkt-text-gradient" />
@@ -485,7 +362,7 @@ export default function Landing() {
       </section>
 
 
-      {/* ═══════════ REALITY CHECK ═══════════ */}
+      {/* ═══════════ WHERE LEADS SLIP AWAY ═══════════ */}
       <section className="relative py-20 sm:py-28 overflow-hidden">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-rose-600/10 mkt-bloom" />
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6">
@@ -493,16 +370,13 @@ export default function Landing() {
             <div className="mkt-chip mb-5 !border-rose-400/25 !bg-rose-500/10">
               <AlertTriangle size={13} className="text-rose-300" />
               <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-rose-300">
-                Reality Check
+                Where leads slip away
               </span>
             </div>
             <h2 className="font-display font-bold text-3xl sm:text-5xl tracking-[-0.025em] text-white mb-5">
-              Slow replies cost real money —{" "}
-              <span className="text-rose-400">here's how much</span>
+              The gaps that lose leads —{" "}
+              <span className="text-rose-400">and how we close them</span>
             </h2>
-            <p className="text-lg text-midnight-200/75">
-              Based on data from 180+ Codeskate customers and industry benchmarks.
-            </p>
           </Reveal>
 
           <Stagger className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -515,17 +389,13 @@ export default function Landing() {
                     </div>
                     <div>
                       <p className="font-semibold text-white mb-1.5">{item.problem}</p>
-                      <p className="text-sm text-rose-300/90 font-medium">{item.cost}</p>
+                      <p className="text-sm text-midnight-200/80 leading-relaxed">{item.fix}</p>
                     </div>
                   </div>
                 </div>
               </StaggerItem>
             ))}
           </Stagger>
-
-          <p className="text-center text-xs text-midnight-300/80 mt-7">
-            Based on industry benchmarks and aggregated Codeskate customer data (2024–2026).
-          </p>
 
           <Reveal className="text-center mt-9">
             <button
@@ -557,10 +427,8 @@ export default function Landing() {
               <span className="mkt-text-gradient">converts</span>
             </h2>
             <p className="text-lg text-midnight-200/75">
-              A customer sends a WhatsApp message.{" "}
-              <strong className="text-white font-semibold">3 seconds later</strong>, they get an
-              accurate, context-aware reply drawn from your knowledge base. No delays, no missed
-              hours, no training required.
+              A customer sends a WhatsApp message. The AI replies with an answer drawn from your
+              knowledge base, without waiting for someone on your team to come online.
             </p>
           </Reveal>
 
@@ -839,8 +707,8 @@ export default function Landing() {
                   Prepaid voice wallet — pay only for what you use
                 </p>
                 <p className="text-xs text-midnight-200/70 mt-1">
-                  Bridge from ₹2/min · AI Voice Bot from ₹8/min. Top up anytime, minutes never
-                  expire while your plan is active.
+                  Top up from ₹100. Bridge calls are billed per connected minute; recordings are saved
+                  to the lead. Available on Growth and above.
                 </p>
               </div>
               <button
@@ -863,13 +731,12 @@ export default function Landing() {
       >
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
           <Reveal className="text-center max-w-2xl mx-auto mb-16">
-            <p className="mkt-eyebrow mb-4">90+ Features, One Platform</p>
+            <p className="mkt-eyebrow mb-4">One platform</p>
             <h2 className="font-display font-bold text-3xl sm:text-5xl tracking-[-0.025em] text-white mb-5">
               Everything you need — <span className="mkt-text-gradient">one platform</span>
             </h2>
             <p className="text-lg text-midnight-200/75">
-              CRM + WhatsApp + AI + Voice + Automation — 5 tools replaced by 1. Simple. Powerful.
-              Affordable.
+              CRM, WhatsApp, AI replies, calling and automation, in one place.
             </p>
           </Reveal>
 
@@ -900,51 +767,6 @@ export default function Landing() {
       </section>
 
 
-      {/* ═══════════ COMPARISON ═══════════ */}
-      <section className="relative py-20 sm:py-28">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <Reveal className="text-center mb-14">
-            <h2 className="font-display font-bold text-3xl sm:text-5xl tracking-[-0.025em] text-white mb-5">
-              What other CRMs <span className="text-rose-400">can't offer</span>
-            </h2>
-            <p className="text-lg text-midnight-200/75">
-              Only on Codeskate CRM — everything on a single platform.
-            </p>
-          </Reveal>
-
-          <Reveal>
-            <div className="mkt-card mkt-sheen rounded-3xl overflow-hidden">
-              <div className="grid grid-cols-3 border-b border-white/[0.08] bg-white/[0.03]">
-                <div className="p-4 sm:p-5 text-sm font-semibold text-midnight-300">Feature</div>
-                <div className="p-4 sm:p-5 text-sm font-bold text-center text-orange-300 border-x border-white/[0.08] bg-orange-500/[0.07]">
-                  Codeskate CRM
-                </div>
-                <div className="p-4 sm:p-5 text-sm font-semibold text-center text-midnight-300/80">
-                  Others
-                </div>
-              </div>
-              {COMPETITORS_MISSING.map((feature, i) => (
-                <div
-                  key={feature}
-                  className={`grid grid-cols-3 transition-colors hover:bg-white/[0.02] ${
-                    i < COMPETITORS_MISSING.length - 1 ? "border-b border-white/[0.05]" : ""
-                  }`}
-                >
-                  <div className="p-4 sm:p-5 text-sm text-midnight-100 font-medium">{feature}</div>
-                  <div className="p-4 sm:p-5 text-center border-x border-white/[0.05] bg-orange-500/[0.04]">
-                    <Check size={18} className="mx-auto text-emerald-400" strokeWidth={3} />
-                  </div>
-                  <div className="p-4 sm:p-5 text-center">
-                    <span className="text-rose-400/70 text-lg leading-none">✗</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
-
       {/* ═══════════ PRICING ═══════════ */}
       <section
         id="pricing"
@@ -959,15 +781,15 @@ export default function Landing() {
               <span className="mkt-text-gradient">one subscription</span>
             </h2>
             <p className="text-lg text-midnight-200/75">
-              Starting at ₹599/month — a full AI-powered CRM for{" "}
-              <strong className="text-white font-semibold">₹20/day</strong>. Starter plan includes
-              a {TRIAL_DAYS}-day free trial.
+              Starting at ₹{fmtInr(startingPrice)}/month — about{" "}
+              <strong className="text-white font-semibold">₹{perDay}/day</strong>. Starter includes a{" "}
+              {TRIAL_DAYS}-day free trial.
             </p>
           </Reveal>
 
           <Stagger className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 items-start">
-            {PRICING_PLANS.map((plan) => (
-              <StaggerItem key={plan.name}>
+            {plans.map((plan) => (
+              <StaggerItem key={plan.id}>
                 <div
                   className={`relative h-full rounded-3xl p-7 transition-all duration-300 ${
                     plan.popular
@@ -985,18 +807,20 @@ export default function Landing() {
 
                   <div className="mb-5">
                     <h3 className="font-display font-bold text-xl text-white">{plan.name}</h3>
-                    <p className="text-sm text-midnight-300/80 mt-1">{plan.desc}</p>
+                    <p className="text-sm text-midnight-300/80 mt-1">{plan.tagline}</p>
                   </div>
 
                   <div className="mb-6">
                     <span className="font-display font-bold text-4xl text-white tracking-[-0.02em]">
-                      ₹{plan.price}
+                      ₹{fmtInr(plan.monthlyPrice)}
                     </span>
-                    <span className="text-midnight-300/80 text-sm">{plan.period}</span>
+                    <span className="text-midnight-300/80 text-sm">/mo</span>
                     <div className="flex gap-2.5 mt-2.5 text-xs text-midnight-300/80">
-                      <span>{plan.seats}</span>
+                      <span>{plan.includedSeats < 0 ? "Unlimited" : plan.includedSeats} users</span>
                       <span className="text-midnight-300/80">•</span>
-                      <span>{plan.leads}</span>
+                      <span>
+                        {plan.leadsLimit < 0 ? "Unlimited" : fmtInr(plan.leadsLimit)} leads/mo
+                      </span>
                     </div>
                   </div>
 
@@ -1006,37 +830,33 @@ export default function Landing() {
                       plan.popular ? "mkt-btn-ember" : "mkt-btn-glass"
                     }`}
                   >
-                    {plan.cta} <ArrowRight size={15} />
+                    {plan.trial ? "Start free trial" : "Get started"} <ArrowRight size={15} />
                   </button>
 
                   <div className="mt-6 space-y-3">
-                    {plan.features.map((f) => (
-                      <div key={f} className="flex items-start gap-2.5 text-sm">
-                        <Check
-                          size={15}
-                          className="text-emerald-400 shrink-0 mt-0.5"
-                          strokeWidth={3}
-                        />
-                        <span className="text-midnight-200/80">{f}</span>
-                      </div>
-                    ))}
-                    {plan.comingSoon?.map((f) => (
-                      <div key={f} className="flex items-start gap-2.5 text-sm">
-                        <Clock size={15} className="text-amber-400 shrink-0 mt-0.5" />
-                        <span className="text-midnight-300/80">
-                          {f}{" "}
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 ml-1">
-                            COMING SOON
+                    {plan.features.map((f) => {
+                      const soon = /coming soon/i.test(f.text);
+                      if (!f.included) {
+                        return (
+                          <div key={f.text} className="flex items-start gap-2.5 text-sm opacity-35">
+                            <span className="w-[15px] text-center text-rose-400 shrink-0">—</span>
+                            <span className="text-midnight-300">{f.text}</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={f.text} className="flex items-start gap-2.5 text-sm">
+                          {soon ? (
+                            <Clock size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                          ) : (
+                            <Check size={15} className="text-emerald-400 shrink-0 mt-0.5" strokeWidth={3} />
+                          )}
+                          <span className={soon ? "text-midnight-300/80" : "text-midnight-200/80"}>
+                            {f.text}
                           </span>
-                        </span>
-                      </div>
-                    ))}
-                    {plan.missing.map((f) => (
-                      <div key={f} className="flex items-start gap-2.5 text-sm opacity-35">
-                        <span className="w-[15px] text-center text-rose-400 shrink-0">—</span>
-                        <span className="text-midnight-300">{f}</span>
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </StaggerItem>
@@ -1046,53 +866,9 @@ export default function Landing() {
           <p className="text-center text-sm text-midnight-300/80 mt-10 leading-relaxed">
             Starter plan includes a {TRIAL_DAYS}-day free trial. No credit card required.
             <br />
-            Save <strong className="text-white font-semibold">20%</strong> with yearly billing ·
-            Voice calling is a prepaid wallet — pay only for minutes you use.
+            Save about <strong className="text-white font-semibold">{yearlySavingPct}%</strong> with
+            yearly billing · Calling uses a prepaid wallet, billed per connected minute.
           </p>
-        </div>
-      </section>
-
-
-      {/* ═══════════ TESTIMONIALS ═══════════ */}
-      <section className="relative py-20 sm:py-28">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <Reveal className="text-center max-w-2xl mx-auto mb-14">
-            <p className="mkt-eyebrow mb-4">Results that speak</p>
-            <h2 className="font-display font-bold text-3xl sm:text-5xl tracking-[-0.025em] text-white">
-              Real results from <span className="mkt-text-gradient">real teams</span>
-            </h2>
-          </Reveal>
-
-          <Stagger className="grid sm:grid-cols-2 gap-5">
-            {TESTIMONIALS.map((t) => (
-              <StaggerItem key={t.name}>
-                <figure className="h-full mkt-card mkt-card-hover mkt-sheen rounded-2xl p-7">
-                  <div className="flex items-center gap-2.5 mb-5">
-                    <div className="flex gap-0.5">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} size={14} className="text-orange-400" fill="currentColor" />
-                      ))}
-                    </div>
-                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/12 text-emerald-300 border border-emerald-400/20">
-                      {t.metric}
-                    </span>
-                  </div>
-                  <blockquote className="text-midnight-100/85 leading-relaxed mb-6">
-                    “{t.quote}”
-                  </blockquote>
-                  <figcaption className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-orange flex items-center justify-center font-bold text-white text-sm shrink-0">
-                      {t.name[0]}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-white text-sm">{t.name}</p>
-                      <p className="text-xs text-midnight-300/80">{t.role}</p>
-                    </div>
-                  </figcaption>
-                </figure>
-              </StaggerItem>
-            ))}
-          </Stagger>
         </div>
       </section>
 
@@ -1106,7 +882,7 @@ export default function Landing() {
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-ember-500/10 mkt-bloom" />
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6">
           <Reveal className="text-center max-w-2xl mx-auto mb-14">
-            <p className="mkt-eyebrow mb-4">2 minute setup</p>
+            <p className="mkt-eyebrow mb-4">How it works</p>
             <h2 className="font-display font-bold text-3xl sm:text-5xl tracking-[-0.025em] text-white mb-5">
               So <span className="mkt-text-gradient">simple</span>, it needs no explanation
             </h2>
@@ -1150,12 +926,9 @@ export default function Landing() {
 
               <div className="relative">
                 <div className="mkt-chip mb-7">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
-                  </span>
+                  <Sparkles size={13} className="text-orange-300" />
                   <span className="text-xs font-semibold text-white">
-                    12,400+ AI replies sent just today
+                    Plans from ₹{fmtInr(startingPrice)}/month
                   </span>
                 </div>
 
@@ -1166,10 +939,8 @@ export default function Landing() {
                 </h2>
 
                 <p className="text-lg text-midnight-200/80 max-w-xl mx-auto mb-9 leading-relaxed">
-                  The average business takes 30 minutes to reply. Codeskate customers reply in 3
-                  seconds.
-                  <br />
-                  That gap is where deals are won.
+                  Leads message at all hours. Codeskate's AI replies even when your team is offline,
+                  and hands over to a person when it matters.
                 </p>
 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -1190,7 +961,7 @@ export default function Landing() {
                 </div>
 
                 <p className="text-sm text-midnight-300/80 mt-7">
-                  {TRIAL_DAYS}-day free trial. No credit card. 2 minute setup. Cancel anytime.
+                  {TRIAL_DAYS}-day free trial on Starter. No credit card needed.
                 </p>
               </div>
             </div>

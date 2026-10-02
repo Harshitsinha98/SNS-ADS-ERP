@@ -215,22 +215,22 @@ export default function Signup() {
           <div>
             <div className="inline-flex items-center gap-2 bg-orange-500/15 border border-orange-400/30 rounded-full px-4 py-1.5 mb-5">
               <Rocket size={13} className="text-orange-400" />
-              <span className="text-[11px] font-bold text-orange-300 uppercase tracking-wider">Join 180+ growing businesses</span>
+              <span className="text-[11px] font-bold text-orange-300 uppercase tracking-wider">Built for WhatsApp-first sales teams</span>
             </div>
             <h2 className="font-display font-bold text-3xl xl:text-[2.5rem] text-white leading-tight mb-4">
               Your AI-powered sales engine starts here
             </h2>
             <p className="text-midnight-200/80 text-sm leading-relaxed max-w-sm">
-              Set up in 2 minutes. First lead captured in 10. First AI reply sent in under a minute. No technical skills required.
+              Sign up with your phone number, connect WhatsApp, and let AI answer leads from your knowledge base. No technical skills required.
             </p>
           </div>
 
           {/* Feature highlights with icons */}
           <div className="grid grid-cols-2 gap-3">
             {[
-              { icon: Brain, label: "AI Auto-Reply", sub: "3-second responses" },
+              { icon: Brain, label: "AI Auto-Reply", sub: "Answers from your knowledge base" },
               { icon: MessageSquare, label: "WhatsApp API", sub: "Built-in integration" },
-              { icon: Zap, label: "Workflow Engine", sub: "Automate everything" },
+              { icon: Zap, label: "Workflow Engine", sub: "Assign, remind, escalate" },
               { icon: TrendingUp, label: "Live Analytics", sub: "Real-time pipeline" },
             ].map((f) => (
               <div key={f.label} className="bg-white/5 border border-white/10 rounded-xl p-3.5 backdrop-blur-sm hover:bg-white/10 transition-colors">
@@ -241,47 +241,33 @@ export default function Signup() {
             ))}
           </div>
 
-          {/* Live stats */}
+          {/* Product facts — from the price list, not usage (pre-launch: no usage data to quote) */}
           <div className="flex items-center gap-6">
             <div className="text-center">
-              <p className="font-display font-bold text-2xl text-orange-400">12.4K+</p>
-              <p className="text-[10px] text-midnight-300/80">AI replies today</p>
+              <p className="font-display font-bold text-2xl text-orange-400">
+                ₹{Math.min(...plans.map((p) => p.monthlyPrice)).toLocaleString("en-IN")}
+              </p>
+              <p className="text-[10px] text-midnight-300/80">per month, Starter</p>
             </div>
             <div className="w-px h-10 bg-white/10" />
             <div className="text-center">
-              <p className="font-display font-bold text-2xl text-emerald-400">70%</p>
-              <p className="text-[10px] text-midnight-300/80">auto-resolved</p>
+              <p className="font-display font-bold text-2xl text-emerald-400">{trialDays} days</p>
+              <p className="text-[10px] text-midnight-300/80">free trial, no card</p>
             </div>
             <div className="w-px h-10 bg-white/10" />
             <div className="text-center">
-              <p className="font-display font-bold text-2xl text-violet-300">3s</p>
-              <p className="text-[10px] text-midnight-300/80">response time</p>
+              <p className="font-display font-bold text-2xl text-violet-300">24/7</p>
+              <p className="text-[10px] text-midnight-300/80">AI auto-reply</p>
             </div>
           </div>
         </div>
 
-        {/* Testimonial */}
-        <div className="relative bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-sm">
-          <div className="flex gap-0.5 mb-2.5">
-            {[...Array(5)].map((_, i) => <Star key={i} size={12} className="text-orange-400" fill="currentColor" />)}
-          </div>
-          <p className="text-midnight-100 text-sm leading-relaxed mb-3">
-            "We replaced 3 employees with Codeskate AI and our conversion rate went up 3x. Best decision this year."
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-xs font-bold text-orange-400">V</div>
-            <div>
-              <p className="text-xs font-semibold text-white">Vikram Saxena</p>
-              <p className="text-[10px] text-midnight-300/80">Director, Meridian Properties</p>
-            </div>
-          </div>
-        </div>
 
         {/* Trust badges */}
         <div className="relative flex items-center gap-4">
           {[
-            { icon: Shield, text: "Bank-level security" },
-            { icon: Clock, text: "2-min setup" },
+            { icon: Shield, text: "Per-organisation data isolation" },
+            { icon: Clock, text: "OTP sign-in" },
             { icon: Lock, text: "Data encrypted" },
           ].map((b) => (
             <div key={b.text} className="flex items-center gap-1.5 text-[10px] text-midnight-300/80">
@@ -384,7 +370,7 @@ export default function Signup() {
                 {step === "details" && (
                   <>
                     <h1 className="font-display font-bold text-[1.6rem] text-white mb-1.5">Get started for free</h1>
-                    <p className="text-[13px] text-midnight-300/80 mb-7">Set up your workspace in under 2 minutes. No credit card needed.</p>
+                    <p className="text-[13px] text-midnight-300/80 mb-7">Set up your workspace with your phone number. No credit card needed for the trial.</p>
                     <form onSubmit={submitDetails} className="space-y-5">
                       <Field icon={User} label="Your name" value={fullName} onChange={setFullName} placeholder="e.g. Rohan Mehta" disabled={loading} />
                       <Field icon={Building2} label="Organization name" value={orgName} onChange={setOrgName} placeholder="e.g. Meridian Properties" disabled={loading} />
@@ -424,7 +410,7 @@ export default function Signup() {
                               <span className={`block text-[10px] mt-1 font-medium ${p.trial ? "text-emerald-600" : "text-midnight-300/80"}`}>{p.trial ? `${trialDays}-day free trial` : "Paid plan"}</span>
                               {/* Key feature highlight */}
                               <span className="block text-[9px] text-midnight-300/80 mt-1.5 leading-tight">
-                                {p.id === "starter" ? "3 users · 1K leads" : p.id === "growth" ? "10 users · AI + Human Takeover" : p.id === "enterprise" ? "25 users · Bridge calling" : "Unlimited + AI Voice Bot"}
+                                {p.id === "starter" ? "3 users · 1K leads" : p.id === "growth" ? "10 users · AI + Human Takeover" : p.id === "enterprise" ? "25 users · Bridge calling" : "Unlimited users & leads"}
                               </span>
                             </button>
                           ))}
@@ -540,7 +526,7 @@ export default function Signup() {
                       <span className="text-sm font-medium text-white">Billing cycle</span>
                       <div className="inline-flex bg-white/[0.06] rounded-full p-0.5 text-sm border border-white/[0.1]">
                         <button onClick={() => setCycle("monthly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "monthly" ? "bg-orange-500 text-white shadow-sm" : "text-midnight-300/80 hover:text-white"}`}>Monthly</button>
-                        <button onClick={() => setCycle("yearly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "yearly" ? "bg-orange-500 text-white shadow-sm" : "text-midnight-300/80 hover:text-white"}`}>Yearly <span className="text-[9px] font-bold ml-0.5">-20%</span></button>
+                        <button onClick={() => setCycle("yearly")} className={`px-4 py-1.5 rounded-full font-medium transition-all ${cycle === "yearly" ? "bg-orange-500 text-white shadow-sm" : "text-midnight-300/80 hover:text-white"}`}>Yearly <span className="text-[9px] font-bold ml-0.5">-{Math.round((1 - plan.yearlyPrice / (plan.monthlyPrice * 12)) * 100)}%</span></button>
                       </div>
                     </div>
 
@@ -594,7 +580,7 @@ export default function Signup() {
           <div className="lg:hidden flex items-center justify-center gap-4 mt-4">
             {[
               { icon: Shield, text: "Secure" },
-              { icon: Clock, text: "2-min setup" },
+              { icon: Clock, text: "OTP sign-in" },
               { icon: Lock, text: "Encrypted" },
             ].map((b) => (
               <div key={b.text} className="flex items-center gap-1 text-[10px] text-midnight-300/80">

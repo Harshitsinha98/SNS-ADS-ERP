@@ -27,10 +27,11 @@ const ROW_TONES = {
   followup: { dot: "bg-violet-400", label: "Follow-up", chip: "bg-violet-500/15 text-violet-300" },
 };
 
+// Capabilities, not results — there is no usage data to quote pre-launch.
 const RAIL_STATS = [
-  { icon: Zap, value: "3s", label: "avg reply" },
-  { icon: Bot, value: "70%", label: "auto-resolved" },
-  { icon: Clock, value: "24/7", label: "active" },
+  { icon: Clock, value: "24/7", label: "auto-reply" },
+  { icon: Zap, value: "Auto", label: "lead assignment" },
+  { icon: Bot, value: "AI", label: "from your knowledge base" },
 ];
 
 /* Phases: 0 idle → 1 lead message → 2 AI typing → 3 AI replied */
@@ -199,9 +200,6 @@ export default function HeroShowcase() {
                     <div className="flex items-center gap-1.5 mb-1">
                       <Brain size={9} className="text-violet-300" />
                       <span className="text-[10px] font-bold text-violet-300">AI Auto-Reply</span>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300">
-                        3 SEC
-                      </span>
                     </div>
                     <p className="text-[12px] leading-relaxed text-midnight-100">
                       Yes — 3 units in Whitefield from ₹72L, with covered parking and clubhouse
@@ -232,6 +230,9 @@ export default function HeroShowcase() {
           </motion.div>
         </div>
       </motion.div>
+      <p className="mt-4 text-center text-[11px] text-midnight-300/80">
+        Illustrative preview with sample data
+      </p>
     </div>
   );
 }

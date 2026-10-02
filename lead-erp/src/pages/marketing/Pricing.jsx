@@ -8,35 +8,41 @@ import { TRIAL_DAYS, mergePlansWithConfig } from "../../data/plans";
 import { fetchPlatformConfig } from "../../utils/platformConfig";
 
 // Codeskate Voice — prepaid, pay-as-you-go wallet packs.
+// Codeskate Voice — prepaid rupee wallet. Facts from whatsapp-backend:
+// MIN_TOPUP_INR = 100 and WALLET_PLANS (wallet.js); bridge calls bill only
+// connected minutes, rounded up (bridgeCall.js); the AI voice bot is not
+// implemented yet, so it is listed as coming soon.
 const VOICE_PACKS = [
   {
     icon: PhoneForwarded,
-    name: "Bridge Call Wallet",
-    price: "₹1,999",
-    unit: "1,000 minutes",
-    rate: "≈ ₹2 / min",
+    name: "Bridge Calling",
+    price: "From ₹100",
+    unit: "wallet top-up",
+    rate: "Billed per connected minute",
     desc: "Masked & recorded agent-to-lead calls. Numbers stay private; recordings land on the lead.",
     plan: "Available on Growth & up",
   },
   {
     icon: Bot,
-    name: "AI Voice Bot Wallet",
-    price: "₹3,999",
-    unit: "500 minutes",
-    rate: "≈ ₹8 / min",
-    desc: "AI calls, qualifies in Hindi & English, and warm-transfers hot leads to an available agent.",
-    plan: "Available on Scale & up",
+    name: "AI Voice Bot",
+    price: "Coming soon",
+    unit: null,
+    rate: "Planned for Scale & up",
+    desc: "AI that calls leads, qualifies them in Hindi & English, and hands hot leads to an agent.",
+    plan: "Not yet available",
   },
 ];
 
+// Only things every plan really has. Removed: "Unlimited team invites"
+// (seats are capped at 3/10/25 per plan) and "Bank-level security".
 const INCLUDED_EVERYWHERE = [
-  "Unlimited team invites",
   "WhatsApp integration",
-  "Mobile app access",
-  "Bank-level security",
+  "Android app",
+  "Role-based access",
   "Real-time sync",
-  "Data export",
-  "Email support",
+  "Lead export (CSV)",
+  "In-app support chat",
+  "Follow-up reminders",
   "Free updates",
 ];
 
@@ -46,7 +52,7 @@ const salesWhatsAppUrl = `https://wa.me/${SALES_WHATSAPP_NUMBER}?text=${encodeUR
 const buildFaqs = (trialDays) => [
   {
     q: `What happens after my ${trialDays}-day trial ends?`,
-    a: "Your data is always preserved. If you haven't subscribed, your workspace downgrades to a read-only state until you pick a plan. Upgrade anytime to unlock everything again.",
+    a: "Your data stays in your workspace. To keep using it after the trial, choose a plan from the Billing page.",
   },
   {
     q: "Can I change my plan later?",
@@ -66,7 +72,7 @@ const buildFaqs = (trialDays) => [
   },
 ];
 
-function PlanCard({ plan, cycle, onSelect }) {
+function PlanCard({ plan, cycle, onSelect, trialDays }) {
   const price = cycle === "monthly" ? plan.monthlyPrice : plan.yearlyPrice;
   const yearlySaving = plan.monthlyPrice * 12 - plan.yearlyPrice;
 
@@ -128,7 +134,7 @@ function PlanCard({ plan, cycle, onSelect }) {
       </button>
       {plan.trial ? (
         <p className="relative text-center text-xs text-emerald-400 -mt-4 mb-5 font-medium">
-          7-day free trial included
+          {trialDays}-day free trial included
         </p>
       ) : (
         <p className="relative text-center text-xs text-midnight-300/80 -mt-4 mb-5">
@@ -204,6 +210,10 @@ export default function Pricing() {
   // Dynamic: reflect the platform owner's configured prices/limits/trial days.
   const { plans: PLANS, trialDays: TRIAL_DAYS } = mergePlansWithConfig(config);
   const FAQS = buildFaqs(TRIAL_DAYS);
+  // Smallest real yearly saving across plans (currently ~17%), rounded.
+  const yearlySavingPct = Math.round(
+    Math.min(...PLANS.map((p) => (1 - p.yearlyPrice / (p.monthlyPrice * 12)) * 100))
+  );
 
   const selectPlan = (plan) => {
     navigate("/signup", { state: { planId: plan.id, cycle } });
@@ -230,7 +240,7 @@ export default function Pricing() {
           >
             <Sparkles size={14} className="text-orange-400" />
             <span className="text-xs font-semibold text-midnight-100">
-              {TRIAL_DAYS} days free · No credit card
+              {TRIAL_DAYS}-day free trial on Starter · No credit card
             </span>
           </motion.div>
 
@@ -249,8 +259,8 @@ export default function Pricing() {
             transition={{ duration: 0.7, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
             className="text-lg text-midnight-200/80 mb-10 leading-relaxed"
           >
-            Pick the plan that fits your team. Every plan starts with a {TRIAL_DAYS}-day free
-            trial — upgrade, downgrade, or cancel anytime.
+            Pick the plan that fits your team. Starter comes with a {TRIAL_DAYS}-day free trial.
+            Upgrade or downgrade from Billing; downgrades apply at the end of the billing period.
           </motion.p>
 
           {/* Billing toggle */}
@@ -286,7 +296,7 @@ export default function Pricing() {
                     : "bg-emerald-500/15 text-emerald-300"
                 }`}
               >
-                SAVE 17%
+                SAVE {yearlySavingPct}%
               </span>
             </button>
           </motion.div>
@@ -297,7 +307,7 @@ export default function Pricing() {
       <section className="pb-20 sm:pb-28">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 grid md:grid-cols-3 gap-6 lg:gap-8 items-stretch">
           {PLANS.map((plan) => (
-            <PlanCard key={plan.id} plan={plan} cycle={cycle} onSelect={selectPlan} />
+            <PlanCard key={plan.id} plan={plan} cycle={cycle} onSelect={selectPlan} trialDays={TRIAL_DAYS} />
           ))}
         </div>
 
@@ -351,7 +361,7 @@ export default function Pricing() {
                     <span className="font-display font-bold text-3xl text-white tracking-[-0.02em]">
                       {p.price}
                     </span>
-                    <span className="text-sm text-midnight-300/80 mb-1">/ {p.unit}</span>
+                    {p.unit && <span className="text-sm text-midnight-300/80 mb-1">/ {p.unit}</span>}
                   </div>
                   <p className="text-xs font-semibold text-orange-300 mb-3">{p.rate}</p>
                   <p className="text-sm text-midnight-200/75 leading-relaxed">{p.desc}</p>
@@ -361,8 +371,8 @@ export default function Pricing() {
           </Stagger>
 
           <p className="text-center text-xs text-midnight-300/80 mt-7">
-            Native call tracking (Android) is included free on every plan. Bridge &amp; AI Voice
-            Bot are billed from your voice wallet.
+            Native call tracking (Android) is included on every plan. Bridge calls and dedicated
+            number rental are billed from your voice wallet.
           </p>
         </div>
       </section>
@@ -423,7 +433,7 @@ export default function Pricing() {
                   Start closing more deals today
                 </h2>
                 <p className="text-midnight-200/80 mb-9 max-w-lg mx-auto leading-relaxed">
-                  Try Codeskate CRM free for {TRIAL_DAYS} days. No credit card, no commitment.
+                  Start with a {TRIAL_DAYS}-day free trial on Starter. No credit card needed.
                 </p>
                 <button
                   onClick={() => navigate("/signup")}

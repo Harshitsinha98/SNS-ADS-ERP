@@ -3,6 +3,11 @@
  *
  * Used by: Pricing page, Signup, Billing, Platform dashboard.
  * Platform owner can override via platformConfig/global in Firestore.
+ *
+ * Feature text is customer-facing. Only list what the product does today;
+ * mark anything not yet shipped "(coming soon)". The AI Voice Bot is not
+ * implemented yet (no call-placement code exists; wallet.js marks it
+ * "future"), so it is labelled coming soon rather than sold as included.
  */
 
 export const PLANS = [
@@ -29,7 +34,7 @@ export const PLANS = [
       { text: "Activity log", included: true },
       { text: "Full AI Customer Care (2,000/mo)", included: false },
       { text: "Bridge calling — number masked + recorded", included: false },
-      { text: "AI Voice Bot (auto-call & qualify)", included: false },
+      { text: "AI Voice Bot (coming soon)", included: false },
       { text: "Workflow automation", included: false },
     ],
   },
@@ -55,7 +60,7 @@ export const PLANS = [
       { text: "Goals & performance", included: true },
       { text: "Meta & Google Ad leads", included: true },
       { text: "Priority email support", included: true },
-      { text: "AI Voice Bot (auto-call & qualify)", included: false },
+      { text: "AI Voice Bot (coming soon)", included: false },
     ],
   },
   {
@@ -72,7 +77,7 @@ export const PLANS = [
       { text: "50,000 leads / month", included: true },
       { text: "Everything in Growth", included: true },
       { text: "AI auto-reply (10,000/mo)", included: true },
-      { text: "AI Voice Bot — auto-call, qualify & warm-transfer", included: true },
+      { text: "AI Voice Bot — coming soon", included: true },
       { text: "25 workflow rules", included: true },
       { text: "200 products in catalogue", included: true },
       { text: "API access & webhooks", included: true },
@@ -94,7 +99,7 @@ export const PLANS = [
       { text: "Unlimited leads", included: true },
       { text: "Everything in Scale", included: true },
       { text: "AI auto-reply (50,000/mo)", included: true },
-      { text: "AI Voice Bot + Bridge calling", included: true },
+      { text: "Bridge calling + AI Voice Bot (coming soon)", included: true },
       { text: "500 products + unlimited images", included: true },
       { text: "Unlimited workflows", included: true },
       { text: "Full API & webhooks", included: true },
