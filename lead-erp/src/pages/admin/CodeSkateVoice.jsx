@@ -454,7 +454,7 @@ export default function CodeSkateVoice() {
             <div className="flex-1">
               <h3 className="font-bold text-gray-900">Unlock CodeSkate Voice</h3>
               <p className="text-sm text-gray-600">
-                Dedicated numbers, bridge calling & AI voice are available on Growth and above. Upgrade to give your business its own calling identity.
+                Dedicated numbers and bridge calling are available on Growth and above. Upgrade to give your business its own calling identity. AI voice calls are coming soon.
               </p>
             </div>
             <button onClick={() => navigate("/admin/billing")}
@@ -560,8 +560,8 @@ export default function CodeSkateVoice() {
               <div className="w-9 h-9 rounded-full bg-purple-50 flex items-center justify-center mx-auto mb-2">
                 <Sparkles size={16} className="text-purple-500" />
               </div>
-              <p className="text-lg font-bold text-gray-900">₹5<span className="text-xs font-normal text-gray-400">/min</span></p>
-              <p className="text-xs text-gray-500 mt-0.5">AI voice call</p>
+              <p className="text-lg font-bold text-purple-700">Coming soon</p>
+              <p className="text-xs text-gray-500 mt-0.5">AI voice calls</p>
             </div>
             <div className="bg-white border rounded-xl p-4 text-center">
               <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-2">
@@ -571,7 +571,7 @@ export default function CodeSkateVoice() {
               <p className="text-xs text-gray-500 mt-0.5">Call recordings</p>
             </div>
           </div>
-          <p className="text-xs text-gray-400 mt-2">All usage draws from your Voice Wallet. Top up once, use across bridge, AI & rent.</p>
+          <p className="text-xs text-gray-400 mt-2">All usage draws from your Voice Wallet. Top up once, use across bridge calls & number rent.</p>
         </div>
       </div>
     </Layout>
