@@ -18,7 +18,6 @@ import {
 const PRESETS = [500, 1000, 2000, 5000];
 const MIN_TOPUP = 100;
 const BRIDGE_RATE = 2.20; // ₹/min bridge call
-const AI_RATE = 5;        // ₹/min AI voice call
 
 const fmtDate = (ts) => {
   if (!ts) return "—";
@@ -29,8 +28,6 @@ const fmtDate = (ts) => {
 
 // Voice Wallet is a Growth+ feature.
 const WALLET_PLANS = new Set(["growth", "enterprise", "enterprise_plus"]);
-// AI voice calling is a Scale (enterprise) & above feature.
-const AI_VOICE_PLANS = new Set(["enterprise", "enterprise_plus"]);
 
 export default function VoiceWallet() {
   const b = useBilling();
@@ -40,7 +37,6 @@ export default function VoiceWallet() {
 
   const planId = b.planId || "starter";
   const walletLocked = !WALLET_PLANS.has(planId);
-  const aiVoiceEnabled = AI_VOICE_PLANS.has(planId);
 
   const [balance, setBalance] = useState({ balanceInr: 0, totalSpentInr: 0 });
   const [transactions, setTransactions] = useState([]);
@@ -212,39 +208,23 @@ export default function VoiceWallet() {
           </p>
         </div>
 
-        {/* AI voice minutes — locked if plan doesn't include AI voice */}
-        <div className={`rounded-2xl shadow-card border p-5 relative overflow-hidden ${aiVoiceEnabled ? "bg-white border-cream-300/60" : "bg-purple-50/40 border-purple-200"}`}>
+        {/* AI voice calls — not built yet (no call-placement code in the backend;
+            wallet.js marks AI voice as "future"). Shown as coming soon, with no
+            rate, minute balance or upgrade prompt, so nobody pays for it. */}
+        <div className="rounded-2xl shadow-card border p-5 relative overflow-hidden bg-purple-50/40 border-purple-200">
           <div className="flex items-center gap-2 mb-3">
-            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${aiVoiceEnabled ? "bg-purple-100" : "bg-purple-100"}`}>
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-purple-100">
               <Sparkles size={16} className="text-purple-600" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-ink">AI Voice Minutes</p>
-              <p className="text-[11px] text-ink-muted">₹5/min · auto-call & qualify</p>
+              <p className="text-sm font-semibold text-ink">AI Voice Calls</p>
+              <p className="text-[11px] text-ink-muted">Auto-call & qualify leads</p>
             </div>
           </div>
-          {aiVoiceEnabled ? (
-            <p className="font-display font-bold text-3xl text-ink">
-              {Math.floor(balance.balanceInr / AI_RATE).toLocaleString("en-IN")}
-              <span className="text-sm font-normal text-ink-muted ml-1">min</span>
-            </p>
-          ) : (
-            <div>
-              <p className="font-display font-bold text-3xl text-ink/30">
-                {Math.floor(balance.balanceInr / AI_RATE).toLocaleString("en-IN")}
-                <span className="text-sm font-normal ml-1">min</span>
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">
-                  <Lock size={10} /> Locked
-                </span>
-                <button onClick={() => navigate("/admin/billing")}
-                  className="text-xs font-semibold text-purple-700 hover:text-purple-900 flex items-center gap-0.5">
-                  Upgrade to Scale to unlock <ArrowRight size={12} />
-                </button>
-              </div>
-            </div>
-          )}
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 bg-purple-100 px-2.5 py-1 rounded-full">
+            <Sparkles size={11} /> Coming soon
+          </span>
+          <p className="text-xs text-ink-muted mt-2">In development — not available yet.</p>
         </div>
       </div>
 
