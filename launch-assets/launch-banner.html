@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CodeSkate CRM — Launch Banners</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --orange-300:#FFAC70; --orange-400:#FF8A3D; --orange-500:#FF6B1A; --orange-600:#F04E00;
+    --ember-500:#C74E24; --ember-600:#A63A18;
+    --mid-900:#0F0C0A; --mid-800:#171310; --mid-700:#231D18; --mid-200:#C9C3BD; --mid-300:#A49C94;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"Inter",system-ui,sans-serif;
+    background:#0a0808;
+    color:#fff;
+    padding:48px 24px;
+    display:flex;flex-direction:column;align-items:center;gap:56px;
+  }
+  .label{font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a7f76;margin-bottom:14px;align-self:flex-start}
+  .wrap{width:100%;max-width:1200px}
+
+  /* Shared brand pieces */
+  .skate{display:inline-flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--orange-400),var(--orange-600));
+    box-shadow:0 8px 28px rgba(255,107,26,.4);}
+  .wordmark{font-family:"Space Grotesk",sans-serif;font-weight:700;letter-spacing:-.02em;color:#fff}
+  .wordmark .sk{color:var(--orange-400)}
+  .crm-pill{font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#fff;border-radius:7px;
+    background:linear-gradient(135deg,var(--orange-400),var(--orange-600))}
+  .grad-text{background:linear-gradient(100deg,var(--orange-300),var(--orange-500) 55%,var(--orange-400));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .chip{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,172,112,.28);
+    background:rgba(255,107,26,.1);border-radius:999px;padding:7px 15px;font-size:13px;font-weight:600;color:#FFCEA8}
+
+  /* Ambient background common to banners */
+  .banner{position:relative;overflow:hidden;border-radius:24px;
+    background:radial-gradient(120% 120% at 50% -10%,rgba(255,107,26,.22) 0%,rgba(255,107,26,0) 55%),
+      linear-gradient(180deg,#0F0C0A 0%,#171310 55%,#0F0C0A 100%);
+    border:1px solid rgba(255,255,255,.08)}
+  .bloom{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none}
+  .grid-fade{position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+    background-size:44px 44px;
+    -webkit-mask-image:radial-gradient(120% 90% at 50% 0%,#000 40%,transparent 85%);
+    mask-image:radial-gradient(120% 90% at 50% 0%,#000 40%,transparent 85%)}
+
+  /* ============ 1. HERO / SOCIAL BANNER 1200x630 ============ */
+  .hero{width:1200px;height:630px;max-width:100%;display:flex;flex-direction:column;justify-content:center;padding:72px 80px}
+  .hero .bloom.a{width:620px;height:420px;top:-160px;left:50%;transform:translateX(-50%);background:rgba(255,107,26,.3)}
+  .hero .bloom.b{width:360px;height:360px;bottom:-120px;right:-80px;background:rgba(199,78,36,.22)}
+  .hero-top{display:flex;align-items:center;gap:12px;margin-bottom:34px}
+  .hero-top .skate{width:52px;height:52px;border-radius:15px}
+  .hero-top .wordmark{font-size:30px}
+  .hero-top .crm-pill{font-size:12px;padding:4px 9px}
+  .launch-badge{margin-left:auto;display:inline-flex;align-items:center;gap:9px;font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.14em;
+    text-transform:uppercase;color:#FFCEA8;border:1px solid rgba(255,172,112,.3);border-radius:999px;padding:7px 16px}
+  .live-dot{width:8px;height:8px;border-radius:50%;background:#34D399;box-shadow:0 0 10px #34D399}
+  .svg-arrow{width:18px;height:18px;flex-shrink:0}
+  .svg-tick{width:15px;height:15px;flex-shrink:0}
+  .hero h1{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:66px;line-height:1.03;letter-spacing:-.035em;margin:8px 0 20px}
+  .hero h1 .muted{color:var(--mid-300)}
+  .hero p{font-size:21px;line-height:1.5;color:rgba(201,195,189,.85);max-width:720px;margin-bottom:34px}
+  .hero p strong{color:#fff;font-weight:600}
+  .hero-cta{display:flex;align-items:center;gap:16px}
+  .btn-primary{display:inline-flex;align-items:center;gap:10px;font-weight:700;font-size:18px;color:#fff;
+    background:linear-gradient(135deg,var(--orange-400),var(--orange-600));border-radius:14px;padding:16px 30px;
+    box-shadow:0 10px 30px -6px rgba(240,78,0,.5)}
+  .trial-note{font-size:15px;color:rgba(164,156,148,.9);display:flex;gap:18px}
+  .trial-note span{display:inline-flex;align-items:center;gap:7px}
+  .tick{color:#34D399;font-weight:800}
+
+  /* ============ 2. WIDE / LINKEDIN COVER 1584x396 ============ */
+  .cover{width:1584px;height:396px;max-width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 90px;gap:40px}
+  .cover .bloom.a{width:520px;height:380px;top:-140px;left:12%;background:rgba(255,107,26,.26)}
+  .cover .bloom.b{width:420px;height:420px;bottom:-160px;right:4%;background:rgba(199,78,36,.2)}
+  .cover-left{max-width:900px}
+  .cover-brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+  .cover-brand .skate{width:46px;height:46px;border-radius:13px}
+  .cover-brand .wordmark{font-size:26px}
+  .cover-brand .crm-pill{font-size:11px;padding:3px 8px}
+  .cover h2{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:48px;line-height:1.05;letter-spacing:-.03em;margin-bottom:16px}
+  .cover h2 .muted{color:var(--mid-300)}
+  .cover .sub{font-size:19px;color:rgba(201,195,189,.82);max-width:760px}
+  .feat-stack{display:flex;flex-direction:column;gap:12px;flex-shrink:0}
+  .feat{display:flex;align-items:center;gap:11px;font-size:15px;font-weight:500;color:#E8E5E2;
+    background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 18px;white-space:nowrap}
+  .feat .dot{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--orange-400),var(--orange-600));flex-shrink:0}
+
+  /* ============ 3. SQUARE / INSTAGRAM 1080x1080 ============ */
+  .square{width:1080px;height:1080px;max-width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:90px 80px}
+  .square .bloom.a{width:640px;height:460px;top:-180px;left:50%;transform:translateX(-50%);background:rgba(255,107,26,.3)}
+  .square .bloom.b{width:420px;height:420px;bottom:-140px;left:-120px;background:rgba(147,51,234,.14)}
+  .square .brand{display:flex;align-items:center;gap:14px;margin-bottom:46px}
+  .square .skate{width:64px;height:64px;border-radius:18px}
+  .square .wordmark{font-size:38px}
+  .square .crm-pill{font-size:14px;padding:5px 11px}
+  .square .chip{margin-bottom:30px}
+  .square h2{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:76px;line-height:1.02;letter-spacing:-.035em;margin-bottom:28px}
+  .square h2 .muted{color:var(--mid-300)}
+  .square p{font-size:24px;line-height:1.5;color:rgba(201,195,189,.85);max-width:760px;margin-bottom:44px}
+  .square .btn-primary{font-size:22px;padding:20px 40px}
+  .square .ticker{margin-top:52px;display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-width:860px}
+  .square .tkn{font-size:14px;color:rgba(201,195,189,.8);border:1px solid rgba(255,255,255,.09);
+    background:rgba(255,255,255,.03);border-radius:999px;padding:9px 16px}
+
+  @media (max-width:1240px){
+    .hero,.cover,.square{transform-origin:top left}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="label">1 · Hero / Social share · 1200 × 630</div>
+  <div class="banner hero">
+    <div class="bloom a"></div><div class="bloom b"></div><div class="grid-fade"></div>
+    <div class="hero-top">
+      <span class="skate"><svg width="34" height="34" viewBox="0 0 48 48"><path d="M33 15 A13 13 0 1 0 33 33" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/></svg></span>
+      <span class="wordmark">Code<span class="sk">Skate</span></span>
+      <span class="crm-pill">CRM</span>
+      <span class="launch-badge"><span class="live-dot"></span>Now Live</span>
+    </div>
+    <h1>Reply to every lead,<br><span class="grad-text">automatically</span>.<br><span class="muted">Close more deals.</span></h1>
+    <p>Capture WhatsApp leads, auto-assign them to your team, and let AI reply from your own knowledge base — working <strong>24/7</strong>, even when your team is offline.</p>
+    <div class="hero-cta">
+      <span class="btn-primary">Get Started — 7 Days Free <svg class="svg-arrow" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+      <span class="trial-note">
+        <span><svg class="svg-tick" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> No credit card</span>
+        <span><svg class="svg-tick" viewBox="0 0 24 24" fill="none" stroke="#34D399" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> From ₹599/month</span>
+      </span>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="label">2 · LinkedIn / X cover · 1584 × 396</div>
+  <div class="banner cover">
+    <div class="bloom a"></div><div class="bloom b"></div><div class="grid-fade"></div>
+    <div class="cover-left">
+      <div class="cover-brand">
+        <span class="skate"><svg width="30" height="30" viewBox="0 0 48 48"><path d="M33 15 A13 13 0 1 0 33 33" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/></svg></span>
+        <span class="wordmark">Code<span class="sk">Skate</span></span>
+        <span class="crm-pill">CRM</span>
+      </div>
+      <h2>The WhatsApp CRM that <span class="grad-text">replies for you</span>.<br><span class="muted">Now launching for sales teams in India.</span></h2>
+      <p class="sub">AI auto-reply, native call tracking, bridge calling and workflow automation — one platform, every channel.</p>
+    </div>
+    <div class="feat-stack">
+      <div class="feat"><span class="dot"></span>AI auto-reply, 24/7</div>
+      <div class="feat"><span class="dot"></span>WhatsApp Business API</div>
+      <div class="feat"><span class="dot"></span>Smart human takeover</div>
+      <div class="feat"><span class="dot"></span>Live pipeline analytics</div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="label">3 · Instagram / square · 1080 × 1080</div>
+  <div class="banner square">
+    <div class="bloom a"></div><div class="bloom b"></div><div class="grid-fade"></div>
+    <div class="brand">
+      <span class="skate"><svg width="42" height="42" viewBox="0 0 48 48"><path d="M33 15 A13 13 0 1 0 33 33" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/></svg></span>
+      <span class="wordmark">Code<span class="sk">Skate</span></span>
+      <span class="crm-pill">CRM</span>
+    </div>
+    <span class="chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="#FF8A3D"><path d="M12 2l2.2 6.6L21 9l-5.4 4 2 6.8L12 16l-5.6 3.8 2-6.8L3 9l6.8-.4z"/></svg> Built for WhatsApp-first sales teams</span>
+    <h2>Reply to every lead,<br><span class="grad-text">automatically</span>.</h2>
+    <p>AI answers your WhatsApp leads instantly, your team takes over when it matters, and no lead ever goes cold.</p>
+    <span class="btn-primary">Start free — 7 days <svg class="svg-arrow" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    <div class="ticker">
+      <span class="tkn">AI Auto-Reply</span>
+      <span class="tkn">WhatsApp Business API</span>
+      <span class="tkn">Bridge Calling</span>
+      <span class="tkn">Workflow Automation</span>
+      <span class="tkn">Native Call Tracking</span>
+      <span class="tkn">SLA Escalation</span>
+      <span class="tkn">Live Analytics</span>
+      <span class="tkn">Multi-Org Support</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
