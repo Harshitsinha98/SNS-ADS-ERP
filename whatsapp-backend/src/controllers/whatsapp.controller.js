@@ -39,13 +39,17 @@ export async function connectWhatsApp(req, res) {
     const orgId = String(req.body?.orgId || "").trim();
     const code = String(req.body?.code || "").trim();
     const wabaId = String(req.body?.wabaId || "").trim();
-    const phoneNumberId = String(req.body?.phoneNumberId || "").trim();
+    let phoneNumberId = String(req.body?.phoneNumberId || "").trim();
     const registrationPin = String(req.body?.registrationPin || "").trim();
+    // "business_app" = coexistence: an existing WhatsApp Business app number.
+    // Meta registers it during Embedded Signup, so /register must be skipped.
+    const onboardingType = req.body?.onboardingType === "business_app" ? "business_app" : "cloud_api";
+    const isBusinessApp = onboardingType === "business_app";
 
-    if (!orgId || !code || !validMetaId(wabaId) || !validMetaId(phoneNumberId)) {
+    if (!orgId || !code || !validMetaId(wabaId) || (phoneNumberId && !validMetaId(phoneNumberId)) || (!phoneNumberId && !isBusinessApp)) {
       return res.status(400).json({ error: "Complete WhatsApp Business connection details are required" });
     }
-    if (!/^\d{6}$/.test(registrationPin)) {
+    if (!isBusinessApp && !/^\d{6}$/.test(registrationPin)) {
       return res.status(400).json({ error: "Enter a six-digit WhatsApp registration PIN" });
     }
     if (!(await isOrgAdmin(req.authUser.uid, orgId))) {
@@ -54,8 +58,21 @@ export async function connectWhatsApp(req, res) {
 
     const exchange = await exchangeMetaAuthorizationCode(code);
     const accessToken = exchange.access_token;
-    const phoneNumbers = await metaGraphRequest(`${wabaId}/phone_numbers`, { token: accessToken });
-    if (!(phoneNumbers.data || []).some((number) => String(number.id) === phoneNumberId)) {
+    const phoneNumbers = await metaGraphRequest(
+      `${wabaId}/phone_numbers?fields=id,display_phone_number,is_on_biz_app,platform_type`,
+      { token: accessToken }
+    );
+    const numbers = phoneNumbers.data || [];
+    if (!phoneNumberId) {
+      // Coexistence completion events may only carry the WABA ID.
+      const candidates = numbers.filter((number) => number.is_on_biz_app);
+      const pool = candidates.length ? candidates : numbers;
+      if (pool.length !== 1) {
+        return res.status(400).json({ error: "Could not identify the WhatsApp Business app number in this account. Please run Connect with Meta again." });
+      }
+      phoneNumberId = String(pool[0].id);
+    }
+    if (!numbers.some((number) => String(number.id) === phoneNumberId)) {
       return res.status(400).json({ error: "The selected phone number is not part of this WhatsApp Business Account" });
     }
 
@@ -74,9 +91,9 @@ export async function connectWhatsApp(req, res) {
       if (previousPhoneNumberId && previousPhoneNumberId !== phoneNumberId) {
         throw Object.assign(new Error("Disconnect the current WhatsApp number before connecting a different one"), { status: 409 });
       }
-      tx.set(configRef, { orgId, phoneNumberId, wabaId, active: true, connectedAt, connectedBy: req.authUser.uid });
+      tx.set(configRef, { orgId, phoneNumberId, wabaId, onboardingType, active: true, connectedAt, connectedBy: req.authUser.uid });
       tx.set(credentialRef, {
-        orgId, phoneNumberId, wabaId,
+        orgId, phoneNumberId, wabaId, onboardingType,
         tokenCiphertext: encryptWhatsAppToken(accessToken),
         tokenExpiresAtMs,
         connectionState: "connecting",
@@ -91,17 +108,19 @@ export async function connectWhatsApp(req, res) {
     });
 
     try {
-      try {
-        await metaGraphRequest(`${phoneNumberId}/register`, {
-          method: "POST",
-          token: accessToken,
-          body: { messaging_product: "whatsapp", pin: registrationPin },
-        });
-      } catch (error) {
-        throw Object.assign(new Error("Meta could not register this phone number. Confirm the six-digit WhatsApp registration PIN and try again."), {
-          status: error.status || 502,
-          deliveryUnknown: error.deliveryUnknown,
-        });
+      if (!isBusinessApp) {
+        try {
+          await metaGraphRequest(`${phoneNumberId}/register`, {
+            method: "POST",
+            token: accessToken,
+            body: { messaging_product: "whatsapp", pin: registrationPin },
+          });
+        } catch (error) {
+          throw Object.assign(new Error("Meta could not register this phone number. Confirm the six-digit WhatsApp registration PIN and try again."), {
+            status: error.status || 502,
+            deliveryUnknown: error.deliveryUnknown,
+          });
+        }
       }
       await metaGraphRequest(`${wabaId}/subscribed_apps`, { method: "POST", token: accessToken });
       await Promise.all([

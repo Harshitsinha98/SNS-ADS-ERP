@@ -17,9 +17,13 @@ export const connectWhatsAppSchema = z.object({
   orgId: z.string().min(1, "Organization ID is required"),
   code: z.string().min(1, "Authorization code is required"),
   wabaId: z.string().regex(/^\d{6,32}$/, "Invalid WhatsApp Business Account ID"),
-  phoneNumberId: z.string().regex(/^\d{6,32}$/, "Invalid phone number ID"),
-  registrationPin: z.string().regex(/^\d{6}$/, "Enter a six-digit WhatsApp registration PIN"),
-});
+  phoneNumberId: z.string().regex(/^\d{6,32}$/, "Invalid phone number ID").optional(),
+  onboardingType: z.enum(["cloud_api", "business_app"]).default("cloud_api"),
+  registrationPin: z.string().regex(/^\d{6}$/, "Enter a six-digit WhatsApp registration PIN").optional(),
+}).refine(
+  (body) => body.onboardingType === "business_app" || (body.phoneNumberId && body.registrationPin),
+  { message: "Phone number ID and registration PIN are required for a new Cloud API number" }
+);
 
 export const orgIdSchema = z.object({
   orgId: z.string().min(1, "Organization ID is required"),
