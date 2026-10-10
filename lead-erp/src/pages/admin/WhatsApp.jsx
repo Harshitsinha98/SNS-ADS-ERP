@@ -71,8 +71,8 @@ export default function WhatsApp() {
       setMessage("WhatsApp onboarding is not configured yet. Ask the platform administrator to add the Meta App ID and Embedded Signup Configuration ID in Vercel.");
       return;
     }
-    if (!/^\d{6}$/.test(registrationPin)) {
-      setMessage("Enter a six-digit WhatsApp registration PIN before connecting. This is not an SMS OTP.");
+    if (registrationPin && !/^\d{6}$/.test(registrationPin)) {
+      setMessage("The WhatsApp registration PIN must be exactly six digits. Leave it empty if you are connecting an existing WhatsApp Business app number.");
       return;
     }
     setSaving(true);
@@ -81,16 +81,26 @@ export default function WhatsApp() {
 
     const finishConnection = async () => {
       const state = completionRef.current;
-      if (state.done || !state.code || !state.signup?.wabaId || !state.signup?.phoneNumberId) return;
+      if (state.done || !state.code || !state.signup?.wabaId) return;
+      const isBusinessApp = state.signup.onboardingType === "business_app";
+      // A Cloud API number needs its phone number ID; a WhatsApp Business app
+      // (coexistence) number may only return the WABA ID — the server resolves it.
+      if (!isBusinessApp && !state.signup.phoneNumberId) return;
       state.done = true;
       window.removeEventListener("message", onMetaMessage);
+      if (!isBusinessApp && !/^\d{6}$/.test(registrationPin)) {
+        setMessage("This is a new Cloud API number, so Meta needs a six-digit registration PIN. Enter a PIN and click Connect again.");
+        setSaving(false);
+        return;
+      }
       try {
         await connectWhatsAppBusiness({
           orgId,
           code: state.code,
           wabaId: state.signup.wabaId,
-          phoneNumberId: state.signup.phoneNumberId,
-          registrationPin,
+          phoneNumberId: state.signup.phoneNumberId || undefined,
+          onboardingType: state.signup.onboardingType,
+          registrationPin: isBusinessApp ? undefined : registrationPin,
         });
         await refreshConnection();
         setRegistrationPin("");
@@ -103,7 +113,13 @@ export default function WhatsApp() {
     };
 
     const onMetaMessage = (event) => {
-      if (!["https://www.facebook.com", "https://web.facebook.com"].includes(event.origin)) return;
+      let origin;
+      try {
+        origin = new URL(event.origin);
+      } catch {
+        return;
+      }
+      if (origin.protocol !== "https:" || !(origin.hostname === "facebook.com" || origin.hostname.endsWith(".facebook.com"))) return;
       let payload;
       try {
         payload = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
@@ -111,15 +127,23 @@ export default function WhatsApp() {
         return;
       }
       if (payload?.type !== "WA_EMBEDDED_SIGNUP") return;
-      if (payload.event === "FINISH") {
-        const data = payload.data || {};
+      const data = payload.data || {};
+      if (payload.event === "FINISH" || payload.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING") {
         completionRef.current.signup = {
           wabaId: String(data.waba_id || data.wabaId || ""),
           phoneNumberId: String(data.phone_number_id || data.phoneNumberId || ""),
+          onboardingType: payload.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING" ? "business_app" : "cloud_api",
         };
         finishConnection();
-      } else if (payload.event === "CANCEL") {
-        setMessage("WhatsApp connection was cancelled before completion.");
+      } else if (payload.event === "FINISH_ONLY_WABA") {
+        window.removeEventListener("message", onMetaMessage);
+        setMessage("Meta finished without a phone number. Run Connect with Meta again and add or select a WhatsApp phone number.");
+        setSaving(false);
+      } else if (payload.event === "CANCEL" || payload.event === "ERROR") {
+        window.removeEventListener("message", onMetaMessage);
+        setMessage(data.error_message
+          ? `Meta reported an error: ${data.error_message}${data.session_id ? ` (session ${data.session_id})` : ""}`
+          : "WhatsApp connection was cancelled before completion.");
         setSaving(false);
       }
     };
@@ -141,7 +165,10 @@ export default function WhatsApp() {
         config_id: META_EMBEDDED_SIGNUP_CONFIG_ID,
         response_type: "code",
         override_default_response_type: true,
-        extras: { setup: {}, featureType: "whatsapp_business_app_onboarding" },
+        // Coexistence: lets customers connect an existing WhatsApp Business app
+        // number. Without sessionInfoVersion "3" Meta falls back to the plain
+        // Cloud API screen, where Business app numbers show as "Ineligible".
+        extras: { setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3" },
       });
     } catch (error) {
       window.removeEventListener("message", onMetaMessage);
@@ -234,7 +261,7 @@ export default function WhatsApp() {
           </p>
           {!connection.connected && (
             <label className="block mt-5">
-              <span className="block text-sm font-medium text-ink mb-1.5">WhatsApp registration PIN</span>
+              <span className="block text-sm font-medium text-ink mb-1.5">WhatsApp registration PIN <span className="text-ink-muted font-normal">(not needed for an existing WhatsApp Business app number)</span></span>
               <input
                 type="password"
                 inputMode="numeric"
@@ -245,7 +272,7 @@ export default function WhatsApp() {
                 placeholder="Six digits"
                 className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm text-ink focus:border-orange-500 focus:outline-none"
               />
-              <span className="block text-xs text-ink-muted mt-1.5">For a new number, choose and keep a six-digit PIN. For an existing number, enter its current WhatsApp two-step PIN. This is not an SMS OTP and is never stored.</span>
+              <span className="block text-xs text-ink-muted mt-1.5">If you are connecting the number you already use in the WhatsApp Business app, leave this empty. For a new number, choose and keep a six-digit PIN. For an existing number, enter its current WhatsApp two-step PIN. This is not an SMS OTP and is never stored.</span>
             </label>
           )}
           <button onClick={connect} disabled={saving || connection.connected} className="btn btn-primary w-full mt-6">
