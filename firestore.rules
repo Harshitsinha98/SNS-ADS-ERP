@@ -295,6 +295,72 @@ service cloud.firestore {
           || (isActiveMember(orgId) && resource.data.employeeId == request.auth.uid);
         allow write: if false;
       }
+
+      // ── Team Chat (mobile app) ──
+      // `general` is one org-wide channel for every active member.
+      // `dm_{uidA}__{uidB}` (uids sorted) is a 1:1 thread whose participants
+      // must both be active members. Messages are append-only and the sender
+      // is pinned to the caller; the thread doc only carries a last-message
+      // summary that participants may bump.
+      match /teamChats/{chatId} {
+        function chatPath() {
+          return /databases/$(database)/documents/organizations/$(orgId)/teamChats/$(chatId);
+        }
+        function isActiveUid(uid) {
+          return exists(/databases/$(database)/documents/memberships/$(uid + '_' + orgId))
+            && get(/databases/$(database)/documents/memberships/$(uid + '_' + orgId)).data.active == true;
+        }
+        function validDm(data) {
+          return data.kind == 'dm'
+            && data.participants is list
+            && data.participants.size() == 2
+            && data.participants[0] < data.participants[1]
+            && request.auth.uid in data.participants
+            && chatId == 'dm_' + data.participants[0] + '__' + data.participants[1]
+            && isActiveUid(data.participants[0])
+            && isActiveUid(data.participants[1]);
+        }
+        function validGeneral(data) {
+          return chatId == 'general' && data.kind == 'general' && data.participants == [];
+        }
+        function validSummary() {
+          return request.resource.data.lastSenderId == request.auth.uid
+            && request.resource.data.lastMessageAt == request.time
+            && request.resource.data.lastMessage is string
+            && request.resource.data.lastMessage.size() <= 200;
+        }
+        function summaryOnly() {
+          return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'lastMessage', 'lastSenderId', 'lastSenderName', 'lastMessageAt', 'participantNames'
+          ]);
+        }
+
+        allow read: if isActiveMember(orgId)
+          && (chatId == 'general' || request.auth.uid in resource.data.participants);
+        allow create: if isActiveMember(orgId)
+          && (validGeneral(request.resource.data) || validDm(request.resource.data))
+          && validSummary();
+        allow update: if isActiveMember(orgId)
+          && (chatId == 'general' || request.auth.uid in resource.data.participants)
+          && summaryOnly()
+          && validSummary();
+        allow delete: if false;
+
+        match /messages/{messageId} {
+          allow read: if isActiveMember(orgId)
+            && (chatId == 'general' || request.auth.uid in get(chatPath()).data.participants);
+          // getAfter(): the first DM message is batched with the thread create.
+          allow create: if isActiveMember(orgId)
+            && (chatId == 'general' || request.auth.uid in getAfter(chatPath()).data.participants)
+            && request.resource.data.keys().hasOnly(['senderId', 'senderName', 'text', 'at'])
+            && request.resource.data.senderId == request.auth.uid
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 2000
+            && request.resource.data.at == request.time;
+          allow update, delete: if false;
+        }
+      }
     }
 
     // Website-integration credentials, public-form settings, and shared rate
