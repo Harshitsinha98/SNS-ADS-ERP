@@ -29,6 +29,7 @@ import { createCodeskateVoiceRoutes } from "./codeskateVoice.routes.js";
 import { createSupportRoutes } from "./support.routes.js";
 import { createOrgTicketRoutes } from "./orgTickets.routes.js";
 import { publicChatMessage } from "../../controllers/publicChat.controller.js";
+import { createDeviceRoutes } from "./devices.routes.js";
 
 export function createV1Router() {
   const router = Router();
@@ -80,6 +81,9 @@ export function createV1Router() {
 
   // Chat Sessions (human takeover, session-bounded messaging)
   router.use("/chat-sessions", createChatSessionRoutes());
+
+  // Mobile app push-notification device registration
+  router.use("/devices", createDeviceRoutes());
 
   // Platform Owner Console — cross-tenant operations (platform admin only)
   router.use("/platform", createPlatformRoutes());

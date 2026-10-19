@@ -29,6 +29,7 @@ import { runScheduledBroadcasts } from "./services/broadcast.js";
 import { chargeDueRents } from "./services/voiceNumbers.js";
 import { runPlatformAlerts } from "./services/platformAlerts.js";
 import { cleanupResolvedOrgTickets } from "./services/orgTickets.js";
+import { startPushDispatcher } from "./services/pushNotifications.js";
 
 // ── Cron Jobs ──────────────────────────────────────────────────────
 
@@ -159,6 +160,12 @@ app.listen(serverConfig.port, () => {
     port: serverConfig.port,
     webhookVerified: Boolean(metaConfig.whatsappAppSecret),
   }, "Backend started");
+  // Forward new in-app notifications to the mobile app via FCM.
+  try {
+    startPushDispatcher();
+  } catch (error) {
+    logger.error({ err: error.message }, "Push dispatcher failed to start");
+  }
 });
 
 // deploy test 1786217256
