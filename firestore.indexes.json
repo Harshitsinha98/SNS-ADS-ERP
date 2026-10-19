@@ -338,8 +338,16 @@
       "collectionGroup": "notifications",
       "fieldPath": "at",
       "indexes": [
-        { "order": "DESCENDING", "queryScope": "COLLECTION" }
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
       ]
+    },
+    {
+      "collectionGroup": "pushDeliveries",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
     }
   ]
 }

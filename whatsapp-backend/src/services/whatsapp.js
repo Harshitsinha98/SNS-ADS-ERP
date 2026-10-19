@@ -22,10 +22,11 @@ import { triggerAIResponse } from "./ai/aiWhatsAppBridge.js";
 import { handleBroadcastStatusReceipt, recordBroadcastReply } from "./broadcast.js";
 import { parseInteractiveReply } from "./whatsappInteractive.js";
 import { recordInboundConversation } from "./conversationIndexService.js";
+import { parseAdReferral, adLeadFields, adCampaignLabel } from "./adReferral.js";
 
 // ─── Pending Queue ──────────────────────────────────────────────────
 
-async function queuePendingWhatsAppMessage({ orgId, phone, name, requirement, providerMessageId, messageType, messageTimestampMs }) {
+async function queuePendingWhatsAppMessage({ orgId, phone, name, requirement, providerMessageId, messageType, messageTimestampMs, adReferral = null }) {
   await db.collection("whatsappPendingMessages").doc(safeDocId(providerMessageId)).set({
     orgId,
     phone,
@@ -34,13 +35,14 @@ async function queuePendingWhatsAppMessage({ orgId, phone, name, requirement, pr
     providerMessageId,
     messageType,
     messageTimestampMs,
+    adReferral: adReferral || null,
     queuedAt: nowIso(),
   }, { merge: true });
 }
 
 // ─── Lead Import ────────────────────────────────────────────────────
 
-async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, messageId = null, messageType = "text", messageTimestampMs = Date.now() }) {
+async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, messageId = null, messageType = "text", messageTimestampMs = Date.now(), adReferral = null }) {
   if (!orgId) return { status: "error", reason: "org_not_resolved" };
   const leadsRef = orgCollection(db, orgId, "leads");
   const inboundAtMs = Number(messageTimestampMs);
@@ -58,6 +60,7 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
     atMs: inboundAtMs,
     receivedAt,
     receivedAtMs: Date.now(),
+    ...(adReferral ? { referral: adReferral } : {}),
   };
 
   const existing = await leadsRef.where("phone", "==", phone).limit(1).get();
@@ -83,7 +86,24 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
         lastUpdated: receivedAt,
         lastWhatsAppInboundAt: new Date(latestTimestampMs).toISOString(),
         lastWhatsAppInboundAtMs: latestTimestampMs,
+        // Returning lead re-engaged through a Click-to-WhatsApp ad: keep the
+        // original source but record the latest ad touch for attribution.
+        ...(adReferral ? {
+          lastAdReferral: { ...adReferral, capturedAt: receivedAt },
+          lastAdReferralAt: receivedAt,
+        } : {}),
       });
+      if (adReferral) {
+        tx.set(leadRef.collection("notes").doc(), {
+          type: "system",
+          text: `📣 Re-engaged via Meta ad: ${adCampaignLabel(adReferral)}`,
+          authorId: "system",
+          authorName: "Meta Ads",
+          visibility: "team",
+          sourceMessageId: providerMessageId,
+          at: receivedAt,
+        });
+      }
     });
     // whatsapp_message_received on an EXISTING lead — e.g. a rule that
     // reopens/reassigns a cold lead the moment it messages back.
@@ -111,7 +131,7 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
 
   if (!assignedTo) {
     await queuePendingWhatsAppMessage({
-      orgId, phone, name, requirement, providerMessageId, messageType, messageTimestampMs: inboundAtMs,
+      orgId, phone, name, requirement, providerMessageId, messageType, messageTimestampMs: inboundAtMs, adReferral,
     });
     return { status: "queued", reason: "no_active_employees" };
   }
@@ -119,7 +139,7 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
   const capacityReserved = await reserveLeadCapacity(orgId);
   if (!capacityReserved) {
     await queuePendingWhatsAppMessage({
-      orgId, phone, name, requirement, providerMessageId, messageType, messageTimestampMs: inboundAtMs,
+      orgId, phone, name, requirement, providerMessageId, messageType, messageTimestampMs: inboundAtMs, adReferral,
     });
     return { status: "queued", reason: "subscription_or_lead_limit" };
   }
@@ -146,11 +166,14 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
       followUp: null,
       lastContactedAt: null,
       orgId,
+      ...adLeadFields(adReferral),
     });
     batch.create(leadRef.collection("messages").doc(safeDocId(providerMessageId)), inboundMessage);
     batch.create(leadRef.collection("notes").doc("created"), {
       type: "system",
-      text: "Lead created via WhatsApp",
+      text: adReferral
+        ? `Lead created from Meta Click-to-WhatsApp ad: ${adCampaignLabel(adReferral)}`
+        : "Lead created via WhatsApp",
       authorId: "system",
       authorName: "System",
       visibility: "team",
@@ -159,7 +182,11 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
     });
     batch.create(orgCollection(db, orgId, "notifications").doc(), {
       userId: assignedTo,
-      text: `New WhatsApp lead: ${name || "WhatsApp Lead"} (${leadRef.id})`,
+      text: adReferral
+        ? `New ad lead from Meta: ${name || "WhatsApp Lead"} — ${adCampaignLabel(adReferral)}`
+        : `New WhatsApp lead: ${name || "WhatsApp Lead"} (${leadRef.id})`,
+      type: "new_lead",
+      leadId: leadRef.id,
       read: false,
       at: createdAt,
       orgId,
@@ -182,6 +209,7 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
     // Both are awaited-but-swallowed so neither can fail this lead's creation.
     const createdLead = {
       id: leadRef.id, name: name || "WhatsApp Lead", phone, email: "", source: "WhatsApp",
+      ...adLeadFields(adReferral),
       requirement: requirement || "", status: "New", assignedTo, assignedToName,
       blacklisted: false, priority: "Warm", createdAt, lastUpdated: createdAt, orgId,
     };
@@ -201,17 +229,17 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
 }
 
 export async function importWhatsAppLead(args) {
-  const { orgId, phone, name, requirement, messageId = null, messageType = "text", messageTimestampMs = Date.now() } = args;
+  const { orgId, phone, name, requirement, messageId = null, messageType = "text", messageTimestampMs = Date.now(), adReferral = null } = args;
   if (!orgId) return { status: "error", reason: "org_not_resolved" };
   const locked = await withLease(
     `whatsappLead_${safeDocId(`${orgId}_${phone}`)}`,
     2 * 60 * 1000,
-    () => importWhatsAppLeadUnlocked({ orgId, phone, name, requirement, messageId, messageType, messageTimestampMs })
+    () => importWhatsAppLeadUnlocked({ orgId, phone, name, requirement, messageId, messageType, messageTimestampMs, adReferral })
   );
   if (locked !== null) return locked;
   await queuePendingWhatsAppMessage({
     orgId, phone, name, requirement,
-    providerMessageId: messageId || crypto.randomUUID(), messageType, messageTimestampMs,
+    providerMessageId: messageId || crypto.randomUUID(), messageType, messageTimestampMs, adReferral,
   });
   return { status: "queued", reason: "lead_creation_in_progress" };
 }
@@ -284,6 +312,7 @@ export async function processInboundMessage({ orgId, message, contact }) {
       messageId,
       messageType: message.type || "unknown",
       messageTimestampMs: providerTimestampMs,
+      adReferral: parseAdReferral(message),
     });
     await ref.update({ status: "completed", completedAt: nowIso(), result });
 
@@ -443,6 +472,7 @@ export async function processPendingQueue(orgId = null) {
       messageId: message.providerMessageId,
       messageType: message.messageType || "text",
       messageTimestampMs: message.messageTimestampMs,
+      adReferral: message.adReferral || null,
     });
     if (result.status !== "queued") {
       await pendingSnap.ref.delete();

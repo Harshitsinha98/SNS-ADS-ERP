@@ -375,6 +375,7 @@ service cloud.firestore {
     match /billingEvents/{id} { allow read, write: if false; }
     match /razorpayWebhookEvents/{id} { allow read, write: if false; }
     match /whatsappMessageEvents/{id} { allow read, write: if false; }
+    match /pushDeliveries/{id} { allow read, write: if false; }
     match /whatsappPendingMessages/{id} { allow read, write: if false; }
     match /whatsappOutboundIntents/{id} { allow read, write: if false; }
     match /whatsappOutboundDispatches/{id} { allow read, write: if false; }
