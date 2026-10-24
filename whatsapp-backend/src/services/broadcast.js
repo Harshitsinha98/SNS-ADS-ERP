@@ -48,15 +48,53 @@ const rateForCategory = (cat) => CONVERSATION_RATES_INR[String(cat || "MARKETING
 // compare against — sourced from public 2025/26 benchmark reports.
 export const BENCHMARKS = { deliveryRate: 95, readRate: 63, responseRate: 8, failureRate: 5 };
 
-// Bucket raw provider/error strings into human failure categories.
-function bucketFailure(error) {
+// Map a Meta Cloud API error code to a human failure category. Codes are far
+// more reliable than string matching — see Meta's messaging error reference.
+function bucketByCode(code) {
+  switch (Number(code)) {
+    case 131026: // Message undeliverable (recipient not on WhatsApp / can't receive)
+    case 131021: // Recipient cannot be the sender
+      return "Invalid / no WhatsApp";
+    case 131047: // Re-engagement outside 24h window
+    case 131048: // Spam rate limit (likely not opted in)
+    case 131049: // Meta chose not to deliver (user preference / health)
+    case 131050: // User stopped marketing messages
+    case 130472: // Marketing message not delivered (user experiment)
+      return "Not opted-in / blocked";
+    case 131056: // Pair rate limit
+    case 80007: // Rate limit hit
+    case 130429: // Cloud API throughput limit
+    case 131031: // Account limit / locked
+      return "Rate limited / account limit";
+    case 132000: // Template param count mismatch
+    case 132001: // Template does not exist / not approved in this language
+    case 132005: // Template hydrated text too long
+    case 132007: // Template paused / policy violation
+    case 132012: // Template param format mismatch
+    case 132015: // Template paused
+    case 132016: // Template disabled
+      return "Template issue";
+    case 190: // Access token expired
+    case 131000: // Generic auth / something went wrong
+      return "Auth / connection";
+    default:
+      return null;
+  }
+}
+
+// Bucket a failure into a human category. Prefer Meta's error code; fall back to
+// string heuristics for legacy rows that predate code capture.
+function bucketFailure(error, code = null) {
+  const byCode = bucketByCode(code);
+  if (byCode) return byCode;
   const e = String(error || "").toLowerCase();
   if (!e) return "Other";
   if (e.includes("not") && (e.includes("exist") || e.includes("valid") || e.includes("whatsapp"))) return "Invalid / no WhatsApp";
-  if (e.includes("opt") || e.includes("consent") || e.includes("blocked")) return "Not opted-in / blocked";
-  if (e.includes("rate") || e.includes("limit") || e.includes("throttl")) return "Rate limited";
-  if (e.includes("template") || e.includes("paused") || e.includes("rejected")) return "Template issue";
+  if (e.includes("opt") || e.includes("consent") || e.includes("blocked") || e.includes("re-engage") || e.includes("24 hour")) return "Not opted-in / blocked";
+  if (e.includes("rate") || e.includes("limit") || e.includes("throttl")) return "Rate limited / account limit";
+  if (e.includes("template") || e.includes("paused")) return "Template issue";
   if (e.includes("reauth") || e.includes("token") || e.includes("expired") || e.includes("connect")) return "Auth / connection";
+  if (e.includes("rejected")) return "Provider rejected (see reason)";
   return "Other";
 }
 
@@ -418,7 +456,7 @@ export async function runScheduledBroadcasts() {
 // DELIVERY RECEIPT (called from WhatsApp status webhook)
 // Returns true if the callback belonged to a broadcast recipient.
 // ─────────────────────────────────────────────────────────────────────────────
-export async function handleBroadcastStatusReceipt(orgId, clientMessageId, providerStatus, providerMessageId) {
+export async function handleBroadcastStatusReceipt(orgId, clientMessageId, providerStatus, providerMessageId, providerError = null) {
   const dispatchRef = db.collection("broadcastDispatches").doc(clientMessageId);
   const dispatchSnap = await dispatchRef.get();
   if (!dispatchSnap.exists) return false;
@@ -439,7 +477,11 @@ export async function handleBroadcastStatusReceipt(orgId, clientMessageId, provi
       tx.update(recipientRef, {
         status: "failed", stage: STAGE.failed,
         providerStatus, providerMessageId: providerMessageId || recipient.providerMessageId || null,
-        error: "Provider rejected delivery", updatedAt: nowIso(),
+        error: providerError?.message || "Provider rejected delivery",
+        providerErrorCode: providerError?.code ?? null,
+        providerErrorTitle: providerError?.title || null,
+        providerErrorDetail: providerError?.detail || null,
+        updatedAt: nowIso(),
       });
       // A previously-counted send that later fails: adjust counters
       const inc = { failed: FieldValue.increment(1) };
@@ -569,7 +611,8 @@ export async function getBroadcastRecipients(broadcastId, { status = null, limit
     .where("status", "==", "failed").limit(1000).get();
   const failureBreakdown = {};
   failedSnap.docs.forEach((d) => {
-    const bucket = bucketFailure(d.data().error);
+    const data = d.data();
+    const bucket = bucketFailure(data.error, data.providerErrorCode);
     failureBreakdown[bucket] = (failureBreakdown[bucket] || 0) + 1;
   });
 
