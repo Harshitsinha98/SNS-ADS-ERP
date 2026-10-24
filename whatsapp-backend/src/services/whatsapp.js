@@ -382,8 +382,13 @@ export async function reconcileOutboundWhatsAppStatus(orgId, status) {
   // both, so trying the broadcast path first is safe and avoids a redundant
   // per-lead transaction for broadcast receipts.
   const providerStatus = String(status.status || "");
+  // Meta attaches the real reason (code + title + optional details) on a
+  // `failed` status. Surface it so "Provider rejected delivery" isn't the only
+  // thing users see — the code/title tells them whether it's opt-in, an invalid
+  // number, a paused template, a quality/limit block, etc.
+  const providerError = extractProviderError(status);
   const matchedBroadcast = await handleBroadcastStatusReceipt(
-    orgId, clientMessageId, providerStatus, status.id || null
+    orgId, clientMessageId, providerStatus, status.id || null, providerError
   );
   if (matchedBroadcast) return { status: "reconciled_broadcast" };
 
@@ -407,12 +412,36 @@ export async function reconcileOutboundWhatsAppStatus(orgId, status) {
       tx.set(dispatchRef, { status: "sent", providerMessageId: status.id || null, providerStatus, finalizedAt: nowIso() }, { merge: true });
       tx.delete(intentRef);
     } else if (providerStatus === "failed") {
-      tx.set(messageRef, { status: "failed", providerStatus, failedAt: nowIso(), failure: "WhatsApp provider rejected delivery" }, { merge: true });
+      tx.set(messageRef, {
+        status: "failed",
+        providerStatus,
+        failedAt: nowIso(),
+        failure: providerError?.message || "WhatsApp provider rejected delivery",
+        providerErrorCode: providerError?.code ?? null,
+        providerErrorTitle: providerError?.title || null,
+        providerErrorDetail: providerError?.detail || null,
+      }, { merge: true });
       tx.set(dispatchRef, { status: "failed", providerStatus, finalizedAt: nowIso() }, { merge: true });
       tx.delete(intentRef);
     }
   });
   return { status: "reconciled" };
+}
+
+/**
+ * Pull the first error Meta reports on an outbound status webhook into a flat
+ * shape. Meta nests the human-readable cause under `error_data.details`, which
+ * is usually the most actionable string (e.g. why a template was rejected).
+ */
+export function extractProviderError(status) {
+  const err = Array.isArray(status?.errors) ? status.errors[0] : null;
+  if (!err) return null;
+  const detail = err.error_data?.details || null;
+  const title = err.title || err.message || null;
+  const code = err.code ?? null;
+  const message = [title, detail].filter(Boolean).join(" — ")
+    || (code != null ? `WhatsApp error ${code}` : "WhatsApp provider rejected delivery");
+  return { code, title, detail, message };
 }
 
 // ─── Pending Queue Processing ───────────────────────────────────────

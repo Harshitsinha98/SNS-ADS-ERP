@@ -162,10 +162,10 @@ export default function BroadcastDetail() {
   const failureEntries = Object.entries(failureBreakdown).sort((a, b) => b[1] - a[1]);
 
   const exportRecipients = () => {
-    const rows = [["Name", "Phone", "Status", "Replied", "Error", "Sent At", "Updated At"]];
+    const rows = [["Name", "Phone", "Status", "Replied", "Error", "Meta Error Code", "Sent At", "Updated At"]];
     recipients.forEach((r) => rows.push([
       r.name || "", r.phone || "", r.status || "", r.repliedAt ? "Yes" : "No",
-      r.error || "", r.sentAt || "", r.updatedAt || "",
+      r.error || "", r.providerErrorCode ?? "", r.sentAt || "", r.updatedAt || "",
     ]));
     downloadCsv(rows, `broadcast-${broadcastId.slice(0, 8)}-recipients.csv`);
   };
@@ -350,8 +350,11 @@ export default function BroadcastDetail() {
                             <MessageCircle size={11} /> Replied
                           </span>
                         )}
-                        {r.status === "failed" && r.error && (
-                          <span className="block text-[10px] text-red-400 mt-0.5 truncate max-w-[200px]">{r.error}</span>
+                        {r.status === "failed" && (r.error || r.providerErrorCode) && (
+                          <span className="block text-[10px] text-red-400 mt-0.5 max-w-[260px]" title={r.error || ""}>
+                            {r.error || "Provider rejected delivery"}
+                            {r.providerErrorCode ? ` (Meta #${r.providerErrorCode})` : ""}
+                          </span>
                         )}
                       </td>
                       <td className="px-6 py-3 text-ink-muted text-xs">{fmtDateTime(r.updatedAt || r.sentAt)}</td>
