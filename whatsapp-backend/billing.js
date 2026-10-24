@@ -8,6 +8,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getMergedPlans, amountForPlan } from "./plans.js";
 import { ADD_ONS } from "./src/billing/planLimits.js";
 import { getQuotaStatus } from "./src/billing/quotaEnforcement.js";
+import { importOptInFields } from "./src/services/optIn.js";
 
 let Razorpay = null;
 try {
@@ -1520,6 +1521,20 @@ export default function createBillingRouter(db) {
   router.post("/leads/bulk-import", requireAuth, requireOrgAdmin, async (req, res) => {
     const { orgId, rows, assigner = "round-robin" } = req.body || {};
     const importId = safeDocId(req.body?.importId || crypto.randomUUID());
+    // WhatsApp permission the admin declares for this file. Validated up front
+    // so a bad declaration never creates a half-recorded import.
+    let optInStart;
+    try {
+      optInStart = importOptInFields({
+        consentSource: req.body?.consentSource,
+        consentDeclared: req.body?.consentDeclared,
+        consentMethod: req.body?.consentMethod,
+        consentNote: req.body?.consentNote,
+        actorId: req.authUser.uid,
+      });
+    } catch (error) {
+      return res.status(error.status || 400).json({ error: error.message, importId });
+    }
     const importRef = db.collection("leadImports").doc(importId);
     let canRecordFailure = false;
     try {
@@ -1600,6 +1615,7 @@ export default function createBillingRouter(db) {
               lastContactedAt: null,
               orgId,
               importId,
+              ...optInStart,
             },
           };
         });
@@ -1632,7 +1648,7 @@ export default function createBillingRouter(db) {
         tx.update(importRef, { status: "completed", completedAt: nowIso() });
         return imported;
       });
-      await audit(orgId, `${completed} leads imported`, { actorId: req.authUser.uid, importId });
+      await audit(orgId, `${completed} leads imported (WhatsApp permission: ${optInStart.whatsappOptIn}, source: ${optInStart.whatsappOptInSource})`, { actorId: req.authUser.uid, importId });
       res.json({ ok: true, imported: completed, importId });
     } catch (error) {
       if (canRecordFailure) {

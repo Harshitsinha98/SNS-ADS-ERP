@@ -5,6 +5,7 @@ import { useData } from "../../context/DataContext";
 import { useAuth } from "../../context/AuthContext";
 import { parseCSV, toCSV, fmtDate } from "../../utils/helpers";
 import { StatusLamp } from "../../components/StatusLamp";
+import { OPT_IN_META, effectiveOptIn, IMPORT_CONSENT_SOURCES, CONSENT_METHODS } from "../../utils/whatsappOptIn";
 import { Upload, Download, RefreshCw, RotateCcw, Plus, KeyRound, Copy, X, CheckCircle } from "lucide-react";
 
 const PRIORITIES = ["Hot", "Warm", "Cold"];
@@ -41,6 +42,9 @@ export default function LeadHub() {
   const [apiData, setApiData] = useState(null);
   const [copied, setCopied] = useState(false);
   const importIdsRef = useRef(new Map());
+  // A picked CSV waits here until the admin says where the leads came from.
+  const [importDraft, setImportDraft] = useState(null);
+  const [importBusy, setImportBusy] = useState(false);
   const employees = users.filter((member) => member.role === "employee" && !member.pending);
 
   const activeLeads = useMemo(() => leads.filter((lead) => !isLost(lead)), [leads]);
@@ -53,27 +57,49 @@ export default function LeadHub() {
     return list;
   }, [activeLeads, lostLeads, section, sortBy, filterStatus]);
 
-  const handleImport = async (event) => {
+  const handleImport = (event) => {
     const file = event.target.files[0];
+    event.target.value = "";
     if (!file) return;
+    setImportDraft({ file, consentSource: "", consentDeclared: false, consentMethod: "", consentNote: "", error: "" });
+  };
+
+  const canConfirmImport = Boolean(importDraft?.consentSource)
+    && (importDraft.consentSource !== "consent_given" || (importDraft.consentDeclared && importDraft.consentMethod));
+
+  const confirmImport = () => {
+    if (!importDraft || !canConfirmImport || importBusy) return;
+    const { file, consentSource, consentDeclared, consentMethod, consentNote } = importDraft;
     const importKey = `${file.name}:${file.size}:${file.lastModified}`;
     const importId = importIdsRef.current.get(importKey)
       || globalThis.crypto?.randomUUID?.()
       || `import_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     importIdsRef.current.set(importKey, importId);
+    setImportBusy(true);
     const reader = new FileReader();
     reader.onload = async (loadEvent) => {
       try {
         const rows = parseCSV(loadEvent.target.result);
-        const count = await addBulkLeads(rows, settings.autoAssign, importId);
+        const count = await addBulkLeads(rows, settings.autoAssign, importId, {
+          consentSource,
+          ...(consentSource === "consent_given" ? { consentDeclared, consentMethod, consentNote: consentNote.trim() } : {}),
+        });
         importIdsRef.current.delete(importKey);
-        alert(`${count} leads imported and auto-assigned (${settings.autoAssign}).`);
+        setImportDraft(null);
+        const permission = consentSource === "consent_given" ? "ready for WhatsApp broadcasts"
+          : consentSource === "third_party_list" ? "marked as NOT eligible for WhatsApp marketing"
+          : "marked “permission pending” for WhatsApp";
+        alert(`${count} leads imported and auto-assigned (${settings.autoAssign}). They are ${permission}.`);
       } catch (error) {
         if (error.importId) importIdsRef.current.set(importKey, error.importId);
-        alert(error.message || "Could not import leads.");
+        setImportDraft((current) => current && { ...current, error: error.message || "Could not import leads." });
       } finally {
-        event.target.value = "";
+        setImportBusy(false);
       }
+    };
+    reader.onerror = () => {
+      setImportBusy(false);
+      setImportDraft((current) => current && { ...current, error: "Could not read that file." });
     };
     reader.readAsText(file);
   };
@@ -211,7 +237,7 @@ export default function LeadHub() {
       <div className="bg-white rounded-lg shadow-card border border-paper-line overflow-x-auto">
         <table className="w-full text-sm min-w-[760px]">
           <thead><tr className="text-left text-ink/40 border-b border-paper-line bg-paper/60">
-            <th className="p-3 font-medium">ID</th><th className="font-medium">Name</th><th className="font-medium">Source</th>
+            <th className="p-3 font-medium">ID</th><th className="font-medium">Name</th><th className="font-medium">Source</th><th className="font-medium">WhatsApp</th>
             {section === "Active" && <th className="font-medium">Priority</th>}
             <th className="font-medium">Status</th><th className="font-medium">Assigned</th>
             <th className="font-medium">{section === "Active" ? "Created" : "Lost on"}</th><th className="font-medium">Actions</th>
@@ -222,6 +248,7 @@ export default function LeadHub() {
                 <td className="p-3 num text-ink/50">{lead.id}</td>
                 <td><Link to={`/admin/leads/${lead.id}`} className="font-medium hover:underline">{lead.name}</Link></td>
                 <td>{lead.source}</td>
+                <td>{(() => { const meta = OPT_IN_META[effectiveOptIn(lead)]; return <span title={meta.hint} className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${meta.className}`}>{meta.label}</span>; })()}</td>
                 {section === "Active" && (
                   <td><select value={lead.priority || "Warm"} onChange={(event) => updatePriority(lead.id, event.target.value, user)} className={`border rounded p-1 text-xs font-medium ${priorityClass(lead.priority)}`}>
                     {PRIORITIES.map((priority) => <option key={priority}>{priority}</option>)}
@@ -241,11 +268,11 @@ export default function LeadHub() {
                 )}</td>
               </tr>
             ))}
-            {view.length === 0 && <tr><td colSpan={section === "Active" ? 8 : 7} className="text-ink/40 p-4 text-center">{section === "Active" ? "No active leads found." : "No lost or blacklisted leads."}</td></tr>}
+            {view.length === 0 && <tr><td colSpan={section === "Active" ? 9 : 8} className="text-ink/40 p-4 text-center">{section === "Active" ? "No active leads found." : "No lost or blacklisted leads."}</td></tr>}
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-ink/35 mt-2">CSV headers expected: name, phone, email, source, requirement</p>
+      <p className="text-xs text-ink/35 mt-2">CSV headers expected: name, phone, email, source, requirement. You will be asked where the leads came from (WhatsApp permission).</p>
 
       {showCreate && (
         <Modal title="Add a lead" onClose={() => setShowCreate(false)}>
@@ -266,6 +293,42 @@ export default function LeadHub() {
             <p className="text-xs text-ink/50">At least a phone number or email is required. Existing phone/email matches are returned as duplicates instead of creating another lead.</p>
             <div className="flex justify-end gap-2 pt-2"><button type="button" onClick={() => setShowCreate(false)} className="btn btn-secondary">Cancel</button><button disabled={leadSaving} className="btn btn-primary">{leadSaving ? "Creating…" : "Create & auto-assign"}</button></div>
           </form>
+        </Modal>
+      )}
+
+      {importDraft && (
+        <Modal title="Import leads — WhatsApp permission" onClose={() => !importBusy && setImportDraft(null)}>
+          <p className="text-sm text-ink-soft">File: <span className="font-medium text-ink">{importDraft.file.name}</span></p>
+          <p className="text-sm text-ink-soft mt-2">Meta only lets you send WhatsApp marketing to people who agreed to receive it. Tell us where these leads came from so we can set their permission correctly.</p>
+          <div className="mt-4 space-y-2" role="radiogroup" aria-label="Where did these leads come from?">
+            {IMPORT_CONSENT_SOURCES.map((option) => (
+              <label key={option.value} className={`flex gap-3 rounded-lg border p-3 cursor-pointer ${importDraft.consentSource === option.value ? "border-ink bg-paper" : "border-paper-line hover:bg-paper/60"}`}>
+                <input type="radio" name="consentSource" className="mt-1" checked={importDraft.consentSource === option.value}
+                  onChange={() => setImportDraft({ ...importDraft, consentSource: option.value, error: "" })} />
+                <span><span className="block text-sm font-medium text-ink">{option.label}</span><span className="block text-xs text-ink-soft mt-0.5">{option.help}</span></span>
+              </label>
+            ))}
+          </div>
+          {importDraft.consentSource === "consent_given" && (
+            <div className="mt-4 space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+              <Field label="How did they give consent?">
+                <select className="input mt-1" value={importDraft.consentMethod} onChange={(event) => setImportDraft({ ...importDraft, consentMethod: event.target.value })}>
+                  <option value="">Choose…</option>
+                  {CONSENT_METHODS.map((method) => <option key={method.value} value={method.value}>{method.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Note (optional)"><input className="input mt-1" maxLength={300} value={importDraft.consentNote} onChange={(event) => setImportDraft({ ...importDraft, consentNote: event.target.value })} placeholder="e.g. Landing page form, Oct 2026" /></Field>
+              <label className="flex gap-2 text-xs text-ink">
+                <input type="checkbox" className="mt-0.5" checked={importDraft.consentDeclared} onChange={(event) => setImportDraft({ ...importDraft, consentDeclared: event.target.checked })} />
+                <span>I confirm these people clearly agreed to receive WhatsApp messages from my business, and I can show proof if asked. This declaration is recorded against my account.</span>
+              </label>
+            </div>
+          )}
+          {importDraft.error && <p className="mt-3 text-sm text-danger" role="alert">{importDraft.error}</p>}
+          <div className="flex justify-end gap-2 pt-4">
+            <button type="button" disabled={importBusy} onClick={() => setImportDraft(null)} className="btn btn-secondary">Cancel</button>
+            <button type="button" disabled={!canConfirmImport || importBusy} onClick={confirmImport} className="btn btn-primary disabled:opacity-50">{importBusy ? "Importing…" : "Import leads"}</button>
+          </div>
         </Modal>
       )}
 

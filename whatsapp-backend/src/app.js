@@ -97,6 +97,8 @@ import { getBalance, getTransactions, createOrder, verifyPayment } from "./contr
 import {
   createHandler as broadcastCreate,
   previewHandler as broadcastPreview,
+  consentHandler as broadcastConsent,
+  optOutHandler as broadcastOptOut,
   listHandler as broadcastList,
   statusHandler as broadcastStatus,
   recipientsHandler as broadcastRecipients,
@@ -132,6 +134,8 @@ app.post("/api/wallet/verify", requireAuth, verifyPayment);
 // ── WhatsApp Broadcast (legacy paths) ──
 app.post("/api/broadcast/create", requireAuth, broadcastCreate);
 app.post("/api/broadcast/preview", requireAuth, broadcastPreview);
+app.post("/api/broadcast/consent", requireAuth, broadcastConsent);
+app.post("/api/broadcast/opt-out", requireAuth, broadcastOptOut);
 app.get("/api/broadcast/list", requireAuth, broadcastList);
 app.get("/api/broadcast/status", requireAuth, broadcastStatus);
 app.get("/api/broadcast/recipients", requireAuth, broadcastRecipients);

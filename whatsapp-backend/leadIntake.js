@@ -3,6 +3,7 @@ import express from "express";
 import { getAuth } from "firebase-admin/auth";
 import { getNextEmployeeByWorkload, getNextEmployeeRoundRobin } from "./utils/assignLead.js";
 import { emitWorkflowTrigger } from "./src/services/workflow/workflowEngine.js";
+import { OPT_IN, optInFields, formConsentFields } from "./src/services/optIn.js";
 
 const nowIso = () => new Date().toISOString();
 const safeEqual = (left, right) => {
@@ -76,6 +77,11 @@ function normalizeLeadPayload(input = {}, { source, origin }) {
     utmCampaign: trimText(input.utmCampaign, 120) || null,
     priority: ["Hot", "Warm", "Cold"].includes(input.priority) ? input.priority : "Warm",
     origin,
+    // WhatsApp marketing permission. Self-reported consent is honoured only for
+    // lead sources where the visitor ticked a box themselves (hosted form,
+    // website embed, generic webhook) — never for admin-typed or ad-platform
+    // leads, which start as "pending" until permission is confirmed.
+    ...(["hosted_form", "website", "webhook"].includes(origin) ? formConsentFields(input.whatsappOptIn, { source: origin === "webhook" ? "webhook_form" : "website_form" }) : {}),
   };
 }
 
@@ -106,6 +112,8 @@ function normalizeWebhookPayload(input = {}) {
     utmMedium: valueFrom(input, ["utmMedium", "utm_medium"]),
     utmCampaign: valueFrom(input, ["utmCampaign", "utm_campaign"]),
     priority: valueFrom(input, ["priority"]),
+    // Only an explicit "I agree to WhatsApp updates" flag from the form counts.
+    whatsappOptIn: valueFrom(input, ["whatsappOptIn", "whatsapp_opt_in", "whatsappConsent", "whatsapp_consent", "whatsapp_optin"]),
   };
 }
 
@@ -241,6 +249,9 @@ export async function createLeadFromIntake({ db, orgId, input, source, origin, a
       );
     }
     batch.create(leadRef, {
+      // Starts as "pending" unless the visitor explicitly consented (spread
+      // below via `lead`). Never inferred from the phone number alone.
+      ...optInFields({ status: OPT_IN.PENDING, source: `intake_${lead.origin}` }),
       ...lead,
       status: "New",
       assignedTo: employee.id,

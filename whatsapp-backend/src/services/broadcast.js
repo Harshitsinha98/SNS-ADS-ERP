@@ -25,6 +25,9 @@ import { decryptWhatsAppToken, metaGraphRequest, isWhatsAppCredentialExpired, no
 import { nowIso, orgCollection } from "./helpers.js";
 import { checkQuota, consumeBroadcastMessages } from "../billing/quotaEnforcement.js";
 import { templateComponents, validateHeaderMediaUrl } from "../../whatsappTemplates.js";
+import {
+  OPT_IN, CONSENT_METHODS, effectiveOptIn, isBroadcastEligible, optInBreakdown, optInFields,
+} from "./optIn.js";
 
 const BATCH_SIZE = 50;           // messages per batch
 const BATCH_DELAY_MS = 1200;     // delay between batches (~40 msgs/sec safe)
@@ -130,8 +133,17 @@ async function resolveLeads(orgId, { leadIds, filters }) {
 // AUDIENCE PREVIEW (count without creating)
 // ─────────────────────────────────────────────────────────────────────────────
 export async function previewAudience({ orgId, leadIds, filters }) {
-  const leads = await resolveLeads(orgId, { leadIds, filters });
-  return { count: Math.min(leads.length, MAX_RECIPIENTS), capped: leads.length > MAX_RECIPIENTS };
+  const all = await resolveLeads(orgId, { leadIds, filters });
+  const eligible = all.filter(isBroadcastEligible);
+  // `count` is what will actually be sent (permission-gated); the breakdown
+  // explains the difference so admins know why leads are excluded.
+  return {
+    count: Math.min(eligible.length, MAX_RECIPIENTS),
+    capped: eligible.length > MAX_RECIPIENTS,
+    totalMatching: all.length,
+    excluded: all.length - eligible.length,
+    optIn: optInBreakdown(all),
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -148,6 +160,61 @@ async function loadValidTemplate(orgId, templateId, parameters) {
     throw Object.assign(new Error(`Template requires ${template.parameterCount} parameter(s)`), { status: 400 });
   }
   return template;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WHATSAPP PERMISSION UPDATES (admin-declared consent / opt-out)
+// ─────────────────────────────────────────────────────────────────────────────
+async function writeOptIn(orgId, leads, fields) {
+  for (let i = 0; i < leads.length; i += 400) {
+    const batch = db.batch();
+    leads.slice(i, i + 400).forEach((lead) => {
+      batch.update(orgCollection(db, orgId, "leads").doc(lead.id), fields);
+    });
+    await batch.commit();
+  }
+}
+
+/**
+ * Admin declares they hold WhatsApp consent for leads that are still
+ * "pending". Requires an explicit attestation and a consent method, and is
+ * written to the activity log. Leads that came from a third-party list
+ * (not_opted_in) and anyone who opted out are never upgraded this way.
+ */
+export async function confirmLeadConsent({ orgId, uid, leadIds, filters, method, note, attested }) {
+  if (attested !== true) {
+    throw Object.assign(new Error("Confirm that you have the leads' permission to message them on WhatsApp"), { status: 400 });
+  }
+  if (!CONSENT_METHODS.includes(method)) {
+    throw Object.assign(new Error("Choose how the consent was collected"), { status: 400 });
+  }
+  const matching = await resolveLeads(orgId, { leadIds, filters });
+  const pending = matching.filter((lead) => effectiveOptIn(lead) === OPT_IN.PENDING);
+  await writeOptIn(orgId, pending, optInFields({
+    status: OPT_IN.OPTED_IN, source: "admin_confirmed", method, proof: note, actorId: uid,
+  }));
+  const breakdown = optInBreakdown(matching);
+  await orgCollection(db, orgId, "activity").add({
+    text: `WhatsApp consent confirmed for ${pending.length} lead(s) (method: ${method})`,
+    at: nowIso(), orgId, actorId: uid, source: "whatsapp_opt_in",
+  }).catch(() => {});
+  return {
+    updated: pending.length,
+    notEligible: {
+      thirdPartyList: breakdown[OPT_IN.NOT_OPTED_IN],
+      optedOut: breakdown[OPT_IN.OPTED_OUT],
+    },
+  };
+}
+
+/** Mark leads as opted out — they are never included in a broadcast again. */
+export async function markLeadsOptedOut({ orgId, uid, leadIds }) {
+  if (!Array.isArray(leadIds) || leadIds.length === 0) {
+    throw Object.assign(new Error("Choose at least one lead"), { status: 400 });
+  }
+  const matching = await resolveLeads(orgId, { leadIds: leadIds.slice(0, 1000), filters: null });
+  await writeOptIn(orgId, matching, optInFields({ status: OPT_IN.OPTED_OUT, source: "admin_opt_out", actorId: uid }));
+  return { updated: matching.length };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,9 +245,20 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
   }
 
   // 3. Resolve leads
-  let leads = await resolveLeads(orgId, { leadIds, filters });
-  if (leads.length === 0) {
+  const matching = await resolveLeads(orgId, { leadIds, filters });
+  if (matching.length === 0) {
     throw Object.assign(new Error("No leads with valid WhatsApp numbers found"), { status: 400 });
+  }
+  // Permission gate (enforced server-side — the UI cannot bypass it). Only
+  // leads with WhatsApp permission are messaged; the rest are reported back.
+  const permissionBreakdown = optInBreakdown(matching);
+  let leads = matching.filter(isBroadcastEligible);
+  const excludedNoPermission = matching.length - leads.length;
+  if (leads.length === 0) {
+    throw Object.assign(
+      new Error(`None of the ${matching.length} matching leads have WhatsApp permission yet. Confirm consent for leads you have permission from, or let them message you first.`),
+      { status: 400, code: "no_opted_in_leads", optIn: permissionBreakdown }
+    );
   }
   if (leads.length > MAX_RECIPIENTS) leads = leads.slice(0, MAX_RECIPIENTS);
 
@@ -228,6 +306,8 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
     scheduledAtMs: isScheduled ? Number(scheduledAtMs) : null,
     scheduledAt: isScheduled ? new Date(Number(scheduledAtMs)).toISOString() : null,
     totalRecipients: leads.length,
+    excludedNoPermission,
+    permissionBreakdown,
     sent: 0,
     delivered: 0,
     read: 0,
@@ -252,6 +332,8 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
         name: lead.name || lead.phone || "",
         status: "pending",
         stage: STAGE.pending,
+        optIn: effectiveOptIn(lead),
+        optInSource: lead.whatsappOptInSource || null,
         clientMessageId: null,
         providerMessageId: null,
         error: null,
@@ -277,7 +359,10 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
     });
   }
 
-  return { broadcastId, totalRecipients: leads.length, scheduled: isScheduled, scheduledAtMs: isScheduled ? Number(scheduledAtMs) : null };
+  return {
+    broadcastId, totalRecipients: leads.length, excludedNoPermission,
+    scheduled: isScheduled, scheduledAtMs: isScheduled ? Number(scheduledAtMs) : null,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -349,10 +434,31 @@ export async function processBroadcast(broadcastId) {
     const recipientSnap = await recipientQuery.get();
     if (recipientSnap.empty) break;
 
+    // Re-check permission at send time: a scheduled or long-running broadcast
+    // must not message someone who opted out (or whose lead was deleted)
+    // after it was created.
+    const leadsCol = orgCollection(db, broadcast.orgId, "leads");
+    const leadSnaps = await db.getAll(...recipientSnap.docs.map((d) => leadsCol.doc(d.data().leadId)));
+    const stillAllowed = new Map(leadSnaps.map((snap) => [snap.id, snap.exists && isBroadcastEligible(snap.data())]));
+    const skippedDocs = recipientSnap.docs.filter((d) => !stillAllowed.get(d.data().leadId));
+    if (skippedDocs.length) {
+      const skipBatch = db.batch();
+      skippedDocs.forEach((d) => skipBatch.update(d.ref, {
+        status: "skipped", stage: -2, error: "Skipped: recipient no longer has WhatsApp permission", updatedAt: nowIso(),
+      }));
+      await skipBatch.commit();
+      await broadcastRef.update({
+        totalRecipients: FieldValue.increment(-skippedDocs.length),
+        skippedAtSend: FieldValue.increment(skippedDocs.length),
+      });
+    }
+    const skippedIds = new Set(skippedDocs.map((d) => d.id));
+    const sendDocs = recipientSnap.docs.filter((d) => !skippedIds.has(d.id));
+
     let batchSent = 0;
     let batchFailed = 0;
 
-    await Promise.all(recipientSnap.docs.map(async (doc) => {
+    await Promise.all(sendDocs.map(async (doc) => {
       const recipient = doc.data();
       const clientMessageId = crypto.randomUUID();
       try {

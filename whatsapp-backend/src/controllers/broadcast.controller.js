@@ -4,6 +4,8 @@
  * Endpoints:
  *   POST /api/broadcast/create      → create + start (or schedule) broadcast
  *   POST /api/broadcast/preview     → audience count for filters/leadIds
+ *   POST /api/broadcast/consent     → admin confirms WhatsApp consent for pending leads
+ *   POST /api/broadcast/opt-out     → mark leads as opted out of WhatsApp messages
  *   GET  /api/broadcast/list        → list org broadcasts
  *   GET  /api/broadcast/status      → single broadcast status
  *   GET  /api/broadcast/recipients  → recipient rows (optionally by status)
@@ -15,6 +17,8 @@
 import {
   createBroadcast,
   previewAudience,
+  confirmLeadConsent,
+  markLeadsOptedOut,
   getBroadcasts,
   getBroadcastStatus,
   getBroadcastRecipients,
@@ -54,6 +58,31 @@ export async function createHandler(req, res) {
     return res.json({ ok: true, ...result });
   } catch (e) {
     return res.status(e.status || 500).json({ error: e.message || "Could not create broadcast" });
+  }
+}
+
+export async function consentHandler(req, res) {
+  try {
+    const { orgId, filters, leadIds, method, note, attested } = req.body || {};
+    if (!(await requireAdmin(req, orgId, res))) return;
+    const result = await confirmLeadConsent({
+      orgId, uid: req.authUser.uid, filters: filters || null, leadIds: leadIds || null,
+      method, note: String(note || "").slice(0, 500), attested,
+    });
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(e.status || 500).json({ error: e.message || "Could not record consent" });
+  }
+}
+
+export async function optOutHandler(req, res) {
+  try {
+    const { orgId, leadIds } = req.body || {};
+    if (!(await requireAdmin(req, orgId, res))) return;
+    const result = await markLeadsOptedOut({ orgId, uid: req.authUser.uid, leadIds });
+    return res.json({ ok: true, ...result });
+  } catch (e) {
+    return res.status(e.status || 500).json({ error: e.message || "Could not update opt-out" });
   }
 }
 

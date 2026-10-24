@@ -45,6 +45,7 @@ const STATUS_META = {
   delivered: { label: "Delivered", color: "text-green-600", bg: "bg-green-100", icon: CheckCheck },
   read: { label: "Read", color: "text-orange-600", bg: "bg-orange-100", icon: Eye },
   failed: { label: "Failed", color: "text-red-600", bg: "bg-red-100", icon: XCircle },
+  skipped: { label: "Skipped", color: "text-gray-600", bg: "bg-gray-200", icon: Ban },
 };
 
 const bcStatusBadge = (status) => {
@@ -204,6 +205,12 @@ export default function BroadcastDetail() {
                 ? <>Scheduled for <span className="font-medium">{fmtDateTime(broadcast.scheduledAtMs)}</span></>
                 : <>Created {fmtDateTime(broadcast.createdAt)}{broadcast.completedAt ? ` · Completed ${fmtDateTime(broadcast.completedAt)}` : ""}</>}
             </p>
+            {(broadcast.excludedNoPermission > 0 || broadcast.skippedAtSend > 0) && (
+              <p className="text-xs text-amber-700 mt-1">
+                {broadcast.excludedNoPermission > 0 && <>{broadcast.excludedNoPermission} matching lead(s) were not included because they have no WhatsApp permission. </>}
+                {broadcast.skippedAtSend > 0 && <>{broadcast.skippedAtSend} recipient(s) were skipped at send time because they no longer have permission.</>}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {(broadcast.status === "processing" || broadcast.status === "queued" || broadcast.status === "scheduled") && (
@@ -312,6 +319,7 @@ export default function BroadcastDetail() {
               <option value="delivered">Delivered</option>
               <option value="read">Read</option>
               <option value="failed">Failed</option>
+              <option value="skipped">Skipped</option>
               <option value="pending">Pending</option>
             </select>
             <button onClick={exportRecipients} className="btn btn-secondary text-sm flex items-center gap-1.5">

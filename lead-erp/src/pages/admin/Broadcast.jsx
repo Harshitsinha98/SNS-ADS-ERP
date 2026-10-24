@@ -10,7 +10,9 @@ import {
   getBroadcasts,
   getBroadcastAnalytics,
   cancelBroadcast,
+  confirmBroadcastConsent,
 } from "../../utils/billingApi";
+import { OPT_IN_META, CONSENT_METHODS } from "../../utils/whatsappOptIn";
 import {
   ResponsiveContainer,
   BarChart,
@@ -435,8 +437,17 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
 
   // Audience preview
   const [audienceCount, setAudienceCount] = useState(null);
+  const [audienceOptIn, setAudienceOptIn] = useState(null); // permission breakdown of everyone matching the filters
   const [previewing, setPreviewing] = useState(false);
+  const [previewNonce, setPreviewNonce] = useState(0);
   const previewTimer = useRef(null);
+
+  // "I have consent" declaration for leads whose permission is still pending
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [consentMethod, setConsentMethod] = useState("");
+  const [consentNote, setConsentNote] = useState("");
+  const [consentAttested, setConsentAttested] = useState(false);
+  const [consentBusy, setConsentBusy] = useState(false);
 
   // Scheduling
   const [scheduleMode, setScheduleMode] = useState("now"); // "now" | "later"
@@ -486,17 +497,43 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
       try {
         const res = await previewBroadcastAudience({ orgId, filters: buildFilters() });
         setAudienceCount(res.count);
+        setAudienceOptIn(res.optIn || null);
       } catch {
         setAudienceCount(null);
+        setAudienceOptIn(null);
       } finally {
         setPreviewing(false);
       }
     }, 500);
     return () => previewTimer.current && clearTimeout(previewTimer.current);
-  }, [orgId, buildFilters]);
+  }, [orgId, buildFilters, previewNonce]);
+
+  const pendingCount = audienceOptIn?.pending || 0;
+
+  const handleConfirmConsent = async () => {
+    if (!consentAttested || !consentMethod || consentBusy) return;
+    setConsentBusy(true);
+    setMsg({ type: "", text: "" });
+    try {
+      const res = await confirmBroadcastConsent({
+        orgId, filters: buildFilters(), method: consentMethod, note: consentNote.trim(), attested: true,
+      });
+      setMsg({ type: "success", text: `Recorded WhatsApp consent for ${res.updated} lead(s). They are now included in broadcasts.` });
+      setConsentOpen(false); setConsentAttested(false); setConsentMethod(""); setConsentNote("");
+      setPreviewNonce((n) => n + 1);
+    } catch (e) {
+      setMsg({ type: "error", text: e.message || "Could not record consent." });
+    } finally {
+      setConsentBusy(false);
+    }
+  };
 
   const handleSend = async () => {
     if (!templateId || sending) return;
+    if (audienceCount === 0) {
+      setMsg({ type: "error", text: "No leads in this audience have WhatsApp permission yet. Confirm consent below or let leads message you first." });
+      return;
+    }
     if (selectedTemplate?.parameterCount > 0 && parameters.some((p) => !p.trim())) {
       setMsg({ type: "error", text: "Fill all template parameter values." });
       return;
@@ -526,9 +563,9 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
       });
       setMsg({
         type: "success",
-        text: result.scheduled
+        text: `${result.scheduled
           ? `Broadcast scheduled for ${fmtDate(result.scheduledAtMs)} — ${result.totalRecipients} leads.`
-          : `Broadcast started! Sending to ${result.totalRecipients} leads...`,
+          : `Broadcast started! Sending to ${result.totalRecipients} leads...`}${result.excludedNoPermission > 0 ? ` (${result.excludedNoPermission} skipped — no WhatsApp permission)` : ""}`,
       });
       setBroadcastName(""); setTemplateId(""); setParameters([]); setHeaderMediaUrl("");
       setFilterStatus(""); setFilterSource(""); setFilterAssigned("");
@@ -636,7 +673,7 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
             )}
           </div>
 
-          <button onClick={handleSend} disabled={!templateId || sending}
+          <button onClick={handleSend} disabled={!templateId || sending || audienceCount === 0}
             className="btn btn-primary w-full py-3 text-base flex items-center justify-center gap-2">
             {sending ? <><Loader2 size={18} className="animate-spin" /> Starting...</>
               : scheduleMode === "later" ? <><Calendar size={18} /> Schedule Broadcast</>
@@ -655,8 +692,59 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
             <p className="font-display font-bold text-4xl">
               {previewing ? <Loader2 size={28} className="animate-spin" /> : (audienceCount != null ? audienceCount.toLocaleString("en-IN") : "—")}
             </p>
-            <p className="text-xs opacity-80 mt-1">leads with valid WhatsApp numbers</p>
+            <p className="text-xs opacity-80 mt-1">leads with WhatsApp permission</p>
+            {audienceOptIn && (() => {
+              const excluded = (audienceOptIn.pending || 0) + (audienceOptIn.not_opted_in || 0) + (audienceOptIn.opted_out || 0);
+              return excluded > 0 ? <p className="text-xs mt-2 bg-white/20 rounded-md px-2 py-1">{excluded.toLocaleString("en-IN")} more match your filters but can’t be messaged yet (see below)</p> : null;
+            })()}
           </div>
+
+          {/* WhatsApp permission summary */}
+          {audienceOptIn && (
+            <div className="bg-white rounded-2xl shadow-card border border-cream-300/60 p-5">
+              <h3 className="font-display font-bold text-base text-ink mb-1">WhatsApp permission</h3>
+              <p className="text-xs text-ink-muted mb-3">Meta only allows marketing to people who agreed to receive it.</p>
+              <ul className="space-y-1.5">
+                {["opted_in", "engaged", "pending", "not_opted_in", "opted_out"].map((key) => (
+                  <li key={key} className="flex items-center justify-between text-sm">
+                    <span className={`inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${OPT_IN_META[key].className}`} title={OPT_IN_META[key].hint}>{OPT_IN_META[key].label}</span>
+                    <span className="font-medium text-ink">{(audienceOptIn[key] || 0).toLocaleString("en-IN")}</span>
+                  </li>
+                ))}
+              </ul>
+              {pendingCount > 0 && !consentOpen && (
+                <button onClick={() => setConsentOpen(true)} className="mt-4 w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-100">
+                  I have WhatsApp consent from the {pendingCount.toLocaleString("en-IN")} pending lead(s)
+                </button>
+              )}
+              {consentOpen && (
+                <div className="mt-4 space-y-3 rounded-lg border border-amber-200 bg-amber-50/60 p-3">
+                  <div>
+                    <label className="text-xs font-medium text-ink-muted block mb-1">How did they give consent?</label>
+                    <select value={consentMethod} onChange={(e) => setConsentMethod(e.target.value)} className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm">
+                      <option value="">Choose…</option>
+                      {CONSENT_METHODS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </div>
+                  <input value={consentNote} onChange={(e) => setConsentNote(e.target.value)} maxLength={300} placeholder="Note (optional) e.g. Site-visit form, Oct 2026"
+                    className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm" />
+                  <label className="flex gap-2 text-xs text-ink">
+                    <input type="checkbox" className="mt-0.5" checked={consentAttested} onChange={(e) => setConsentAttested(e.target.checked)} />
+                    <span>I confirm these people clearly agreed to receive WhatsApp messages from my business and I can show proof if asked. This is recorded against my account.</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <button onClick={() => setConsentOpen(false)} disabled={consentBusy} className="btn btn-secondary text-sm">Cancel</button>
+                    <button onClick={handleConfirmConsent} disabled={!consentAttested || !consentMethod || consentBusy} className="btn btn-primary text-sm disabled:opacity-50">
+                      {consentBusy ? "Saving…" : "Confirm consent"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {(audienceOptIn.not_opted_in || 0) > 0 && (
+                <p className="mt-3 text-[11px] text-ink-muted">Leads from third-party lists can’t be sent WhatsApp marketing. Contact them by call, SMS or email, or let them message you first.</p>
+              )}
+            </div>
+          )}
 
           {/* Broadcast quota meter */}
           {quotaData?.quotas?.broadcastMessages && (
@@ -684,7 +772,7 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
               <Filter size={18} className="text-orange-500" />
               <h3 className="font-display font-bold text-base text-ink">Lead Filters</h3>
             </div>
-            <p className="text-xs text-ink-muted mb-4">Leave empty to send to all leads with WhatsApp numbers.</p>
+            <p className="text-xs text-ink-muted mb-4">Leave empty to include all leads. Only leads with WhatsApp permission will be messaged.</p>
             <div className="space-y-4">
               <FilterSelect label="Status" value={filterStatus} onChange={setFilterStatus} options={STATUS_OPTIONS} allLabel="All statuses" />
               <FilterSelect label="Source" value={filterSource} onChange={setFilterSource} options={SOURCE_OPTIONS} allLabel="All sources" />
