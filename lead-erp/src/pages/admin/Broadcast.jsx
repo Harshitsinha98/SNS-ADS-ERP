@@ -586,7 +586,7 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
                         {parameters.map((val, idx) => (
                           <input key={idx} value={val}
                             onChange={(e) => { const next = [...parameters]; next[idx] = e.target.value; setParameters(next); }}
-                            placeholder={`Value for {{${idx + 1}}}`}
+                            placeholder={`Value for {{${selectedTemplate?.parameterNames?.[idx] || idx + 1}}}`}
                             className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200" />
                         ))}
                       </div>

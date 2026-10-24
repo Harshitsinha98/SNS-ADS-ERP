@@ -92,10 +92,12 @@ export function LeadsProvider({ children }) {
       (err) => console.error("Follow-up tasks listener error:", err)
     );
 
-    // OPTIMIZATION: WhatsApp templates limited to available ones only.
-    // Most orgs have <50 templates; filtering server-side saves reads.
+    // Load the full synced catalog (orgs typically have <50 templates). Every
+    // send surface filters on `available`, while the Automation page must also
+    // show pending/rejected/unsupported templates so admins can see why a
+    // template is not ready instead of an empty list after sync.
     const unsubWhatsAppTemplates = onSnapshot(
-      query(orgCollection(orgId, "whatsappTemplates"), where("available", "==", true)),
+      orgCollection(orgId, "whatsappTemplates"),
       (snap) => setWhatsappTemplates(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
       (err) => console.error("WhatsApp templates listener error:", err)
     );
