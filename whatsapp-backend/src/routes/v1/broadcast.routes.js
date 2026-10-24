@@ -10,6 +10,8 @@ import { requireAuth } from "../../middleware/auth.js";
 import {
   createHandler,
   previewHandler,
+  consentHandler,
+  optOutHandler,
   listHandler,
   statusHandler,
   recipientsHandler,
@@ -23,6 +25,8 @@ export function createBroadcastRoutes() {
 
   router.post("/create", requireAuth, createHandler);
   router.post("/preview", requireAuth, previewHandler);
+  router.post("/consent", requireAuth, consentHandler);
+  router.post("/opt-out", requireAuth, optOutHandler);
   router.get("/list", requireAuth, listHandler);
   router.get("/status", requireAuth, statusHandler);
   router.get("/recipients", requireAuth, recipientsHandler);

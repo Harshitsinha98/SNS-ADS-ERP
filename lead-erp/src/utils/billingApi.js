@@ -145,3 +145,5 @@ export const getBroadcastRecipients = (broadcastId, status) => authedGet(`/api/b
 export const getBroadcastAnalytics = (orgId) => authedGet(`/api/broadcast/analytics?orgId=${encodeURIComponent(orgId)}`);
 export const retryBroadcast = (body) => authedPost("/api/broadcast/retry", body);
 export const cancelBroadcast = (body) => authedPost("/api/broadcast/cancel", body);
+export const confirmBroadcastConsent = (body) => authedPost("/api/broadcast/consent", body);
+export const markLeadsOptedOut = (body) => authedPost("/api/broadcast/opt-out", body);

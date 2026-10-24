@@ -23,6 +23,7 @@ import { handleBroadcastStatusReceipt, recordBroadcastReply } from "./broadcast.
 import { parseInteractiveReply } from "./whatsappInteractive.js";
 import { recordInboundConversation } from "./conversationIndexService.js";
 import { parseAdReferral, adLeadFields, adCampaignLabel } from "./adReferral.js";
+import { inboundEngagementFields } from "./optIn.js";
 
 // ─── Pending Queue ──────────────────────────────────────────────────
 
@@ -41,6 +42,21 @@ async function queuePendingWhatsAppMessage({ orgId, phone, name, requirement, pr
 }
 
 // ─── Lead Import ────────────────────────────────────────────────────
+
+/**
+ * WhatsApp delivers the sender as bare digits with country code
+ * ("919876543210"), but leads created by CSV import, website forms or manual
+ * entry are stored as "9876543210" or "+919876543210". Match every common
+ * spelling so a lead who replies on WhatsApp is recognised as the same person
+ * (instead of spawning a duplicate lead that never inherits their history or
+ * WhatsApp permission status).
+ */
+export function inboundPhoneVariants(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  const variants = new Set([String(phone || ""), digits, `+${digits}`]);
+  if (/^91[6-9]\d{9}$/.test(digits)) variants.add(digits.slice(2));
+  return [...variants].filter(Boolean);
+}
 
 async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, messageId = null, messageType = "text", messageTimestampMs = Date.now(), adReferral = null }) {
   if (!orgId) return { status: "error", reason: "org_not_resolved" };
@@ -63,7 +79,7 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
     ...(adReferral ? { referral: adReferral } : {}),
   };
 
-  const existing = await leadsRef.where("phone", "==", phone).limit(1).get();
+  const existing = await leadsRef.where("phone", "in", inboundPhoneVariants(phone)).limit(1).get();
   if (!existing.empty) {
     const leadRef = existing.docs[0].ref;
     await db.runTransaction(async (tx) => {
@@ -86,6 +102,9 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
         lastUpdated: receivedAt,
         lastWhatsAppInboundAt: new Date(latestTimestampMs).toISOString(),
         lastWhatsAppInboundAtMs: latestTimestampMs,
+        // The customer messaged us first: record the engagement (never
+        // overrides an explicit opt-in or opt-out).
+        ...(inboundEngagementFields(currentLead.data(), { viaAd: Boolean(adReferral) }) || {}),
         // Returning lead re-engaged through a Click-to-WhatsApp ad: keep the
         // original source but record the latest ad touch for attribution.
         ...(adReferral ? {
@@ -166,6 +185,7 @@ async function importWhatsAppLeadUnlocked({ phone, name, requirement, orgId, mes
       followUp: null,
       lastContactedAt: null,
       orgId,
+      ...inboundEngagementFields(null, { viaAd: Boolean(adReferral) }),
       ...adLeadFields(adReferral),
     });
     batch.create(leadRef.collection("messages").doc(safeDocId(providerMessageId)), inboundMessage);

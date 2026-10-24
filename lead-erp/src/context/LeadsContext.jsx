@@ -289,12 +289,16 @@ export function LeadsProvider({ children }) {
     return requestDeleteLead(id, { orgId: user.activeOrgId });
   };
 
-  const addBulkLeads = async (rows, assigner, importId) => {
+  // `consent` = { consentSource, consentDeclared, consentMethod, consentNote }:
+  // what the admin declares about WhatsApp permission for this file. The
+  // backend validates it and records it on every imported lead.
+  const addBulkLeads = async (rows, assigner, importId, consent = {}) => {
     if (!user?.activeOrgId) return 0;
     try {
       const result = await importBulkLeads({
         orgId: user.activeOrgId, rows, importId,
         assigner: assigner === "workload" ? "workload" : "round-robin",
+        ...consent,
       });
       return result.imported || 0;
     } catch (e) { console.error("Bulk import error:", e); throw e; }
