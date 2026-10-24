@@ -26,6 +26,7 @@
 
 import { getNextEmployeeRoundRobin, getNextEmployeeByWorkload } from "../../../utils/assignLead.js";
 import { nowIso, safeDocId, orgCollection } from "../helpers.js";
+import { templateBodyComponents } from "../../../whatsappTemplates.js";
 import { sendWorkflowEmail } from "./emailService.js";
 import { processWithAI } from "../ai/aiService.js";
 import { triggerAIResponse } from "../ai/aiWhatsAppBridge.js";
@@ -187,7 +188,7 @@ async function executeWhatsAppTemplate(db, orgId, params, ctx, helpers) {
         name: template.name,
         language: { code: template.language },
         ...(params.parameters?.length ? {
-          components: [{ type: "body", parameters: params.parameters.map((text) => ({ type: "text", text: resolveTemplate(text, lead) })) }],
+          components: templateBodyComponents(template, params.parameters.map((text) => resolveTemplate(text, lead))),
         } : {}),
       },
       biz_opaque_callback_data: clientMessageId,

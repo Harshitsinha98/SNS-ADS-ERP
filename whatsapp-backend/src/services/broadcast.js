@@ -24,6 +24,7 @@ import { logger } from "../middleware/logger.js";
 import { decryptWhatsAppToken, metaGraphRequest, isWhatsAppCredentialExpired, normalizeWhatsAppRecipient } from "./meta.js";
 import { nowIso, orgCollection } from "./helpers.js";
 import { checkQuota, consumeBroadcastMessages } from "../billing/quotaEnforcement.js";
+import { templateBodyComponents } from "../../whatsappTemplates.js";
 
 const BATCH_SIZE = 50;           // messages per batch
 const BATCH_DELAY_MS = 1200;     // delay between batches (~40 msgs/sec safe)
@@ -166,6 +167,8 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
     templateId,
     templateName: template.name,
     templateLanguage: template.language,
+    templateParameterFormat: template.parameterFormat || "POSITIONAL",
+    templateParameterNames: template.parameterNames || [],
     templateCategory: template.category || "MARKETING",
     parameters: parameters || [],
     filters: filters || null,
@@ -261,7 +264,10 @@ export async function processBroadcast(broadcastId) {
       name: broadcast.templateName,
       language: { code: broadcast.templateLanguage },
       ...(broadcast.parameters.length ? {
-        components: [{ type: "body", parameters: broadcast.parameters.map((text) => ({ type: "text", text })) }],
+        components: templateBodyComponents(
+          { parameterFormat: broadcast.templateParameterFormat, parameterNames: broadcast.templateParameterNames },
+          broadcast.parameters,
+        ),
       } : {}),
     },
   };

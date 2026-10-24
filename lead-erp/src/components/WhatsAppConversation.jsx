@@ -215,7 +215,7 @@ export default function WhatsAppConversation({ lead, showConversation = true }) 
           setTemplateParameters(next);
           setTemplateMessageId(null);
           saveTemplateDraft(templateId, next, null);
-        }} maxLength="1024" className="w-full rounded-lg border border-teal-200 bg-white p-2 text-sm" placeholder={`Value for {{${index + 1}}}`} />)}</div><button disabled={templateSending} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50">{templateSending ? <Loader2 size={15} className="animate-spin" /> : <SendHorizontal size={15} />}{templateSending ? "Sending…" : "Send approved template"}</button></>}
+        }} maxLength="1024" className="w-full rounded-lg border border-teal-200 bg-white p-2 text-sm" placeholder={`Value for {{${selectedTemplate?.parameterNames?.[index] || index + 1}}}`} />)}</div><button disabled={templateSending} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50">{templateSending ? <Loader2 size={15} className="animate-spin" /> : <SendHorizontal size={15} />}{templateSending ? "Sending…" : "Send approved template"}</button></>}
         {!approvedTemplates.length && <p className="mt-2 text-xs text-teal-800">No approved, supported templates are synced. An admin can sync them from Automation.</p>}
       </form>
     </div>

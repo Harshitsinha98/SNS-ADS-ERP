@@ -12,29 +12,67 @@ function normalizeRecipient(phone) {
   return /^\d{7,15}$/.test(digits) ? digits : null;
 }
 
-function bodyTemplateDetails(components) {
+const PLACEHOLDER = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
+
+function bodyTemplateDetails(components, parameterFormat) {
   const body = (components || []).find((component) => String(component?.type || "").toUpperCase() === "BODY") || {};
   const header = (components || []).find((component) => String(component?.type || "").toUpperCase() === "HEADER") || {};
   const text = String(body.text || "");
-  const placeholders = [...text.matchAll(/\{\{(\d+)\}\}/g)].map((match) => Number(match[1]));
-  const parameterCount = placeholders.length ? Math.max(...placeholders) : 0;
-  const ordered = placeholders.every((item, index) => item === index + 1);
-  const headerHasVariables = /\{\{\d+\}\}/.test(String(header.text || "")) || Boolean(header.format && header.format !== "TEXT");
-  const buttonsHaveVariables = (components || []).some((component) => String(component?.type || "").toUpperCase() === "BUTTONS" && /\{\{\d+\}\}/.test(JSON.stringify(component)));
+  // Unique placeholders in first-appearance order. A variable may legally be
+  // reused in the body (e.g. "Hi {{1}} ... thanks {{1}}"), so dedupe first.
+  const tokens = [...new Set([...text.matchAll(PLACEHOLDER)].map((match) => match[1]))];
+  const named = String(parameterFormat || "").toUpperCase() === "NAMED" || tokens.some((token) => !/^\d+$/.test(token));
+  let parameterCount = tokens.length;
+  let parameterNames = [];
+  let unsupportedReason = null;
+  if (named) {
+    parameterNames = tokens;
+    if (!tokens.every((token) => /^[a-z0-9_]+$/.test(token))) unsupportedReason = "Invalid named body variables";
+  } else if (tokens.length) {
+    const numbers = tokens.map(Number).sort((a, b) => a - b);
+    parameterCount = numbers[numbers.length - 1];
+    if (!numbers.every((item, index) => item === index + 1)) unsupportedReason = "Body variables are not sequential ({{1}}, {{2}}, …)";
+  }
+  const headerFormat = String(header.format || "").toUpperCase();
+  if (headerFormat && headerFormat !== "TEXT") unsupportedReason = `${headerFormat.toLowerCase()} header is not supported yet`;
+  else if (/\{\{[^}]+\}\}/.test(String(header.text || ""))) unsupportedReason = "Header variables are not supported yet";
+  const buttonsHaveVariables = (components || []).some((component) => String(component?.type || "").toUpperCase() === "BUTTONS"
+    && (component.buttons || []).some((button) => /\{\{[^}]+\}\}/.test(String(button?.url || "")) || String(button?.type || "").toUpperCase() === "COPY_CODE" || String(button?.type || "").toUpperCase() === "OTP" || String(button?.type || "").toUpperCase() === "FLOW"));
+  if (!unsupportedReason && buttonsHaveVariables) unsupportedReason = "Dynamic URL / copy-code / OTP / flow buttons are not supported yet";
   return {
     preview: text || "Approved WhatsApp template",
     parameterCount,
-    supported: ordered && !headerHasVariables && !buttonsHaveVariables,
+    parameterFormat: named ? "NAMED" : "POSITIONAL",
+    parameterNames,
+    supported: !unsupportedReason,
+    unsupportedReason,
   };
 }
 
+/** Build the Cloud API `components` array for a synced template's body. */
+export function templateBodyComponents(template, parameters) {
+  const values = Array.isArray(parameters) ? parameters : [];
+  if (!values.length) return undefined;
+  const names = template?.parameterFormat === "NAMED" ? template.parameterNames || [] : null;
+  return [{
+    type: "body",
+    parameters: values.map((text, index) => (names
+      ? { type: "text", parameter_name: names[index], text }
+      : { type: "text", text })),
+  }];
+}
+
 function renderPreview(template, parameters) {
+  const names = template.parameterFormat === "NAMED" ? template.parameterNames || [] : null;
   return String(template.preview || template.name || "WhatsApp template")
-    .replace(/\{\{(\d+)\}\}/g, (_, index) => parameters[Number(index) - 1] || "");
+    .replace(PLACEHOLDER, (match, token) => {
+      const index = names ? names.indexOf(token) : Number(token) - 1;
+      return index >= 0 ? parameters[index] || "" : match;
+    });
 }
 
 function normalizedTemplate(raw) {
-  const details = bodyTemplateDetails(raw.components);
+  const details = bodyTemplateDetails(raw.components, raw.parameter_format);
   return {
     metaTemplateId: String(raw.id || ""),
     name: String(raw.name || ""),
@@ -45,7 +83,10 @@ function normalizedTemplate(raw) {
     components: Array.isArray(raw.components) ? raw.components : [],
     preview: details.preview,
     parameterCount: details.parameterCount,
+    parameterFormat: details.parameterFormat,
+    parameterNames: details.parameterNames,
     supported: details.supported,
+    unsupportedReason: details.unsupportedReason,
     available: String(raw.status || "").toUpperCase() === "APPROVED" && details.supported,
   };
 }
@@ -85,7 +126,7 @@ export default function createWhatsAppTemplatesRouter(db, helpers) {
       }
       const credential = credentialSnap.data();
       const providerToken = decryptWhatsAppToken(credential.tokenCiphertext);
-      let page = await metaGraphRequest(`${credential.wabaId}/message_templates?limit=250&fields=id,name,language,status,category,components,quality_score`, {
+      let page = await metaGraphRequest(`${credential.wabaId}/message_templates?limit=250&fields=id,name,language,status,category,components,quality_score,parameter_format`, {
         token: providerToken,
       });
       const rawTemplates = [];
@@ -128,8 +169,13 @@ export default function createWhatsAppTemplatesRouter(db, helpers) {
       });
       return res.json({ ok: true, total: templates.length, available: templates.filter((template) => template.available).length });
     } catch (error) {
-      console.error("WhatsApp template sync failed:", error.message);
-      return res.status(error.status || 500).json({ error: error.message || "Could not sync WhatsApp templates" });
+      console.error("WhatsApp template sync failed:", error.message, error.providerCode || "", error.providerMessage || "");
+      // Surface Meta's reason (e.g. missing whatsapp_business_management
+      // permission, wrong WABA) so admins can act on it instead of a generic error.
+      const message = error.providerMessage
+        ? `Meta rejected the template sync: ${error.providerMessage}`
+        : error.message || "Could not sync WhatsApp templates";
+      return res.status(error.status || 500).json({ error: message, providerCode: error.providerCode });
     }
   });
 
@@ -239,7 +285,7 @@ export default function createWhatsAppTemplatesRouter(db, helpers) {
         template: {
           name: send.template.name,
           language: { code: send.template.language },
-          ...(parameters.length ? { components: [{ type: "body", parameters: parameters.map((text) => ({ type: "text", text })) }] } : {}),
+          ...(parameters.length ? { components: templateBodyComponents(send.template, parameters) } : {}),
         },
         biz_opaque_callback_data: clientMessageId,
       };
