@@ -25,6 +25,7 @@ export default function WhatsAppConversation({ lead, showConversation = true }) 
   const [templateSending, setTemplateSending] = useState(false);
   const [templateId, setTemplateId] = useState("");
   const [templateParameters, setTemplateParameters] = useState([]);
+  const [templateMediaUrl, setTemplateMediaUrl] = useState("");
   const [templateMessageId, setTemplateMessageId] = useState(null);
   const [error, setError] = useState("");
   const outboxStorageKey = orgId && lead?.id ? `codeskate:whatsapp-outbox:${orgId}:${lead.id}` : null;
@@ -116,6 +117,7 @@ export default function WhatsAppConversation({ lead, showConversation = true }) 
     const nextParameters = Array.from({ length: Number(template?.parameterCount || 0) }, () => "");
     setTemplateId(nextTemplateId);
     setTemplateParameters(nextParameters);
+    setTemplateMediaUrl("");
     setTemplateMessageId(null);
     saveTemplateDraft(nextTemplateId, nextParameters, null);
   };
@@ -126,6 +128,11 @@ export default function WhatsAppConversation({ lead, showConversation = true }) 
     const values = templateParameters.map((item) => item.trim());
     if (values.some((item) => !item)) {
       setError("Complete every template value before sending.");
+      return;
+    }
+    const mediaUrl = templateMediaUrl.trim();
+    if (selectedTemplate.requiresMedia && !mediaUrl) {
+      setError("Add the media URL for this template's header before sending.");
       return;
     }
     setTemplateSending(true);
@@ -140,8 +147,10 @@ export default function WhatsAppConversation({ lead, showConversation = true }) 
         templateId,
         parameters: values,
         clientMessageId: stableMessageId,
+        ...(selectedTemplate.requiresMedia ? { headerMediaUrl: mediaUrl } : {}),
       });
       setTemplateParameters(Array.from({ length: Number(selectedTemplate.parameterCount || 0) }, () => ""));
+      setTemplateMediaUrl("");
       setTemplateMessageId(null);
       saveTemplateDraft(templateId, Array.from({ length: Number(selectedTemplate.parameterCount || 0) }, () => ""), null);
     } catch (requestError) {
@@ -209,7 +218,7 @@ export default function WhatsAppConversation({ lead, showConversation = true }) 
           <option value="">Select a Meta-approved template</option>
           {approvedTemplates.map((template) => <option key={template.id} value={template.id}>{template.name} · {template.language}</option>)}
         </select>
-        {selectedTemplate && <><p className="mt-2 rounded-md bg-white/80 p-2 text-xs text-teal-900">{selectedTemplate.preview}</p><div className="mt-2 space-y-2">{templateParameters.map((value, index) => <input key={index} value={value} onChange={(event) => {
+        {selectedTemplate && <><p className="mt-2 rounded-md bg-white/80 p-2 text-xs text-teal-900">{selectedTemplate.preview}</p>{selectedTemplate.requiresMedia && <div className="mt-2"><label className="text-[11px] font-medium text-teal-800">{String(selectedTemplate.headerFormat || "IMAGE").toLowerCase()} header URL (https)</label><input value={templateMediaUrl} onChange={(event) => setTemplateMediaUrl(event.target.value)} type="url" placeholder={`https://… public ${String(selectedTemplate.headerFormat || "image").toLowerCase()} URL`} className="mt-1 w-full rounded-lg border border-teal-200 bg-white p-2 text-sm" /></div>}<div className="mt-2 space-y-2">{templateParameters.map((value, index) => <input key={index} value={value} onChange={(event) => {
           const next = [...templateParameters];
           next[index] = event.target.value;
           setTemplateParameters(next);

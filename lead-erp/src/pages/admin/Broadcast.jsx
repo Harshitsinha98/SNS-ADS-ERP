@@ -425,6 +425,7 @@ function KpiCard({ icon: Icon, label, value, color, sub, benchmark, higherIsBett
 function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
   const [templateId, setTemplateId] = useState("");
   const [parameters, setParameters] = useState([]);
+  const [headerMediaUrl, setHeaderMediaUrl] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [filterSource, setFilterSource] = useState("");
   const [filterAssigned, setFilterAssigned] = useState("");
@@ -465,6 +466,7 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
     setTemplateId(id);
     const t = approvedTemplates.find((tpl) => tpl.id === id);
     setParameters(Array.from({ length: t?.parameterCount || 0 }, () => ""));
+    setHeaderMediaUrl("");
   };
 
   // Debounced audience preview whenever filters change
@@ -499,6 +501,10 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
       setMsg({ type: "error", text: "Fill all template parameter values." });
       return;
     }
+    if (selectedTemplate?.requiresMedia && !headerMediaUrl.trim()) {
+      setMsg({ type: "error", text: "Add the media URL for this template's header." });
+      return;
+    }
     let scheduledAtMs = null;
     if (scheduleMode === "later") {
       if (!scheduleAt) { setMsg({ type: "error", text: "Pick a date & time to schedule." }); return; }
@@ -516,6 +522,7 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
         filters: buildFilters(),
         name: broadcastName || undefined,
         scheduledAtMs,
+        ...(selectedTemplate?.requiresMedia ? { headerMediaUrl: headerMediaUrl.trim() } : {}),
       });
       setMsg({
         type: "success",
@@ -523,7 +530,7 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
           ? `Broadcast scheduled for ${fmtDate(result.scheduledAtMs)} — ${result.totalRecipients} leads.`
           : `Broadcast started! Sending to ${result.totalRecipients} leads...`,
       });
-      setBroadcastName(""); setTemplateId(""); setParameters([]);
+      setBroadcastName(""); setTemplateId(""); setParameters([]); setHeaderMediaUrl("");
       setFilterStatus(""); setFilterSource(""); setFilterAssigned("");
       setScheduleMode("now"); setScheduleAt("");
       setTimeout(onSent, 1500);
@@ -580,6 +587,15 @@ function CreateView({ orgId, user, whatsappTemplates, users, onSent }) {
                       <p className="text-xs text-teal-700 font-medium mb-1 flex items-center gap-1"><Eye size={12} /> Preview</p>
                       <p className="text-sm text-teal-900">{selectedTemplate.preview}</p>
                     </div>
+                    {selectedTemplate.requiresMedia && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-ink-muted">{String(selectedTemplate.headerFormat || "IMAGE").toLowerCase()} header URL (https) — same media is sent to every recipient</p>
+                        <input value={headerMediaUrl} type="url"
+                          onChange={(e) => setHeaderMediaUrl(e.target.value)}
+                          placeholder={`https://… public ${String(selectedTemplate.headerFormat || "image").toLowerCase()} URL`}
+                          className="w-full rounded-lg border border-cream-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-200" />
+                      </div>
+                    )}
                     {selectedTemplate.parameterCount > 0 && (
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-ink-muted">Template Parameters</p>

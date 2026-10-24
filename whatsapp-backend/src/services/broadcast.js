@@ -24,7 +24,7 @@ import { logger } from "../middleware/logger.js";
 import { decryptWhatsAppToken, metaGraphRequest, isWhatsAppCredentialExpired, normalizeWhatsAppRecipient } from "./meta.js";
 import { nowIso, orgCollection } from "./helpers.js";
 import { checkQuota, consumeBroadcastMessages } from "../billing/quotaEnforcement.js";
-import { templateBodyComponents } from "../../whatsappTemplates.js";
+import { templateComponents, validateHeaderMediaUrl } from "../../whatsappTemplates.js";
 
 const BATCH_SIZE = 50;           // messages per batch
 const BATCH_DELAY_MS = 1200;     // delay between batches (~40 msgs/sec safe)
@@ -115,7 +115,7 @@ async function loadValidTemplate(orgId, templateId, parameters) {
 // ─────────────────────────────────────────────────────────────────────────────
 // CREATE BROADCAST (immediate or scheduled)
 // ─────────────────────────────────────────────────────────────────────────────
-export async function createBroadcast({ orgId, uid, templateId, parameters, filters, leadIds, name, scheduledAtMs }) {
+export async function createBroadcast({ orgId, uid, templateId, parameters, filters, leadIds, name, scheduledAtMs, headerMediaUrl, headerMediaFilename }) {
   // 1. Validate WhatsApp connection
   const credSnap = await db.collection("whatsappCredentials").doc(orgId).get();
   if (!credSnap.exists || credSnap.data().connectionState !== "connected") {
@@ -127,6 +127,17 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
 
   // 2. Validate template
   const template = await loadValidTemplate(orgId, templateId, parameters);
+
+  // 2.5. Validate media header (same media is sent to every recipient)
+  let headerMedia = null;
+  if (template.requiresMedia) {
+    const check = validateHeaderMediaUrl(headerMediaUrl);
+    if (!check.ok) throw Object.assign(new Error(check.error), { status: 400 });
+    headerMedia = { url: check.url };
+    if (String(template.headerFormat).toUpperCase() === "DOCUMENT" && headerMediaFilename) {
+      headerMedia.filename = String(headerMediaFilename).trim().slice(0, 240);
+    }
+  }
 
   // 3. Resolve leads
   let leads = await resolveLeads(orgId, { leadIds, filters });
@@ -169,6 +180,9 @@ export async function createBroadcast({ orgId, uid, templateId, parameters, filt
     templateLanguage: template.language,
     templateParameterFormat: template.parameterFormat || "POSITIONAL",
     templateParameterNames: template.parameterNames || [],
+    templateHeaderFormat: template.headerFormat || "NONE",
+    templateRequiresMedia: template.requiresMedia || false,
+    headerMedia: headerMedia || null,
     templateCategory: template.category || "MARKETING",
     parameters: parameters || [],
     filters: filters || null,
@@ -257,18 +271,23 @@ export async function processBroadcast(broadcastId) {
   const token = decryptWhatsAppToken(credential.tokenCiphertext);
   const phoneNumberId = credential.phoneNumberId;
 
+  const broadcastComponents = templateComponents(
+    {
+      parameterFormat: broadcast.templateParameterFormat,
+      parameterNames: broadcast.templateParameterNames,
+      headerFormat: broadcast.templateHeaderFormat,
+      requiresMedia: broadcast.templateRequiresMedia,
+    },
+    broadcast.parameters,
+    broadcast.headerMedia || null,
+  );
   const templateBase = {
     messaging_product: "whatsapp",
     type: "template",
     template: {
       name: broadcast.templateName,
       language: { code: broadcast.templateLanguage },
-      ...(broadcast.parameters.length ? {
-        components: templateBodyComponents(
-          { parameterFormat: broadcast.templateParameterFormat, parameterNames: broadcast.templateParameterNames },
-          broadcast.parameters,
-        ),
-      } : {}),
+      ...(broadcastComponents ? { components: broadcastComponents } : {}),
     },
   };
 

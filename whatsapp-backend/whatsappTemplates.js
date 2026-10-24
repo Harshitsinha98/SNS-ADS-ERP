@@ -33,9 +33,19 @@ function bodyTemplateDetails(components, parameterFormat) {
     parameterCount = numbers[numbers.length - 1];
     if (!numbers.every((item, index) => item === index + 1)) unsupportedReason = "Body variables are not sequential ({{1}}, {{2}}, …)";
   }
-  const headerFormat = String(header.format || "").toUpperCase();
-  if (headerFormat && headerFormat !== "TEXT") unsupportedReason = `${headerFormat.toLowerCase()} header is not supported yet`;
-  else if (/\{\{[^}]+\}\}/.test(String(header.text || ""))) unsupportedReason = "Header variables are not supported yet";
+  // Header handling. A TEXT header with no variables needs nothing extra.
+  // IMAGE / VIDEO / DOCUMENT headers are supported: the sender supplies a
+  // public media URL at send time. A TEXT header that contains a variable is
+  // still unsupported (we'd need a separate header parameter UI for it).
+  const headerFormat = String(header.format || "").toUpperCase() || (header.text ? "TEXT" : "");
+  const MEDIA_HEADERS = new Set(["IMAGE", "VIDEO", "DOCUMENT"]);
+  const requiresMedia = MEDIA_HEADERS.has(headerFormat);
+  if (headerFormat === "TEXT" && /\{\{[^}]+\}\}/.test(String(header.text || ""))) {
+    unsupportedReason = "Header variables are not supported yet";
+  } else if (headerFormat && headerFormat !== "TEXT" && !requiresMedia) {
+    // e.g. LOCATION headers
+    unsupportedReason = `${headerFormat.toLowerCase()} header is not supported yet`;
+  }
   const buttonsHaveVariables = (components || []).some((component) => String(component?.type || "").toUpperCase() === "BUTTONS"
     && (component.buttons || []).some((button) => /\{\{[^}]+\}\}/.test(String(button?.url || "")) || String(button?.type || "").toUpperCase() === "COPY_CODE" || String(button?.type || "").toUpperCase() === "OTP" || String(button?.type || "").toUpperCase() === "FLOW"));
   if (!unsupportedReason && buttonsHaveVariables) unsupportedReason = "Dynamic URL / copy-code / OTP / flow buttons are not supported yet";
@@ -44,22 +54,59 @@ function bodyTemplateDetails(components, parameterFormat) {
     parameterCount,
     parameterFormat: named ? "NAMED" : "POSITIONAL",
     parameterNames,
+    headerFormat: headerFormat || "NONE",
+    requiresMedia,
     supported: !unsupportedReason,
     unsupportedReason,
   };
 }
 
-/** Build the Cloud API `components` array for a synced template's body. */
-export function templateBodyComponents(template, parameters) {
+// Reasonable upper bound so a stored URL can't blow past Firestore/Meta limits.
+const MAX_MEDIA_URL_LENGTH = 2048;
+
+/** Validate a sender-supplied media URL for a media-header template. */
+export function validateHeaderMediaUrl(url) {
+  const value = String(url || "").trim();
+  if (!value) return { ok: false, error: "This template needs a media URL for its header" };
+  if (value.length > MAX_MEDIA_URL_LENGTH) return { ok: false, error: "Media URL is too long" };
+  let parsed;
+  try { parsed = new URL(value); } catch { return { ok: false, error: "Enter a valid media URL (https://…)" }; }
+  if (parsed.protocol !== "https:") return { ok: false, error: "Media URL must start with https://" };
+  return { ok: true, url: value };
+}
+
+const HEADER_MEDIA_KEY = { IMAGE: "image", VIDEO: "video", DOCUMENT: "document" };
+
+/**
+ * Build the Cloud API `components` array for a synced template, covering both
+ * the media header (when the template requires one) and body variables.
+ * `media` is { url, filename? } and is only used for media-header templates.
+ */
+export function templateComponents(template, parameters, media = null) {
+  const components = [];
+  const headerFormat = String(template?.headerFormat || "").toUpperCase();
+  const mediaKey = HEADER_MEDIA_KEY[headerFormat];
+  if (template?.requiresMedia && mediaKey && media?.url) {
+    const payload = { link: media.url };
+    if (headerFormat === "DOCUMENT" && media.filename) payload.filename = media.filename;
+    components.push({ type: "header", parameters: [{ type: mediaKey, [mediaKey]: payload }] });
+  }
   const values = Array.isArray(parameters) ? parameters : [];
-  if (!values.length) return undefined;
-  const names = template?.parameterFormat === "NAMED" ? template.parameterNames || [] : null;
-  return [{
-    type: "body",
-    parameters: values.map((text, index) => (names
-      ? { type: "text", parameter_name: names[index], text }
-      : { type: "text", text })),
-  }];
+  if (values.length) {
+    const names = template?.parameterFormat === "NAMED" ? template.parameterNames || [] : null;
+    components.push({
+      type: "body",
+      parameters: values.map((text, index) => (names
+        ? { type: "text", parameter_name: names[index], text }
+        : { type: "text", text })),
+    });
+  }
+  return components.length ? components : undefined;
+}
+
+/** Back-compat wrapper: body-only components. */
+export function templateBodyComponents(template, parameters) {
+  return templateComponents(template, parameters, null);
 }
 
 function renderPreview(template, parameters) {
@@ -85,6 +132,8 @@ function normalizedTemplate(raw) {
     parameterCount: details.parameterCount,
     parameterFormat: details.parameterFormat,
     parameterNames: details.parameterNames,
+    headerFormat: details.headerFormat,
+    requiresMedia: details.requiresMedia,
     supported: details.supported,
     unsupportedReason: details.unsupportedReason,
     available: String(raw.status || "").toUpperCase() === "APPROVED" && details.supported,
@@ -185,6 +234,8 @@ export default function createWhatsAppTemplatesRouter(db, helpers) {
     const templateId = safeDocId(req.body?.templateId || "");
     const clientMessageId = safeDocId(req.body?.clientMessageId || "");
     const parameters = Array.isArray(req.body?.parameters) ? req.body.parameters.map((item) => String(item || "").trim()) : [];
+    const headerMediaUrl = String(req.body?.headerMediaUrl || "").trim();
+    const headerMediaFilename = String(req.body?.headerMediaFilename || "").trim().slice(0, 240);
     let messageRef = null;
     let intentRef = null;
     let dispatchRef = null;
@@ -227,13 +278,22 @@ export default function createWhatsAppTemplatesRouter(db, helpers) {
         if (parameters.length !== Number(template.parameterCount || 0)) {
           throw Object.assign(new Error(`This template needs ${Number(template.parameterCount || 0)} value(s)`), { status: 400 });
         }
+        let media = null;
+        if (template.requiresMedia) {
+          const check = validateHeaderMediaUrl(headerMediaUrl);
+          if (!check.ok) throw Object.assign(new Error(check.error), { status: 400 });
+          media = { url: check.url };
+          if (String(template.headerFormat).toUpperCase() === "DOCUMENT" && headerMediaFilename) media.filename = headerMediaFilename;
+        }
         const recipient = normalizeRecipient(lead.phone);
         if (!recipient) throw Object.assign(new Error("This lead does not have a valid WhatsApp number"), { status: 400 });
         const text = renderPreview(template, parameters);
 
         if (existingMessage.exists) {
           const prior = existingMessage.data();
-          if (prior.direction !== "outbound" || prior.type !== "template" || prior.templateId !== templateId || JSON.stringify(prior.templateParameters || []) !== JSON.stringify(parameters)) {
+          if (prior.direction !== "outbound" || prior.type !== "template" || prior.templateId !== templateId
+            || JSON.stringify(prior.templateParameters || []) !== JSON.stringify(parameters)
+            || (prior.headerMediaUrl || "") !== headerMediaUrl) {
             throw Object.assign(new Error("Message ID cannot be reused for different template content"), { status: 409 });
           }
           if (prior.status === "sent") return { replay: true, providerMessageId: prior.providerMessageId || null };
@@ -244,7 +304,7 @@ export default function createWhatsAppTemplatesRouter(db, helpers) {
           }
         }
 
-        const intentId = crypto.createHash("sha256").update(`${orgId}|${leadId}|${recipient}|template|${templateId}|${JSON.stringify(parameters)}`).digest("hex");
+        const intentId = crypto.createHash("sha256").update(`${orgId}|${leadId}|${recipient}|template|${templateId}|${JSON.stringify(parameters)}|${media?.url || ""}`).digest("hex");
         intentRef = db.collection("whatsappOutboundIntents").doc(intentId);
         const priorIntent = await tx.get(intentRef);
         if (priorIntent.exists) {
@@ -253,8 +313,8 @@ export default function createWhatsAppTemplatesRouter(db, helpers) {
           if (data.status === "processing" && data.clientMessageId !== clientMessageId) throw Object.assign(new Error("An equivalent WhatsApp template is already being sent"), { status: 409 });
         }
         dispatchRef = db.collection("whatsappOutboundDispatches").doc(clientMessageId);
-        tx.set(intentRef, { orgId, leadId, recipient, text, clientMessageId, templateId, parameters, kind: "template", status: "processing", processingStartedAt: nowIso(), processingStartedAtMs: Date.now() }, { merge: true });
-        tx.set(dispatchRef, { orgId, leadId, recipient, text, intentId, clientMessageId, templateId, parameters, kind: "template", status: "processing", createdAt: nowIso(), createdAtMs: Date.now() }, { merge: true });
+        tx.set(intentRef, { orgId, leadId, recipient, text, clientMessageId, templateId, parameters, headerMedia: media, kind: "template", status: "processing", processingStartedAt: nowIso(), processingStartedAtMs: Date.now() }, { merge: true });
+        tx.set(dispatchRef, { orgId, leadId, recipient, text, intentId, clientMessageId, templateId, parameters, headerMedia: media, kind: "template", status: "processing", createdAt: nowIso(), createdAtMs: Date.now() }, { merge: true });
         tx.set(messageRef, {
           direction: "outbound",
           type: "template",
@@ -264,6 +324,8 @@ export default function createWhatsAppTemplatesRouter(db, helpers) {
           templateName: template.name,
           templateLanguage: template.language,
           templateParameters: parameters,
+          headerMediaUrl: media?.url || null,
+          headerMediaFilename: media?.filename || null,
           status: "processing",
           at: nowIso(),
           atMs: Date.now(),
@@ -272,7 +334,7 @@ export default function createWhatsAppTemplatesRouter(db, helpers) {
           senderUid: req.authUser.uid,
           senderName: req.authUser.name || req.authUser.phone_number || "CRM user",
         }, { merge: true });
-        return { credential: credentialSnap.data(), template, recipient, replay: false };
+        return { credential: credentialSnap.data(), template, recipient, media, replay: false };
       });
       if (send.reconciliation) return res.status(409).json({ error: "Template delivery is being reconciled; do not send it again", code: "delivery_indeterminate" });
       if (send.replay) return res.json({ ok: true, replay: true, messageId: clientMessageId, providerMessageId: send.providerMessageId });
@@ -285,7 +347,7 @@ export default function createWhatsAppTemplatesRouter(db, helpers) {
         template: {
           name: send.template.name,
           language: { code: send.template.language },
-          ...(parameters.length ? { components: templateBodyComponents(send.template, parameters) } : {}),
+          ...(templateComponents(send.template, parameters, send.media) ? { components: templateComponents(send.template, parameters, send.media) } : {}),
         },
         biz_opaque_callback_data: clientMessageId,
       };
