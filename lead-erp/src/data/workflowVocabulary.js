@@ -121,6 +121,7 @@ export const ACTIONS = [
     fields: [
       { name: "templateId", label: "Template", type: "whatsapp-template-select" },
       { name: "parameters", label: "Template parameters (comma-separated, supports {{field}})", type: "tags", placeholder: "e.g. {{name}}, {{city}}" },
+      { name: "headerMediaUrl", label: "Media header URL (only for image/video/document templates)", type: "text", placeholder: "https://… public media URL" },
     ],
   },
   {

@@ -35,7 +35,7 @@ async function requireAdmin(req, orgId, res) {
 
 export async function createHandler(req, res) {
   try {
-    const { orgId, templateId, parameters, filters, leadIds, name, scheduledAtMs } = req.body || {};
+    const { orgId, templateId, parameters, filters, leadIds, name, scheduledAtMs, headerMediaUrl, headerMediaFilename } = req.body || {};
     if (!(await requireAdmin(req, orgId, res))) return;
     if (!templateId) return res.status(400).json({ error: "templateId is required" });
 
@@ -48,6 +48,8 @@ export async function createHandler(req, res) {
       leadIds: leadIds || null,
       name: name || "",
       scheduledAtMs: scheduledAtMs || null,
+      headerMediaUrl: headerMediaUrl || "",
+      headerMediaFilename: headerMediaFilename || "",
     });
     return res.json({ ok: true, ...result });
   } catch (e) {

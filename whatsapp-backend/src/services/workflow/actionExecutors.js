@@ -26,7 +26,7 @@
 
 import { getNextEmployeeRoundRobin, getNextEmployeeByWorkload } from "../../../utils/assignLead.js";
 import { nowIso, safeDocId, orgCollection } from "../helpers.js";
-import { templateBodyComponents } from "../../../whatsappTemplates.js";
+import { templateComponents, validateHeaderMediaUrl } from "../../../whatsappTemplates.js";
 import { sendWorkflowEmail } from "./emailService.js";
 import { processWithAI } from "../ai/aiService.js";
 import { triggerAIResponse } from "../ai/aiWhatsAppBridge.js";
@@ -175,6 +175,22 @@ async function executeWhatsAppTemplate(db, orgId, params, ctx, helpers) {
   const recipient = String(lead.phone || "").replace(/\D/g, "");
   if (!/^\d{7,15}$/.test(recipient)) return actionError("Lead has no valid WhatsApp number");
 
+  // Media-header templates need a public media URL configured on the action.
+  let workflowMedia = null;
+  if (template.requiresMedia) {
+    const check = validateHeaderMediaUrl(params.headerMediaUrl);
+    if (!check.ok) return actionError(`Configure a media URL for this template: ${check.error}`);
+    workflowMedia = { url: check.url };
+    if (String(template.headerFormat).toUpperCase() === "DOCUMENT" && params.headerMediaFilename) {
+      workflowMedia.filename = String(params.headerMediaFilename).trim().slice(0, 240);
+    }
+  }
+  const workflowTemplateComponents = templateComponents(
+    template,
+    (params.parameters || []).map((text) => resolveTemplate(text, lead)),
+    workflowMedia,
+  );
+
   const clientMessageId = safeDocId(`${ctx.dedupeKey}_${params.templateId}`);
   const messageRef = leadRef.collection("messages").doc(clientMessageId);
   const provider = await helpers.metaGraphRequest(`${credential.phoneNumberId}/messages`, {
@@ -187,9 +203,7 @@ async function executeWhatsAppTemplate(db, orgId, params, ctx, helpers) {
       template: {
         name: template.name,
         language: { code: template.language },
-        ...(params.parameters?.length ? {
-          components: templateBodyComponents(template, params.parameters.map((text) => resolveTemplate(text, lead))),
-        } : {}),
+        ...(workflowTemplateComponents ? { components: workflowTemplateComponents } : {}),
       },
       biz_opaque_callback_data: clientMessageId,
     },
